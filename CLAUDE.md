@@ -34,8 +34,8 @@
 - [ ] 开发电脑安装 SQL Server Express + SSMS（进行中）
 - [ ] 还原为 `GPiS_Dev`
 - [ ] 跑统计查询 A、B，回答 `docs/gpis-database.md` 第 6 节的问题
-- [x] 诊所已回答 W1、W2、W3、W5、W7（营业日、每格人数、1 hour、改期、Denture 步骤）
-- [ ] 向诊所确认 `docs/clinic-workflow.md` 第 7 节其余问题（W4、W6、W8–W16）
+- [x] 诊所已回答 W1–W3、W5、W7、W13–W16（营业日、假期、每格人数、第 3 人疗程、1 hour、改期、Denture 步骤）
+- [ ] 向诊所确认 `docs/clinic-workflow.md` 第 7 节其余问题（W4、W6、W8–W12、W17）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步

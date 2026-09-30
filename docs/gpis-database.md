@@ -81,7 +81,7 @@
 - **`Tbl_CAH_RefAppointmentStatus`**：`Waiting`、`Canceled`、`Postpone`、`Closed`、`Rearrange`、`Confirmed`
 - **`Qry_CAH_Resource_Sch`（医生）**：`PHANG`、`GOH`、`DOCTOR`（`DOCTOR` 疑似"不指定医生"的通用账号）
 
-- **营业时间**：GPiS 里没有，由诊所提供：9:00–17:00，最后预约 16:30，星期六、日营业，马来西亚公共假期休息；医生排班、午休见 [`clinic-workflow.md`](clinic-workflow.md) 第 1 节。
+- **营业时间**：GPiS 里没有，由诊所提供：9:00–17:00，最后预约 16:30，星期六、日营业（和平日一样），全国 + Johor 公共假期休息；医生排班、午休见 [`clinic-workflow.md`](clinic-workflow.md) 第 1 节。
 
 ### 状态是否占用时段（按 staff 实际用法，待统计验证）
 
@@ -151,10 +151,10 @@ BACKUP DATABASE GPiS TO DISK='D:\GPiS_Backup\GPiS_copy.bak' WITH COPY_ONLY, INIT
 | # | 问题 | 目前所知（2026-09-30） | 验证方式 |
 |---|---|---|---|
 | Q1 | 各状态实际使用多少？哪些占用时段？ | staff：主要用 `Confirmed` / `Closed` / `Canceled` | 统计 A |
-| Q2 | `Duration` 的格式？一个预约会占多个 30 分钟格吗？ | 会。staff 在 Remarks 写 `1 hour`，该病人独占这一格和下一格；`Duration` 字段可能没用 | 统计 A、B5 |
+| Q2 | `Duration` 的格式？一个预约会占多个 30 分钟格吗？ | 会。staff 在 Remarks 写 `1 hour`，该病人独占这一格和下一格（RCT、IMPLANT、SCAN B、VENEER 等）；`Duration` 字段可能没用 | 统计 A、B5 |
 | Q3 | `AppointmentDate` 只有日期还是带时间？ | — | 统计 A |
 | Q4 | 诊所实际营业时间？ | ✅ 9:00–17:00，最后预约 16:30；星期六、日营业，公共假期休息（诊所提供） | 统计 B1、B2 核对 |
-| Q5 | 同一医生、同一时段是否允许多个预约？ | ✅ 允许，一般 2 人，视疗程可到 3 人；相邻两格不能都是 3 人 | 统计 B3 看分布 |
+| Q5 | 同一医生、同一时段是否允许多个预约？ | ✅ 允许，一般 2 人；第 3 人只限 `OR`、`S+P`、`F`、`RETAINER`；相邻两格不能都是 3 人 | 统计 B3 看分布 |
 | Q6 | 数据是否仍在使用（最新预约日期）？ | ✅ 仍在使用（2026-09-30 有预约） | — |
 | Q7 | `DOCTOR` 资源代表什么？ | — | 询问诊所 |
 | Q8 | GPiS 如何产生新的 `AppointmentID`？ | 诊所说员工不会 `Delete`，改期是 `Edit` 原记录（`AppointmentID` 不变） | 在 `GPiS_Dev` 上观察，或用 SQL Profiler 看 GPiS 发出的 SQL；B9 若空洞很多，说明编号方式不是 MAX+1 或有其他删除来源 |
