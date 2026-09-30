@@ -59,14 +59,16 @@ customers             id, name, phone, gpis_contact_id (nullable), created_at
 conversations         id, customer_id, mode (BOT / HUMAN / CLOSED), assigned_staff_id, created_at
 messages              id, conversation_id, direction (IN / OUT), sender (CUSTOMER / BOT / STAFF), body, wa_message_id, created_at
 appointment_requests  id, customer_id, conversation_id, service, preferred_date, preferred_slot, doctor_id,
-                      status (PENDING / CONFIRMED / REJECTED / CANCELLED), handled_by, created_at
+                      status (PENDING / CONFIRMED / REJECTED / CANCELLED), handled_by,
+                      gpis_appointment_id (nullable，员工录入 GPiS 后填上；改期时 ID 不变), created_at
 staff                 id, name, role, password_hash, created_at
 
 -- 诊所设置（GPiS 没有，由本系统配置，员工可在 Admin Platform 修改）
 doctors               id (= GPiS DoctorID), display_name, remark_tag ('P' / 'G'), active
 doctor_schedules      doctor_id, weekday (1=一 … 7=日), is_working, start_time, last_slot, break_start, break_end
-clinic_closures       date, reason                         -- 公共假期、诊所休息日
-settings              max_per_slot_for_ai（默认 2）等
+clinic_closures       date, reason                         -- 马来西亚公共假期、诊所休息日
+                                                           -- 可用程序预填（如 Python `holidays` 套件），员工再核对
+settings              max_per_slot（默认 3）、max_per_slot_for_ai（默认 2）等
 ```
 
 `appointment_requests.service` 使用 GPiS Remarks 的同一套治疗代码（`C/UP`、`S+P`、`OR` …，见 [`clinic-workflow.md`](clinic-workflow.md) 第 6 节），员工录入 GPiS 时可以直接照抄。
@@ -93,12 +95,16 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
      - TimeSlot = '00:00'（提醒 / 未定时间）
      - Status 为 Canceled 或 Postpone
 4. 有"占位记录"（联系人是诊所本身）→ 这天整天标记 NEEDS_REVIEW，AI 不自动推荐，转员工
-5. 每格已占人数 = 该格的预约数
-   前一格有"1 hour"预约（Remarks 关键字，写法见统计 B5）→ 这一格整格封锁
-6. 可用 = 未封锁 且 已占人数 < max_per_slot_for_ai
+5. 1 hour 预约独占两格（Remarks 关键字，写法见统计 B5）：
+   这一格或前一格有 1 hour 预约 → 这一格整格封锁
+6. 每格上限 = max_per_slot（3）；前一格或后一格已有 3 人 → 这一格上限 2（相邻两格不能都是 3 人）
+   AI 上限 = min(每格上限, max_per_slot_for_ai)
+7. 可用 = 未封锁 且 已占人数 < AI 上限
 ```
 
-AI 自己只推荐 30 分钟的一般预约；病人需要 1 小时或属于多步骤疗程的，交给员工安排。
+- 第 3 个名额由疗程决定，AI 默认只用到 2 人，第 3 个名额留给员工判断（等 W15 确认哪些疗程可以当第 3 人后再放开）。
+- 要排 1 hour 预约，这一格和下一格都必须是 0 人。
+- AI 自己只推荐 30 分钟的一般预约；病人需要 1 小时或属于多步骤疗程的，交给员工安排。
 
 ## 5. 人工介入设计
 
@@ -129,6 +135,6 @@ AI 自己只推荐 30 分钟的一般预约；病人需要 1 小时或属于多�
 | A1 | **主机不在公网**：云端 Backend 如何读取主机上的 GPiS？候选：诊所本地放一个同步小程序，定时把空档（不含病人资料）推送到云端 |
 | A2 | AI 自主程度：只收集需求 / 推荐空档由员工一键批准 / 空档明确时自动确认？ |
 | A3 | 员工在哪里介入：只用网页 Admin Platform，还是也要手机？ |
-| A4 | 各服务的时长（洗牙、补牙、根管等）？治疗代码已整理（`clinic-workflow.md` 第 6 节），哪些需要 1 小时仍待确认（W3） |
+| A4 | 各服务的时长（洗牙、补牙、根管等）？治疗代码已整理（`clinic-workflow.md` 第 6 节），哪些需要 1 小时仍待确认（W16） |
 | A5 | 是否已获得诊所 / GPiS 开发商对这种数据使用方式的书面同意？ |
 | A6 | 项目性质（学习 / 毕业项目 / 正式上线）、时间与预算（LLM、WhatsApp API 费用）？ |

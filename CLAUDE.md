@@ -34,7 +34,8 @@
 - [ ] 开发电脑安装 SQL Server Express + SSMS（进行中）
 - [ ] 还原为 `GPiS_Dev`
 - [ ] 跑统计查询 A、B，回答 `docs/gpis-database.md` 第 6 节的问题
-- [ ] 向诊所确认 `docs/clinic-workflow.md` 第 7 节的问题（W1–W12）
+- [x] 诊所已回答 W1、W2、W3、W5、W7（营业日、每格人数、1 hour、改期、Denture 步骤）
+- [ ] 向诊所确认 `docs/clinic-workflow.md` 第 7 节其余问题（W4、W6、W8–W16）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
@@ -42,5 +43,5 @@
 1. 在 SSMS 中还原：右键 Databases → Restore Database → Device 选 `D:\GPiS\GPiS_copy.bak` → Destination 改为 `GPiS_Dev` → Files 勾选 *Relocate all files to folder* → OK。
 2. 验证：`sqlcmd -S .\SQLEXPRESS -E -d GPiS_Dev -Q "SELECT COUNT(*) FROM Tbl_CAH_Appointment"`
 3. 跑 `docs/gpis-database.md` 里的**统计查询 A 和 B**，把结果记录回该文件。
-4. 向诊所确认 `docs/clinic-workflow.md` 第 7 节的问题。
+4. 向诊所确认 `docs/clinic-workflow.md` 第 7 节"待确认"的问题。
 5. 按 `docs/architecture.md` 的"空档计算规则"，写出"查某天某医生空档"的 SQL（开发路线 Phase 1）。
