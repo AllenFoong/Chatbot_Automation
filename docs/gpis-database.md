@@ -90,7 +90,7 @@
 | 状态 | 含义 | 占用时段？ |
 |---|---|---|
 | Confirmed | 预约确定 | ✅ |
-| Closed | 病人已到店、已登记 | ✅（当天仍占用医生时间） |
+| Closed | 病人已到店、已登记（员工手动改） | ✅（当天仍占用医生时间） |
 | Canceled | 病人取消 | ❌ |
 | Postpone | 很少用（改期是直接改原记录） | ❌ |
 | Waiting / Rearrange / 空 | 很少用 | ✅（宁可少推荐，不重复预约） |
@@ -146,7 +146,7 @@ BACKUP DATABASE GPiS TO DISK='D:\GPiS_Backup\GPiS_copy.bak' WITH COPY_ONLY, INIT
 
 ## 6. 待验证的问题
 
-业务流程方面的问题（W1–W12）在 [`clinic-workflow.md`](clinic-workflow.md) 第 7 节。
+业务流程方面的问题（W1–W18）在 [`clinic-workflow.md`](clinic-workflow.md) 第 7 节。
 
 | # | 问题 | 目前所知（2026-09-30） | 验证方式 |
 |---|---|---|---|
@@ -213,7 +213,7 @@ SELECT SameSlot, COUNT(*) AS Slots FROM (
 ) t
 GROUP BY SameSlot ORDER BY SameSlot;
 
--- B4 00:00 记录的状态分布 → 验证"提醒处理完改成 Closed"
+-- B4 00:00 记录的状态分布（诊所说提醒处理完不会改 Closed，W4）
 SELECT Status, COUNT(*) AS N FROM Tbl_CAH_Appointment WHERE TimeSlot = '00:00' GROUP BY Status;
 
 -- B5 Remarks 里表示时长的写法（只取关键字前后几个字，出现少于 3 次的不显示）

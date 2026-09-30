@@ -60,7 +60,8 @@ conversations         id, customer_id, mode (BOT / HUMAN / CLOSED), assigned_sta
 messages              id, conversation_id, direction (IN / OUT), sender (CUSTOMER / BOT / STAFF), body, wa_message_id, created_at
 appointment_requests  id, customer_id, conversation_id, service, preferred_date, preferred_slot, doctor_id,
                       status (PENDING / CONFIRMED / REJECTED / CANCELLED), handled_by,
-                      gpis_appointment_id (nullable，员工录入 GPiS 后填上；改期时 ID 不变), created_at
+                      gpis_appointment_id (nullable，员工录入 GPiS 后填上；改期时 ID 不变),
+                      group_id (nullable，一起来的多位病人共用，对应 Remarks 的 WITH), created_at
 staff                 id, name, role, password_hash, created_at
 
 -- 诊所设置（GPiS 没有，由本系统配置，员工可在 Admin Platform 修改）
@@ -111,6 +112,7 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 
 - `duration = 60` 给 Admin Platform 用，帮员工找 1 hour 空档。AI 只推荐 30 分钟的预约；`may_need_1h` 或多步骤疗程，要不要 1 hour 由员工决定，AI 收集需求后转员工（D15）。
 - AI 可以用第 3 个名额，但只限 `can_be_third` 的疗程；员工最后仍要确认（D6）。
+- 多人一起来（Remarks 的 `WITH`）：AI 先找一格剩余名额够所有人的时段，找不到就转员工。
 
 ## 5. 人工介入设计
 
@@ -129,7 +131,7 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 | 2 | FastAPI 封装 `check_available_slots()` 等 API |
 | 3 | PostgreSQL：customers / conversations / messages / appointment_requests |
 | 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等） |
-| 5 | WhatsApp Cloud API（Webhook） |
+| 5 | WhatsApp Cloud API（Webhook）；预约前一天自动提醒（模板消息，要读 GPiS 明天的预约，和 A1 一起设计） |
 | 6 | AI Agent（Tool Calling）+ 转人工规则 |
 | 7 | Docker 化，部署到云端（假数据） |
 | 8 | 解决主机 ↔ 云端同步，再评估是否写入 GPiS |
@@ -144,3 +146,4 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 | A4 | 各服务的时长？✅ 一般 30 分钟；`RCT`、`IMPLANT`、`SCAN B`、`VENEER` 等可能要 1 hour，由员工看情况在 Remarks 写 `1 hour`（`clinic-workflow.md` 第 2 节） |
 | A5 | 是否已获得诊所 / GPiS 开发商对这种数据使用方式的书面同意？ |
 | A6 | 项目性质（学习 / 毕业项目 / 正式上线）、时间与预算（LLM、WhatsApp API 费用）？ |
+| A7 | 病人已经习惯用诊所现有的 WhatsApp 号码。这个号码怎么接到 WhatsApp Cloud API？员工还能不能继续在手机上用同一个号码？要看诊所用的是哪种 WhatsApp（W18），并查 Meta 目前的规定 |
