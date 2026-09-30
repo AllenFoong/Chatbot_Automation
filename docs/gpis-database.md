@@ -272,6 +272,14 @@ SELECT COUNT(*) AS SharedNumbers FROM (
   GROUP BY REPLACE(REPLACE(HPNo, '-', ''), ' ', '')
   HAVING COUNT(DISTINCT ContactID) > 1
 ) t;
+
+-- B12 OFF DAY 记录：用什么联系人、放在哪个时段（W10）
+SELECT CASE WHEN ContactName LIKE '%DENTAL%' THEN 'CLINIC' ELSE 'OTHER' END AS Contact,
+       TimeSlot, DoctorID, Status, COUNT(*) AS N
+FROM Tbl_CAH_Appointment
+WHERE Remarks LIKE '%OFF%DAY%'
+GROUP BY CASE WHEN ContactName LIKE '%DENTAL%' THEN 'CLINIC' ELSE 'OTHER' END, TimeSlot, DoctorID, Status
+ORDER BY N DESC;
 ```
 
 执行：把上面的 SQL 存成 `gpis_stats_b.sql`，然后
