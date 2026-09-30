@@ -66,8 +66,8 @@ staff                 id, name, role, password_hash, created_at
 -- 诊所设置（GPiS 没有，由本系统配置，员工可在 Admin Platform 修改）
 doctors               id (= GPiS DoctorID), display_name, remark_tag ('P' / 'G'), active
 doctor_schedules      doctor_id, weekday (1=一 … 7=日), is_working, start_time, last_slot, break_start, break_end
-services              code ('OR', 'S+P', 'RCT' …), name, slots (1 = 30 分钟 / 2 = 1 hour 独占),
-                      can_be_third (能否当一格的第 3 人), multi_step, active
+services              code ('OR', 'S+P', 'RCT' …), name,
+                      may_need_1h (可能要 1 hour，由员工看情况决定), can_be_third (能否当一格的第 3 人), multi_step, active
 clinic_closures       date, reason                         -- 假期管理模块维护：全国 + Johor 公共假期、农历新年多休的日子、诊所自定休息日
                                                            -- 每年可用程序预填公共假期（如 Python `holidays` 套件），员工再核对、补上多休的日子
 settings              max_per_slot（默认 3）、max_per_slot_for_ai（默认 3；改成 2 = AI 不用第 3 个名额）等
@@ -78,7 +78,7 @@ settings              max_per_slot（默认 3）、max_per_slot_for_ai（默认 
 ### AI Agent 工具（初步）
 
 ```
-check_available_slots(date, service, doctor_id?)  → 读 GPiS 当天预约 + 本系统排班、疗程设置，规则见下
+check_available_slots(date, service, doctor_id?, duration = 30)  → 读 GPiS 当天预约 + 本系统排班、疗程设置，规则见下
 create_appointment_request(...)            → 写 PostgreSQL（PENDING）
 get_customer_by_phone(phone)               → 读 GPiS Qry_CAH_Appointment / Tbl_CAH_ContactNumbers
 handover_to_human(reason)                  → conversation.mode = HUMAN，通知员工
@@ -89,7 +89,7 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 业务规则来源见 [`clinic-workflow.md`](clinic-workflow.md)。原则：**宁可少推荐，也不要重复预约**；不确定的情况转人工。
 
 ```
-输入：date, service（要预约的疗程代码）, doctor_id
+输入：date, service（要预约的疗程代码）, doctor_id, duration（30 或 60，默认 30）
 1. clinic_closures 有这一天，或 doctor_schedules 显示该医生这天不上班 → 没有空档
 2. 候选时段 = 该医生这天 start_time … last_slot，每 30 分钟一格，扣掉 break_start … break_end
    （例：PHANG 星期三 → 9:00 … 16:30，扣掉 12:00、12:30 → 14 格）
@@ -98,19 +98,18 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
      - Status 为 Canceled 或 Postpone
 4. 有"占位记录"（联系人是诊所本身）→ 这天整天标记 NEEDS_REVIEW，AI 不自动推荐，转员工
 5. 现有预约里的 1 hour 预约独占两格：这一格或前一格有 1 hour 预约 → 这一格整格封锁
-   哪些算 1 hour：Remarks 写了 1 hour（写法见统计 B5），或含 services.slots = 2 的疗程代码
-   （W17 确认前保守处理，见 clinic-workflow.md 第 2 节）
-6. 按要预约的 service 判断每个候选时段 S：
-   a. service 是 1 hour（slots = 2）：
+   哪些算 1 hour：只看 Remarks 有没有写 1 hour（写法见统计 B5），不按疗程代码推断（W17）
+6. 判断每个候选时段 S：
+   a. duration = 60（员工决定这次要 1 hour）：
         S 和下一格都没封锁、都是 0 人，且下一格不是午休
         （S = last_slot 16:30 例外：可以做到 17:30）
-   b. service 是 30 分钟（slots = 1）：
+   b. duration = 30：
         S 没封锁，且已占人数 < 上限
         上限 = 3，如果 service.can_be_third 且前一格、后一格都不是 3 人；否则 2
         AI 用的上限 = min(上限, max_per_slot_for_ai)
 ```
 
-- 算法支持 1 hour，让 Admin Platform 帮员工找空档；但 AI 自己只推荐 30 分钟的预约，1 hour 或多步骤疗程交给员工安排（D15）。
+- `duration = 60` 给 Admin Platform 用，帮员工找 1 hour 空档。AI 只推荐 30 分钟的预约；`may_need_1h` 或多步骤疗程，要不要 1 hour 由员工决定，AI 收集需求后转员工（D15）。
 - AI 可以用第 3 个名额，但只限 `can_be_third` 的疗程；员工最后仍要确认（D6）。
 
 ## 5. 人工介入设计
@@ -142,6 +141,6 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 | A1 | **主机不在公网**：云端 Backend 如何读取主机上的 GPiS？候选：诊所本地放一个同步小程序，定时把空档（不含病人资料）推送到云端 |
 | A2 | AI 自主程度：只收集需求 / 推荐空档由员工一键批准 / 空档明确时自动确认？ |
 | A3 | 员工在哪里介入：只用网页 Admin Platform，还是也要手机？ |
-| A4 | 各服务的时长？已大致确定：`RCT`、`IMPLANT`、`SCAN B`、`VENEER` 等要 1 hour，其余 30 分钟（`clinic-workflow.md` 第 2 节）；具体哪些步骤要 1 hour 待确认（W17） |
+| A4 | 各服务的时长？✅ 一般 30 分钟；`RCT`、`IMPLANT`、`SCAN B`、`VENEER` 等可能要 1 hour，由员工看情况在 Remarks 写 `1 hour`（`clinic-workflow.md` 第 2 节） |
 | A5 | 是否已获得诊所 / GPiS 开发商对这种数据使用方式的书面同意？ |
 | A6 | 项目性质（学习 / 毕业项目 / 正式上线）、时间与预算（LLM、WhatsApp API 费用）？ |

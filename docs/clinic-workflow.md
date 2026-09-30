@@ -37,9 +37,9 @@
 |---|---|---|---|
 | 快 | `OR`、`S+P`、`F`、`RETAINER` | 1 格（30 分钟） | ✅ |
 | 一般 | 其他，如 `C/UP`、`XLA`、`SC`、`ON`、`RB` | 1 格（30 分钟） | ❌ |
-| 长（1 hour） | `RCT`、`IMPLANT`、`SCAN B`、`VENEER` 等 | 2 格，**独占** | ❌ |
+| 可能要 1 hour | `RCT`、`IMPLANT`、`SCAN B`、`VENEER` 等 | 员工看情况：写了 `1 hour` 才占 2 格（独占），否则 1 格 | ❌ |
 
-"长"的列表是诊所举的例子，不一定完整；三类都要能在设置里调整（`services` 表，见 `architecture.md`）。截图和"长"的规则有几处对不上，见下面"预约时长"（W17）。
+"可能要 1 hour"的列表是诊所举的例子，不一定完整；三类都要能在设置里调整（`services` 表，见 `architecture.md`）。
 
 ### 每格人数
 
@@ -61,13 +61,12 @@
 - 员工看起来没有使用 GPiS 的 `Duration` 字段（列表里也没有这一栏），时长只能从 Remarks 的自由文字判断。统计查询 A 会确认 `Duration` 到底有没有值。
 - `1 hour` 的写法可能不统一（`1 hour` / `1HR` / `(1H)` …），用统计查询 B5 找出实际的写法。
 
-**截图和"长疗程 = 1 hour"对不上的地方（W17）**：
+**要不要 1 hour 由员工看情况决定（W17）**：只有 Remarks 写了 `1 hour` 的才独占两格。没写的，即使是 `RCT`、`SCAN B`、`IMPLANT`，也当一般 30 分钟预约，可以和别人同格。截图里的例子都属于正常情况：
 
-- 15:00 有一条 `RCT (C) …`，但 15:30 还排了 2 人；
-- 14:30 的 `SCAN B …` 和另一位 `OR(P)` 在同一格；
-- 16:00 的 `1ST IMPLANT (P)` 和另一位 `PUT HA (P)` 在同一格。
+- 15:00 的 `RCT (C) …` 没写 `1 hour` → 15:30 照常排了 2 人；
+- 14:30 的 `SCAN B …` 没写 `1 hour` → 和另一位 `OR(P)` 在同一格。
 
-可能的解释：只有某些步骤要 1 hour（例如 RCT 只有 `(D)`），或员工看情况，Remarks 写了 `1 hour` 的才真的独占两格。确认之前，系统按 D15 保守处理：Remarks 写了 `1 hour`，**或**含有长疗程代码，都当作 1 hour。
+所以系统判断现有预约时，**只看 Remarks 有没有写 `1 hour`**，不按疗程代码推断。
 
 截图当天（一位医生）：共 15 条记录 = 1 条提醒（`00:00`）+ 1 条占位 + 1 条取消 + **12 位病人**。
 
@@ -84,7 +83,7 @@
 | 情况 | Staff 的做法 | 在 GPiS 里的样子 |
 |---|---|---|
 | 新预约 | `New` → 选日期、时段、医生、病人 → Remarks 写治疗代码（第 6 节） | Status = `Confirmed` |
-| 需要 1 小时（`RCT`、`IMPLANT`、`SCAN B`、`VENEER` 等） | Remarks 加 `1 hour` | 这一格和下一格都不再排别人 |
+| 员工判断需要 1 小时（常见于 `RCT`、`IMPLANT`、`SCAN B`、`VENEER`） | Remarks 加 `1 hour` | 这一格和下一格都不再排别人 |
 | 还没定时间 / 提醒事项 | 时段选 `00:00`，Remarks 写要做的事，例 `REMIND PT STO` | TimeSlot = `00:00`（第 4.1 节） |
 | 医生有私人安排 | 用诊所自己当"病人"建一条记录，Remarks 写说明，例 `1130 FIRST APPT` | 第 4.2 节 |
 | 病人到店 | 在 Queue System 登记（`Patient Come`），预约改为 `Closed` | Status = `Closed` |
@@ -204,7 +203,7 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 ### 对本系统的意义
 
 - AI 收集需求时，`appointment_requests.service` 使用**同一套代码**，员工录入 GPiS 时可以直接照抄到 Remarks。
-- 疗程代码也决定每格能排几人和占几格（第 2 节），每个代码的"占几格""能否当第 3 人"记在 `services` 设置表，员工可以调整。
+- 疗程代码也决定每格能排几人和占几格（第 2 节），每个代码的"可能要 1 hour""能否当第 3 人"记在 `services` 设置表，员工可以调整。
 - 改期不改 `AppointmentID`，所以本系统记下 GPiS 的 `AppointmentID` 后，就能一直追踪同一个预约。
 - 多步骤疗程（implant、denture、ortho、RCT）可能需要找同一位医生，而且系统要知道"下一步是什么"（W9）。
 - 简单、30 分钟、老病人的预约（`OR`、`S+P`、`F`、`RETAINER`、`C/UP`）最适合先交给 AI；需要 1 小时或多步骤疗程的，先转人工。
@@ -224,6 +223,7 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 | W14 | 公共假期以哪一州为准？农历新年会多休吗？ | Johor 州；农历新年会多休几天（后期需要一个假期管理模块） |
 | W15 | 哪些疗程可以当一格的第 3 人？ | `OR`、`S+P`、`F`、`RETAINER` |
 | W16 | 哪些疗程要 1 hour？能从 16:30 开始或跨进午休吗？ | 特殊疗程如 `RCT`、`IMPLANT`、`SCAN B`、`VENEER`；可以从 16:30 开始，不能跨进午休 |
+| W17 | 截图里 `RCT (C)`、`SCAN B` 没有独占两格，是怎么判断的？ | 员工看情况，Remarks 写了 `1 hour` 的才算；截图里那样排是可以接受的 |
 
 ### 待确认
 
@@ -236,4 +236,3 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 | W10 | 占位记录（如 `1130 FIRST APPT`）的确切意思？医生请假一整天、提早下班又怎么记录？ |
 | W11 | 病人现在通过什么方式预约（电话 / WhatsApp / 现场）？预约前一天会提醒病人吗？ |
 | W12 | `Closed` 是员工手动改的，还是在 Queue 按 `Patient Come` 时自动改？ |
-| W17 | 截图里 `RCT (C)`、`SCAN B`、`1ST IMPLANT` 都没有独占两格（第 2 节）。是只有某些步骤要 1 hour（RCT 只有 `(D)`？IMPLANT 只有 `1ST IMPLANT`？），还是员工看情况、写了 `1 hour` 的才算？除了这 4 种，还有别的疗程要 1 hour 吗？ |

@@ -151,7 +151,7 @@ BACKUP DATABASE GPiS TO DISK='D:\GPiS_Backup\GPiS_copy.bak' WITH COPY_ONLY, INIT
 | # | 问题 | 目前所知（2026-09-30） | 验证方式 |
 |---|---|---|---|
 | Q1 | 各状态实际使用多少？哪些占用时段？ | staff：主要用 `Confirmed` / `Closed` / `Canceled` | 统计 A |
-| Q2 | `Duration` 的格式？一个预约会占多个 30 分钟格吗？ | 会。staff 在 Remarks 写 `1 hour`，该病人独占这一格和下一格（RCT、IMPLANT、SCAN B、VENEER 等）；`Duration` 字段可能没用 | 统计 A、B5 |
+| Q2 | `Duration` 的格式？一个预约会占多个 30 分钟格吗？ | 会。staff 在 Remarks 写 `1 hour`，该病人独占这一格和下一格（员工看情况写，常见于 RCT、IMPLANT、SCAN B、VENEER；没写的就是 30 分钟）；`Duration` 字段可能没用 | 统计 A、B5 |
 | Q3 | `AppointmentDate` 只有日期还是带时间？ | — | 统计 A |
 | Q4 | 诊所实际营业时间？ | ✅ 9:00–17:00，最后预约 16:30；星期六、日营业，公共假期休息（诊所提供） | 统计 B1、B2 核对 |
 | Q5 | 同一医生、同一时段是否允许多个预约？ | ✅ 允许，一般 2 人；第 3 人只限 `OR`、`S+P`、`F`、`RETAINER`；相邻两格不能都是 3 人 | 统计 B3 看分布 |
@@ -217,6 +217,7 @@ GROUP BY SameSlot ORDER BY SameSlot;
 SELECT Status, COUNT(*) AS N FROM Tbl_CAH_Appointment WHERE TimeSlot = '00:00' GROUP BY Status;
 
 -- B5 Remarks 里表示时长的写法（只取关键字前后几个字，出现少于 3 次的不显示）
+--    重要：Remarks 写的 1 hour 是判断时长的唯一依据，写法要找齐
 SELECT k.Kw, s.Snippet, COUNT(*) AS N
 FROM Tbl_CAH_Appointment a
 CROSS APPLY (VALUES ('HOUR'), ('HR'), ('1H'), ('MIN')) AS k(Kw)
