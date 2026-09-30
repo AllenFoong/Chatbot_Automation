@@ -68,7 +68,8 @@ staff                 id, name, role, password_hash, created_at
 doctors               id (= GPiS DoctorID), display_name, remark_tag ('P' / 'G'), active
 doctor_schedules      doctor_id, weekday (1=一 … 7=日), is_working, start_time, last_slot, break_start, break_end
 services              code ('OR', 'S+P', 'RCT' …), name,
-                      may_need_1h (可能要 1 hour，由员工看情况决定), can_be_third (能否当一格的第 3 人), multi_step, active
+                      may_need_1h (可能要 1 hour，由员工看情况决定), can_be_third (能否当一格的第 3 人), multi_step,
+                      ai_can_book (AI 能否自己推荐时段；否 = 收集需求后转员工，见 D16), active
 clinic_closures       date, reason                         -- 假期管理模块维护：全国 + Johor 公共假期、农历新年多休的日子、诊所自定休息日
                                                            -- 每年可用程序预填公共假期（如 Python `holidays` 套件），员工再核对、补上多休的日子
 settings              max_per_slot（默认 3）、max_per_slot_for_ai（默认 3；改成 2 = AI 不用第 3 个名额）等
@@ -114,7 +115,7 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
         AI 用的上限 = min(上限, max_per_slot_for_ai)
 ```
 
-- `duration = 60` 给 Admin Platform 用，帮员工找 1 hour 空档。AI 只推荐 30 分钟的预约；`may_need_1h` 或多步骤疗程，要不要 1 hour 由员工决定，AI 收集需求后转员工（D15）。
+- `duration = 60` 给 Admin Platform 用，帮员工找 1 hour 空档。AI 只推荐 30 分钟、`ai_can_book` 的疗程；`may_need_1h` 的疗程和 implant、denture、RCT 的后续步骤，由员工决定，AI 收集需求后转员工（D15、D16）。
 - AI 可以用第 3 个名额，但只限 `can_be_third` 的疗程；员工最后仍要确认（D6）。
 - 多人一起来（Remarks 的 `WITH`）：AI 先找一格剩余名额够所有人的时段，找不到就转员工。
 

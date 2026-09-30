@@ -225,7 +225,8 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 - 疗程代码也决定每格能排几人和占几格（第 2 节），每个代码的"可能要 1 hour""能否当第 3 人"记在 `services` 设置表，员工可以调整。
 - 改期不改 `AppointmentID`，所以本系统记下 GPiS 的 `AppointmentID` 后，就能一直追踪同一个预约。
 - 多步骤疗程（implant、denture、ortho、RCT）**必须由同一位医生做完**（W9）。后续的预约只能找原来那位医生的空档：从 GPiS 找这位病人上一次同类疗程的预约，取它的医生（DoctorID，或 Remarks 的 `(P)` / `(G)`）。
-- 简单、30 分钟、老病人的预约（`OR`、`S+P`、`F`、`RETAINER`、`C/UP`）最适合先交给 AI；`OR` 复诊只推荐病人原来的矫正医生。可能要 1 hour 的疗程，以及 implant、denture、RCT 的后续步骤，先转人工（D15、D16）。
+- 交给 AI 的：简单、30 分钟的预约（`S+P`、`F`、`C/UP`），以及矫正的后续预约（`OR`、`RETAINER`、`RB`，只推荐病人原来的矫正医生）。
+- 转人工的：可能要 1 hour 的疗程，以及 implant、denture、RCT 的后续步骤（D15、D16）。
 
 ## 7. 向诊所确认的问题
 
