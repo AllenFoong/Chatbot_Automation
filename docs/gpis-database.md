@@ -1,7 +1,7 @@
 # GPiS 数据库
 
 > 本文件**不包含任何病人资料、密码或诊所识别信息**。所有查询都只针对表结构、设置表或统计数字。
-> 最后更新：2026-09-28
+> 最后更新：2026-09-30
 
 ## 1. GPiS 程序概况
 
@@ -81,17 +81,21 @@
 - **`Tbl_CAH_RefAppointmentStatus`**：`Waiting`、`Canceled`、`Postpone`、`Closed`、`Rearrange`、`Confirmed`
 - **`Qry_CAH_Resource_Sch`（医生）**：`PHANG`、`GOH`、`DOCTOR`（`DOCTOR` 疑似"不指定医生"的通用账号）
 
-### 状态是否占用时段（推测，部分已由统计验证，见第 6 节）
+- **营业时间**：GPiS 里没有，由诊所提供：9:00–17:00，最后预约 16:30，星期六、日营业（和平日一样），全国 + Johor 公共假期休息；医生排班、午休见 [`clinic-workflow.md`](clinic-workflow.md) 第 1 节。
 
-| 状态 | 实际数量 | 占用时段？ |
+### 状态是否占用时段（按 staff 实际用法，待统计验证）
+
+员工实际只用 `Confirmed`、`Closed`、`Canceled`（详见 [`clinic-workflow.md`](clinic-workflow.md) 第 5 节）。
+
+| 状态 | 含义 | 占用时段？ |
 |---|---|---|
-| Closed | 80,158 | —（已完成的过去预约） |
-| Confirmed | 17,514 | ✅ 正常预约的主要状态 |
-| Canceled | 6,189 | ❌ |
-| Rearrange | 458 | ⚠️ 待定 |
-| Waiting | 114 | ✅（很少用） |
-| Postpone | 103 | ❌ |
-| Calling | 1 | ❓ **不在 `RefAppointmentStatus` 里**，说明状态字段没有外键约束 |
+| Confirmed | 预约确定 | ✅ |
+| Closed | 病人已到店、已登记（员工手动改） | ✅（当天仍占用医生时间） |
+| Canceled | 病人取消 | ❌ |
+| Postpone | 很少用（改期是直接改原记录） | ❌ |
+| Waiting / Rearrange / 空 | 很少用 | ✅（宁可少推荐，不重复预约） |
+
+另外两种记录**不按状态判断**：`TimeSlot = '00:00'` 是提醒 / 未定时间，**不占用**；联系人是诊所本身的是"占位记录"，要转人工（见 `clinic-workflow.md` 第 4 节）。
 
 ## 5. 跑过的 SQL
 
@@ -140,54 +144,23 @@ BACKUP DATABASE GPiS TO DISK='D:\GPiS_Backup\GPiS_copy.bak' WITH COPY_ONLY, INIT
 
 第一次报 `Operating system error 3`（文件夹不存在），用 `New-Item -ItemType Directory -Path "D:\GPiS_Backup" -Force` 建好后成功。
 
-## 6. 统计查询结果（2026-09-30，在开发电脑的 `GPiS_Dev` 上）
+## 6. 待验证的问题
 
-开发电脑：SQL Server **17.0（2025）** Express，备份还原后改名为 `GPiS_Dev`。（新版本可还原旧备份，但**不能再备份回主机的 2012**。）
+业务流程方面的问题（W1–W18）在 [`clinic-workflow.md`](clinic-workflow.md) 第 7 节。
 
-| 项目 | 结果 | 结论 |
-|---|---|---|
-| 日期范围 | 2017-11-18 ～ **2027-04-30** | 数据一直在用，已有约半年后的预约 |
-| 总数 | **104,537** 条 | |
-| `AppointmentDate` | 时间部分全是 `00:00:00` | **只存日期，时间只存在 `TimeSlot`** |
-| `Duration` | `30`：104,449 条（99.9%）；另有 5、15、45、60、90、120 少量 | 单位是**分钟**（文字）；几乎所有预约都只占 1 格 |
-| `DoctorID` | 14 个不同的值，其中一个医生约占 64%；另有 `admin` 3 条 | 多数是历史医生；当前有效医生以 `Qry_CAH_Resource_Sch` 为准 |
+| # | 问题 | 目前所知（2026-09-30） | 验证方式 |
+|---|---|---|---|
+| Q1 | 各状态实际使用多少？哪些占用时段？ | ✅ 统计 A 证实主要用 `Closed` / `Confirmed` / `Canceled`；另有 1 条 `Calling`（不在 `RefAppointmentStatus`，说明状态没有约束） | 统计 A ✅；B13 看未来预约 |
+| Q2 | `Duration` 的格式？一个预约会占多个 30 分钟格吗？ | 会。staff 在 Remarks 写 `1 hour`，该病人独占这一格和下一格（员工看情况写，常见于 RCT、IMPLANT、SCAN B、VENEER；没写的就是 30 分钟）；`Duration` 字段可能没用。✅ 统计 A：`Duration` 99.9% 是 `30`（默认值），证实员工不用这个字段 | 统计 A ✅、B5 |
+| Q3 | `AppointmentDate` 只有日期还是带时间？ | ✅ 只有日期（时间部分全是 00:00:00），时间只看 `TimeSlot` | 统计 A ✅ |
+| Q4 | 诊所实际营业时间？ | ✅ 9:00–17:00，最后预约 16:30；星期六、日营业，公共假期休息（诊所提供）。⚠️ 统计 A：历史上 17:00–20:30 仍有约 1.2 万条预约，和"17:00 下班"不符，可能是以前的夜诊或已离职医生 | 统计 B1、B2 核对（看最近 12 个月） |
+| Q5 | 同一医生、同一时段是否允许多个预约？ | ✅ 允许，一般 2 人；第 3 人只限 `OR`、`S+P`、`F`、`RETAINER`；相邻两格不能都是 3 人。统计 A 的"同格最多"前 10 名全是每月 1 号的 `00:00`（提醒），没有参考价值 | 统计 B3 看分布（已排除 00:00） |
+| Q6 | 数据是否仍在使用（最新预约日期）？ | ✅ 仍在使用：2017-11-18 ～ 2027-04-30，共 104,537 条 | 统计 A ✅ |
+| Q7 | `DOCTOR` 资源代表什么？ | — | 询问诊所 |
+| Q8 | GPiS 如何产生新的 `AppointmentID`？ | 诊所说员工不会 `Delete`，改期是 `Edit` 原记录（`AppointmentID` 不变） | 在 `GPiS_Dev` 上观察，或用 SQL Profiler 看 GPiS 发出的 SQL；B9 若空洞很多，说明编号方式不是 MAX+1 或有其他删除来源 |
+| Q9 | 手机号格式（有无 `+60`、空格、`-`）？能否可靠匹配 WhatsApp 号码？ | 格式混杂：纯数字、带空格、带 `-`，截图里没见到 `+60`；**有家人共用号码** | 统计 B10、B11 |
 
-### `TimeSlot` 分布
-
-| 时段 | 数量 | 解读 |
-|---|---|---|
-| `00:00` | 781 | ❗ 不是真实时间，见下方"00:00 现象" |
-| 00:30–08:30 | 每格 1–8 | 录入错误，可忽略 |
-| **09:00–12:00** | 每格 4.5k–7.3k | 上午营业 |
-| **12:30** | 1,567 | 明显下降 → 可能是午休 |
-| **13:00–17:00** | 每格 3k–8.3k | 下午营业（14:00 最多） |
-| 17:30–20:30 | 每格 100–1.8k | 晚间，逐渐减少 → 可能某些日子有夜诊 |
-| 21:00、22:30 | 各 1 | 录入错误 |
-
-### "00:00 现象"
-
-同一医生、同一时段出现多个预约的前 10 名，**全部是某月 1 号的 `00:00`、同一位医生**（最多 20 条）。
-推测：`00:00` + 每月 1 号 = **"本月待联系 / 回访名单"**，不是真正的预约时间（`Calling` 状态可能也与此有关）。
-→ 计算空档时**排除 `TimeSlot = '00:00'`**。
-
-## 7. 待验证的问题
-
-| # | 问题 | 状态 |
-|---|---|---|
-| Q1 | 各状态实际使用多少？哪些占用时段？ | ✅ 数量已知（见第 4 节）；`Rearrange` 是否占用仍待定 |
-| Q2 | `Duration` 的格式？ | ✅ 分钟数（文字），99.9% 是 30 |
-| Q3 | `AppointmentDate` 只有日期还是带时间？ | ✅ 只有日期 |
-| Q4 | 诊所实际营业时间？ | 🔶 推测 09:00–12:30、13:00–17:30，部分日子到 20:30；需按星期统计 + 询问诊所 |
-| Q5 | 同一医生、同一时段是否允许多个预约？ | 🔶 前 10 名都是 `00:00`；需**排除 00:00** 后重查 |
-| Q6 | 数据是否仍在使用？ | ✅ 是，已有到 2027-04 的预约 |
-| Q7 | `DOCTOR` 资源代表什么？ | 询问诊所 |
-| Q8 | GPiS 如何产生新的 `AppointmentID`？ | 在 `GPiS_Dev` 上观察，或用 SQL Profiler |
-| Q9 | 手机号格式能否可靠匹配 WhatsApp 号码？ | 只统计格式，不看具体号码 |
-| Q10 | `00:00` 预约是否真的是"回访名单"？ | 统计日期是否都是每月 1 号、状态分布 + 询问诊所 |
-| Q11 | 哪天休息？各星期几的营业时段？ | 按星期统计 |
-| Q12 | 最近一年实际在看诊的医生有哪些？ | 统计最近 12 个月的 `DoctorID` |
-
-### 第一轮统计查询（已执行，结果见第 6 节）
+### 统计查询 A（在 `GPiS_Dev` 上执行，只含统计，回答 Q1–Q6）
 
 ```sql
 SET NOCOUNT ON;
@@ -205,33 +178,39 @@ SELECT TOP 5 CONVERT(varchar(19), AppointmentDate, 120) AS RawDate FROM Tbl_CAH_
 
 执行：`sqlcmd -S .\SQLEXPRESS -E -d GPiS_Dev -W -s "," -Q "<上面的 SQL>" -o "$HOME\Desktop\gpis_stats.txt"`
 
-### 第二轮统计查询（待执行，回答 Q4、Q5、Q10–Q12）
+#### 统计查询 A 的结果（2026-09-30，已执行）
 
-备份日期约为 2026-09-28，下面以此为"今天"。只含统计，不含病人资料。
+开发电脑：SQL Server **17.0（2025）** Express，备份还原后改名为 `GPiS_Dev`。（新版本可还原旧备份，但**不能再备份回主机的 2012**。）
+
+| 项目 | 结果 |
+|---|---|
+| 日期范围 / 总数 | 2017-11-18 ～ 2027-04-30，**104,537** 条 |
+| `AppointmentDate` | 时间部分全是 `00:00:00` |
+| `Status` | Closed 80,158；Confirmed 17,514；Canceled 6,189；Rearrange 458；Waiting 114；Postpone 103；Calling 1 |
+| `Duration` | `30`：104,449（99.9%）；60：59；45：9；15：8；90：6；5：4；120：2 |
+| `DoctorID` | 14 个不同的值（多数是以前的医生），PHANG 约占 64%；另有 `admin` 3 条（录入错误） |
+| `TimeSlot` | 09:00–16:30 每格 1.5k–8.3k（12:30 明显较少）；17:00–20:30 共约 1.2 万；`00:00` 781；其他凌晨时段各 1–8 条（录入错误） |
+| 同医生同时段最多 | 前 10 名全是**每月 1 号**、`00:00`、PHANG，最多 20 条 → 提醒，不是预约（和 `clinic-workflow.md` 4.1 一致） |
+
+### 统计查询 B（在 `GPiS_Dev` 上执行，验证 `clinic-workflow.md` 的业务规则）
+
+只输出统计数字、时段、代码片段，不输出病人名字和号码。**尚未在真实数据库上跑过**，报错就把错误信息带回来。
 
 ```sql
 SET NOCOUNT ON;
-SET DATEFIRST 1;  -- 1 = 星期一 ... 7 = 星期日
+SET DATEFIRST 1;  -- 1 = 星期一 … 7 = 星期日
 
--- A. 排除 00:00 后，同一医生同一时段的重复预约（Q5）
-SELECT COUNT(*) AS DupGroups FROM (
-  SELECT AppointmentDate, TimeSlot, DoctorID FROM Tbl_CAH_Appointment
-  WHERE TimeSlot <> '00:00' AND Status IN ('Confirmed','Waiting','Closed')
-  GROUP BY AppointmentDate, TimeSlot, DoctorID HAVING COUNT(*) > 1) x;
-SELECT TOP 10 CONVERT(varchar(10), AppointmentDate, 120) AS D, TimeSlot, DoctorID, COUNT(*) AS SameSlot
-  FROM Tbl_CAH_Appointment
-  WHERE TimeSlot <> '00:00' AND Status IN ('Confirmed','Waiting','Closed')
-  GROUP BY AppointmentDate, TimeSlot, DoctorID HAVING COUNT(*) > 1
-  ORDER BY SameSlot DESC, D DESC;
+-- B1 各医生按星期几的预约数（最近 12 个月）→ 验证休息日、周末是否营业
+SELECT DoctorID, DATEPART(weekday, AppointmentDate) AS WD, COUNT(*) AS N
+FROM Tbl_CAH_Appointment
+WHERE AppointmentDate >= DATEADD(month, -12, GETDATE())
+  AND ISNULL(Status, '') <> 'Canceled' AND ISNULL(TimeSlot, '') <> '00:00'
+GROUP BY DoctorID, DATEPART(weekday, AppointmentDate)
+ORDER BY DoctorID, WD;
 
--- B. 00:00 预约是几号、什么状态（Q10）
-SELECT DAY(AppointmentDate) AS DayOfMonth, COUNT(*) AS N FROM Tbl_CAH_Appointment
-  WHERE TimeSlot = '00:00' GROUP BY DAY(AppointmentDate) ORDER BY N DESC;
-SELECT Status, COUNT(*) AS N FROM Tbl_CAH_Appointment
-  WHERE TimeSlot = '00:00' GROUP BY Status;
-
--- C. 最近 12 个月：时段 × 星期几（Q4、Q11）
-SELECT TimeSlot,
+-- B2 PHANG、GOH 各时段 × 星期几的预约数（最近 12 个月）→ 验证营业时间、午休、休息日
+--    改成横向表格（星期一到日是栏位），行数从约 500 行减到约 50 行，方便贴回来
+SELECT DoctorID, TimeSlot,
   SUM(CASE WHEN DATEPART(weekday, AppointmentDate) = 1 THEN 1 ELSE 0 END) AS Mon,
   SUM(CASE WHEN DATEPART(weekday, AppointmentDate) = 2 THEN 1 ELSE 0 END) AS Tue,
   SUM(CASE WHEN DATEPART(weekday, AppointmentDate) = 3 THEN 1 ELSE 0 END) AS Wed,
@@ -240,19 +219,98 @@ SELECT TimeSlot,
   SUM(CASE WHEN DATEPART(weekday, AppointmentDate) = 6 THEN 1 ELSE 0 END) AS Sat,
   SUM(CASE WHEN DATEPART(weekday, AppointmentDate) = 7 THEN 1 ELSE 0 END) AS Sun
 FROM Tbl_CAH_Appointment
-WHERE TimeSlot <> '00:00' AND Status <> 'Canceled'
-  AND AppointmentDate >= '2025-09-28' AND AppointmentDate < '2026-09-28'
-GROUP BY TimeSlot ORDER BY TimeSlot;
+WHERE AppointmentDate >= DATEADD(month, -12, GETDATE())
+  AND DoctorID IN ('PHANG', 'GOH')
+  AND ISNULL(Status, '') <> 'Canceled' AND ISNULL(TimeSlot, '') <> '00:00'
+GROUP BY DoctorID, TimeSlot
+ORDER BY DoctorID, TimeSlot;
 
--- D. 最近 12 个月实际看诊的医生（Q12）
-SELECT DoctorID, COUNT(*) AS N,
-  CONVERT(varchar(10), MIN(AppointmentDate), 120) AS FirstDate,
-  CONVERT(varchar(10), MAX(AppointmentDate), 120) AS LastDate
+-- B3 同一医生同一时段有几个预约的分布 → 验证"一般 2 人，最多 3 人"
+SELECT SameSlot, COUNT(*) AS Slots FROM (
+  SELECT CONVERT(varchar(10), AppointmentDate, 120) AS D, TimeSlot, DoctorID, COUNT(*) AS SameSlot
+  FROM Tbl_CAH_Appointment
+  WHERE AppointmentDate >= DATEADD(month, -12, GETDATE())
+    AND ISNULL(Status, '') NOT IN ('Canceled', 'Postpone')
+    AND ISNULL(TimeSlot, '') <> '00:00'
+  GROUP BY CONVERT(varchar(10), AppointmentDate, 120), TimeSlot, DoctorID
+) t
+GROUP BY SameSlot ORDER BY SameSlot;
+
+-- B4 00:00 记录的状态分布（诊所说提醒处理完不会改 Closed，W4）
+SELECT Status, COUNT(*) AS N FROM Tbl_CAH_Appointment WHERE TimeSlot = '00:00' GROUP BY Status;
+
+-- B5 Remarks 里表示时长的写法（只取关键字前后几个字，出现少于 3 次的不显示）
+--    重要：Remarks 写的 1 hour 是判断时长的唯一依据，写法要找齐
+SELECT k.Kw, s.Snippet, COUNT(*) AS N
+FROM Tbl_CAH_Appointment a
+CROSS APPLY (VALUES ('HOUR'), ('HR'), ('1H'), ('MIN')) AS k(Kw)
+CROSS APPLY (SELECT CHARINDEX(k.Kw, UPPER(a.Remarks)) AS P) AS p
+CROSS APPLY (SELECT SUBSTRING(UPPER(a.Remarks), CASE WHEN p.P > 4 THEN p.P - 4 ELSE 1 END, LEN(k.Kw) + 6) AS Snippet) AS s
+WHERE p.P > 0
+GROUP BY k.Kw, s.Snippet
+HAVING COUNT(*) >= 3
+ORDER BY k.Kw, N DESC;
+
+-- B6 占位记录（联系人是诊所本身，名字含 DENTAL）的联系人 ID 和数量
+SELECT ContactID, COUNT(*) AS N, MIN(AppointmentDate) AS FirstDate, MAX(AppointmentDate) AS LastDate
 FROM Tbl_CAH_Appointment
-WHERE AppointmentDate >= '2025-09-28'
-GROUP BY DoctorID ORDER BY N DESC;
+WHERE ContactName LIKE '%DENTAL%'
+GROUP BY ContactID;
 
--- E. 未来预约（2026-09-28 之后）的状态分布（Q1：哪些状态代表"已订"）
+-- B7 占位记录的写法（Remarks 是员工写的安排，不是病人资料）
+SELECT TOP 50 DoctorID, TimeSlot, Remarks, COUNT(*) AS N
+FROM Tbl_CAH_Appointment
+WHERE ContactName LIKE '%DENTAL%'
+GROUP BY DoctorID, TimeSlot, Remarks
+ORDER BY N DESC;
+
+-- B8 没有联系人的预约数（可能是其他占位写法）
+SELECT COUNT(*) AS NoContact FROM Tbl_CAH_Appointment WHERE ContactID IS NULL OR ContactID = 0;
+
+-- B9 AppointmentID 的范围和空洞数 → 间接看员工是否常用 Delete（Q8）
+SELECT MIN(AppointmentID) AS MinID, MAX(AppointmentID) AS MaxID, COUNT(*) AS Total,
+       MAX(AppointmentID) - MIN(AppointmentID) + 1 - COUNT(*) AS Gaps
+FROM Tbl_CAH_Appointment;
+
+-- B10 手机号格式（只统计格式，不输出号码）→ Q9
+SELECT Prefix, Sep, COUNT(*) AS N FROM (
+  SELECT
+    CASE WHEN ISNULL(LTRIM(HPNo), '') = '' THEN 'EMPTY'
+         WHEN HPNo LIKE '+%'  THEN 'PLUS'
+         WHEN HPNo LIKE '60%' THEN '60'
+         WHEN HPNo LIKE '0%'  THEN '0'
+         ELSE 'OTHER' END AS Prefix,
+    CASE WHEN HPNo LIKE '%-%' THEN 'DASH'
+         WHEN HPNo LIKE '% %' THEN 'SPACE'
+         ELSE 'PLAIN' END AS Sep
+  FROM (SELECT DISTINCT ContactID, HPNo FROM Qry_CAH_Appointment) c
+) t
+GROUP BY Prefix, Sep ORDER BY N DESC;
+
+-- B11 一个号码对应多位病人的数量（家人共用号码）→ Q9
+SELECT COUNT(*) AS SharedNumbers FROM (
+  SELECT REPLACE(REPLACE(HPNo, '-', ''), ' ', '') AS Num
+  FROM Qry_CAH_Appointment
+  WHERE ISNULL(LTRIM(HPNo), '') <> ''
+  GROUP BY REPLACE(REPLACE(HPNo, '-', ''), ' ', '')
+  HAVING COUNT(DISTINCT ContactID) > 1
+) t;
+
+-- B12 OFF DAY 记录：用什么联系人、放在哪个时段（W10）
+SELECT CASE WHEN ContactName LIKE '%DENTAL%' THEN 'CLINIC' ELSE 'OTHER' END AS Contact,
+       TimeSlot, DoctorID, Status, COUNT(*) AS N
+FROM Tbl_CAH_Appointment
+WHERE Remarks LIKE '%OFF%DAY%'
+GROUP BY CASE WHEN ContactName LIKE '%DENTAL%' THEN 'CLINIC' ELSE 'OTHER' END, TimeSlot, DoctorID, Status
+ORDER BY N DESC;
+
+-- B13 未来预约（备份日 2026-09-28 之后）的状态分布 → 验证"将来的日期不会出现 Closed"（Q1）
 SELECT Status, COUNT(*) AS N FROM Tbl_CAH_Appointment
-  WHERE AppointmentDate >= '2026-09-28' GROUP BY Status;
+WHERE AppointmentDate >= '2026-09-28'
+GROUP BY Status;
 ```
+
+执行：把上面的 SQL 存成 `gpis_stats_b.sql`，然后
+`sqlcmd -S .\SQLEXPRESS -E -d GPiS_Dev -W -s "," -i gpis_stats_b.sql -o "$HOME\Desktop\gpis_stats_b.txt"`
+
+结果贴回来之前先扫一眼，确认里面没有病人名字或号码（B7 如果 Remarks 里有名字，先遮掉）。
