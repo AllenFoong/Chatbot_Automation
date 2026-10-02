@@ -35,13 +35,12 @@
 - [x] 还原并改名为 `GPiS_Dev`
 - [x] 统计查询 A（结果见 `docs/gpis-database.md` 第 6 节）
 - [x] 统计查询 B（B1–B13，结果见 `docs/gpis-database.md`）
-- [ ] 统计查询 C（C1–C6）
+- [x] 统计查询 C（C1–C6，结果见 `docs/gpis-database.md`）
 - [ ] 诊所回答 `docs/clinic-workflow.md` 的新问题 W19–W26
 - [x] 诊所已回答 `docs/clinic-workflow.md` 第 7 节的全部问题（W1–W18）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. 在 SSMS（`GPiS_Dev`，Ctrl+T 文字结果）跑 `docs/gpis-database.md` 的**统计查询 C**，先确认结果里没有病人名字或号码，再把结果记录回该文件。
-2. 向诊所确认 `docs/clinic-workflow.md` 的 W19–W26。
-3. 按 `docs/architecture.md` 的"空档计算规则"，写出"查某天某医生空档"的 SQL（开发路线 Phase 1）。
+1. 向诊所确认 `docs/clinic-workflow.md` 的 W19–W26（W20 午休前半格、W21 GOH 最后时段、W22 每格上限最影响空档计算）。
+2. 同时开始 Phase 1：按 `docs/architecture.md` 的"空档计算规则"，写出"查某天某医生空档"的 SQL。W20–W22 未回答前用保守设定（午休整段封锁、GOH 最后时段 16:00、每格上限 3），之后只改设置值。

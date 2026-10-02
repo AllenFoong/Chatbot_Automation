@@ -83,6 +83,7 @@ settings              max_per_slot（默认 3）、max_per_slot_for_ai（默认 
 check_available_slots(date, service, doctor_id?, duration = 30)  → 读 GPiS 当天预约 + 本系统排班、疗程设置，规则见下
 create_appointment_request(...)            → 写 PostgreSQL（PENDING）
 get_customer_by_phone(phone)               → 读 GPiS Qry_CAH_Appointment / Tbl_CAH_ContactNumbers（一个号码可能对应多位病人）
+                                             号码先标准化成国际格式再比对（约 12% 是新加坡号码），规则见 gpis-database.md 统计查询 C 的结果
 get_treatment_doctor(contact_id, service)  → 读 GPiS：这位病人上一次同类疗程的医生；多步骤疗程的后续预约必须用这位医生（W9）
                                              只回传医生，不回传病历（最少必要信息）
 handover_to_human(reason)                  → conversation.mode = HUMAN，通知员工
@@ -100,7 +101,7 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 3. 从 GPiS 读该医生这天的预约，排除 Status 为 Canceled 的
 4. 先看本系统的"医生请假"记录，再找 GPiS 的占位记录，不论在哪个时段（包括 00:00）、不论联系人是谁
    （统计 B7、B12：诊所联系人也用来记真实疗程，OFF DAY 记录的联系人都不是诊所 → 按 Remarks 判断）：
-     - 本系统记录了请假，或 Remarks 含 OFF DAY → 该医生这天没有空档
+     - 本系统记录了请假，或 Remarks 去掉空格后含 OFFDAY（包括农历新年、圣诞节的写法；`OFF SUNDAY` 不算）→ 该医生这天没有空档
      - 诊所联系人的其他写法（如 1130 FIRST APPT、GO BANK）→ 这天整天标记 NEEDS_REVIEW，AI 不自动推荐，转员工
    占位记录本身不算病人，之后不再计算
 5. 再排除 TimeSlot = '00:00'（提醒 / 未定时间）和 Status = Postpone，剩下的才是占用时段的预约
