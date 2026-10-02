@@ -89,6 +89,11 @@ get_treatment_doctor(contact_id, service)  → 读 GPiS：这位病人上一次�
 handover_to_human(reason)                  → conversation.mode = HUMAN，通知员工
 ```
 
+GPiS 的预约**可能被删除**（W26），所以每次都重新读 GPiS，不缓存旧结果；`appointment_requests.gpis_appointment_id` 在 GPiS 找不到时，在 Admin Platform 提醒员工。
+
+```
+```
+
 ### 空档计算规则（初版，待统计查询 B 验证）
 
 业务规则来源见 [`clinic-workflow.md`](clinic-workflow.md)。原则：**宁可少推荐，也不要重复预约**；不确定的情况转人工。
@@ -107,11 +112,12 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 5. 再排除 TimeSlot = '00:00'（提醒 / 未定时间）和 Status = Postpone，剩下的才是占用时段的预约
 6. 现有预约里的长预约独占多格：1 hour 占 2 格，1.5 hour 占 3 格；被占的格整格封锁
    时长只看 Remarks（W17）：转大写、去空格后用正则匹配"数字 + H / HR / HOUR(S)"，
-   1.5 / 1.30 / 1HOURS30 = 90 分钟；有 HOUR 字样但解析不了 → 当天转人工（写法见统计 B5、C4）
+   1.5 / 1.30 / 1HOURS30 = 90 分钟（3 格，W23）；有 HOUR 字样但解析不了 → 当天转人工（写法见统计 B5、C4）
+   xxMIN（如 20MIN!!!）一律当 30 分钟、1 格（W24）
 7. 判断每个候选时段 S：
    a. duration = 60（员工决定这次要 1 hour）：
         S 和下一格都没封锁、都是 0 人，且下一格不是午休
-        （S = last_slot 例外：PHANG 16:30 可以做到 17:30（W16）；GOH 15:30 能否做到 16:30 待确认（W27），确认前不推荐）
+        （S = last_slot 例外：可以做到下班之后，PHANG 16:30 → 17:30、GOH 15:30 → 16:30（W16、W27））
    b. duration = 30：
         S 没封锁，且已占人数 < 上限
         上限 = 3，如果 service.can_be_third 且前一格、后一格都不是 3 人；否则 2
