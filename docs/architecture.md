@@ -83,9 +83,15 @@ settings              max_per_slot（默认 3）、max_per_slot_for_ai（默认 
 check_available_slots(date, service, doctor_id?, duration = 30)  → 读 GPiS 当天预约 + 本系统排班、疗程设置，规则见下
 create_appointment_request(...)            → 写 PostgreSQL（PENDING）
 get_customer_by_phone(phone)               → 读 GPiS Qry_CAH_Appointment / Tbl_CAH_ContactNumbers（一个号码可能对应多位病人）
+                                             号码先标准化成国际格式再比对（约 12% 是新加坡号码），规则见 gpis-database.md 统计查询 C 的结果
 get_treatment_doctor(contact_id, service)  → 读 GPiS：这位病人上一次同类疗程的医生；多步骤疗程的后续预约必须用这位医生（W9）
                                              只回传医生，不回传病历（最少必要信息）
 handover_to_human(reason)                  → conversation.mode = HUMAN，通知员工
+```
+
+GPiS 的预约**可能被删除**（W26），所以每次都重新读 GPiS，不缓存旧结果；`appointment_requests.gpis_appointment_id` 在 GPiS 找不到时，在 Admin Platform 提醒员工。
+
+```
 ```
 
 ### 空档计算规则（初版，待统计查询 B 验证）
@@ -96,21 +102,22 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 输入：date, service（要预约的疗程代码）, doctor_id（多步骤疗程固定为原来的医生）, duration（30 或 60，默认 30）
 1. clinic_closures 有这一天，或 doctor_schedules 显示该医生这天不上班 → 没有空档
 2. 候选时段 = 该医生这天 start_time … last_slot，每 30 分钟一格，扣掉 break_start … break_end
-   （例：PHANG 星期三 → 9:00 … 16:30，扣掉 12:00、12:30 → 14 格）
+   （例：PHANG 星期三 → 9:00 … 16:30，扣掉午休 12:00、12:30 → 14 格；GOH 星期一 → 9:00 … 15:30，扣掉午休 13:00、13:30 → 12 格）
 3. 从 GPiS 读该医生这天的预约，排除 Status 为 Canceled 的
 4. 先看本系统的"医生请假"记录，再找 GPiS 的占位记录，不论在哪个时段（包括 00:00）、不论联系人是谁
    （统计 B7、B12：诊所联系人也用来记真实疗程，OFF DAY 记录的联系人都不是诊所 → 按 Remarks 判断）：
-     - 本系统记录了请假，或 Remarks 含 OFF DAY → 该医生这天没有空档
+     - 本系统记录了请假，或 Remarks 去掉空格后含 OFFDAY（包括农历新年、圣诞节的写法；`OFF SUNDAY` 不算）→ 该医生这天没有空档
      - 诊所联系人的其他写法（如 1130 FIRST APPT、GO BANK）→ 这天整天标记 NEEDS_REVIEW，AI 不自动推荐，转员工
    占位记录本身不算病人，之后不再计算
 5. 再排除 TimeSlot = '00:00'（提醒 / 未定时间）和 Status = Postpone，剩下的才是占用时段的预约
 6. 现有预约里的长预约独占多格：1 hour 占 2 格，1.5 hour 占 3 格；被占的格整格封锁
    时长只看 Remarks（W17）：转大写、去空格后用正则匹配"数字 + H / HR / HOUR(S)"，
-   1.5 / 1.30 / 1HOURS30 = 90 分钟；有 HOUR 字样但解析不了 → 当天转人工（写法见统计 B5、C4）
+   1.5 / 1.30 / 1HOURS30 = 90 分钟（3 格，W23）；有 HOUR 字样但解析不了 → 当天转人工（写法见统计 B5、C4）
+   xxMIN（如 20MIN!!!）一律当 30 分钟、1 格（W24）
 7. 判断每个候选时段 S：
    a. duration = 60（员工决定这次要 1 hour）：
         S 和下一格都没封锁、都是 0 人，且下一格不是午休
-        （S = last_slot 16:30 例外：可以做到 17:30）
+        （S = last_slot 例外：可以做到下班之后，PHANG 16:30 → 17:30、GOH 15:30 → 16:30（W16、W27））
    b. duration = 30：
         S 没封锁，且已占人数 < 上限
         上限 = 3，如果 service.can_be_third 且前一格、后一格都不是 3 人；否则 2
