@@ -98,13 +98,15 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 2. 候选时段 = 该医生这天 start_time … last_slot，每 30 分钟一格，扣掉 break_start … break_end
    （例：PHANG 星期三 → 9:00 … 16:30，扣掉 12:00、12:30 → 14 格）
 3. 从 GPiS 读该医生这天的预约，排除 Status 为 Canceled 的
-4. 先找"占位记录"（联系人是诊所本身），不论在哪个时段（包括 00:00）：
-     - Remarks 是 OFF DAY → 该医生这天没有空档
-     - 其他写法（如 1130 FIRST APPT）→ 这天整天标记 NEEDS_REVIEW，AI 不自动推荐，转员工
+4. 先看本系统的"医生请假"记录，再找 GPiS 的占位记录，不论在哪个时段（包括 00:00）、不论联系人是谁
+   （统计 B7、B12：诊所联系人也用来记真实疗程，OFF DAY 记录的联系人都不是诊所 → 按 Remarks 判断）：
+     - 本系统记录了请假，或 Remarks 含 OFF DAY → 该医生这天没有空档
+     - 诊所联系人的其他写法（如 1130 FIRST APPT、GO BANK）→ 这天整天标记 NEEDS_REVIEW，AI 不自动推荐，转员工
    占位记录本身不算病人，之后不再计算
 5. 再排除 TimeSlot = '00:00'（提醒 / 未定时间）和 Status = Postpone，剩下的才是占用时段的预约
-6. 现有预约里的 1 hour 预约独占两格：这一格或前一格有 1 hour 预约 → 这一格整格封锁
-   哪些算 1 hour：只看 Remarks 有没有写 1 hour（写法见统计 B5），不按疗程代码推断（W17）
+6. 现有预约里的长预约独占多格：1 hour 占 2 格，1.5 hour 占 3 格；被占的格整格封锁
+   时长只看 Remarks（W17）：转大写、去空格后用正则匹配"数字 + H / HR / HOUR(S)"，
+   1.5 / 1.30 / 1HOURS30 = 90 分钟；有 HOUR 字样但解析不了 → 当天转人工（写法见统计 B5、C4）
 7. 判断每个候选时段 S：
    a. duration = 60（员工决定这次要 1 hour）：
         S 和下一格都没封锁、都是 0 人，且下一格不是午休

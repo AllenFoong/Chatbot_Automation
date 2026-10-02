@@ -24,22 +24,24 @@
 5. **不反编译 GPiS、不解密 `sa` 密码、不读取 `Tbl_User`。**
 6. 仓库里不写入任何密码、连接字符串中的密码、access token（用环境变量 / `.env`，并加入 `.gitignore`）。
 
-## 当前进度（2026-09-30）
+## 当前进度（2026-10-02）
 
 - [x] 确认 GPiS 使用 SQL Server 2012 Express，数据库名 `GPiS`
 - [x] 导出表结构，找到预约表 `Tbl_CAH_Appointment` 及相关设置表
 - [x] 在主机上 `COPY_ONLY` 备份成功
 - [x] 备份经 7-Zip 加密后传到开发电脑：`D:\GPiS\GPiS_copy.bak`
 - [x] 整理 staff 使用 GPiS 预约的方式和业务规则（`docs/clinic-workflow.md`）
-- [ ] 开发电脑安装 SQL Server Express + SSMS（进行中）
-- [ ] 还原为 `GPiS_Dev`
-- [ ] 跑统计查询 A、B，回答 `docs/gpis-database.md` 第 6 节的问题
+- [x] 开发电脑安装 SQL Server 2025 Express + SSMS
+- [x] 还原并改名为 `GPiS_Dev`
+- [x] 统计查询 A（结果见 `docs/gpis-database.md` 第 6 节）
+- [x] 统计查询 B（B1–B13，结果见 `docs/gpis-database.md`）
+- [ ] 统计查询 C（C1–C6）
+- [ ] 诊所回答 `docs/clinic-workflow.md` 的新问题 W19–W26
 - [x] 诊所已回答 `docs/clinic-workflow.md` 第 7 节的全部问题（W1–W18）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. 在 SSMS 中还原：右键 Databases → Restore Database → Device 选 `D:\GPiS\GPiS_copy.bak` → Destination 改为 `GPiS_Dev` → Files 勾选 *Relocate all files to folder* → OK。
-2. 验证：`sqlcmd -S .\SQLEXPRESS -E -d GPiS_Dev -Q "SELECT COUNT(*) FROM Tbl_CAH_Appointment"`
-3. 跑 `docs/gpis-database.md` 里的**统计查询 A 和 B**（B5 优先），把结果记录回该文件。
-4. 按 `docs/architecture.md` 的"空档计算规则"，写出"查某天某医生空档"的 SQL（开发路线 Phase 1）。
+1. 在 SSMS（`GPiS_Dev`，Ctrl+T 文字结果）跑 `docs/gpis-database.md` 的**统计查询 C**，先确认结果里没有病人名字或号码，再把结果记录回该文件。
+2. 向诊所确认 `docs/clinic-workflow.md` 的 W19–W26。
+3. 按 `docs/architecture.md` 的"空档计算规则"，写出"查某天某医生空档"的 SQL（开发路线 Phase 1）。
