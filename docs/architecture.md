@@ -97,7 +97,7 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 输入：date, service（要预约的疗程代码）, doctor_id（多步骤疗程固定为原来的医生）, duration（30 或 60，默认 30）
 1. clinic_closures 有这一天，或 doctor_schedules 显示该医生这天不上班 → 没有空档
 2. 候选时段 = 该医生这天 start_time … last_slot，每 30 分钟一格，扣掉 break_start … break_end
-   （例：PHANG 星期三 → 9:00 … 16:30，扣掉 12:00、12:30 → 14 格）
+   （例：PHANG 星期三 → 9:00 … 16:30，扣掉 12:00、12:30 → 14 格；GOH 星期一 → 9:00 … 15:30，扣掉 13:00、13:30 → 12 格）
 3. 从 GPiS 读该医生这天的预约，排除 Status 为 Canceled 的
 4. 先看本系统的"医生请假"记录，再找 GPiS 的占位记录，不论在哪个时段（包括 00:00）、不论联系人是谁
    （统计 B7、B12：诊所联系人也用来记真实疗程，OFF DAY 记录的联系人都不是诊所 → 按 Remarks 判断）：
@@ -111,7 +111,7 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 7. 判断每个候选时段 S：
    a. duration = 60（员工决定这次要 1 hour）：
         S 和下一格都没封锁、都是 0 人，且下一格不是午休
-        （S = last_slot 16:30 例外：可以做到 17:30）
+        （S = last_slot 例外：PHANG 16:30 可以做到 17:30（W16）；GOH 15:30 能否做到 16:30 待确认（W27），确认前不推荐）
    b. duration = 30：
         S 没封锁，且已占人数 < 上限
         上限 = 3，如果 service.can_be_third 且前一格、后一格都不是 3 人；否则 2
