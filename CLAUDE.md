@@ -38,8 +38,11 @@
 - [x] 统计查询 C（C1–C6，结果见 `docs/gpis-database.md`）
 - [x] 诊所回答 `docs/clinic-workflow.md` 的新问题 W19–W27
 - [x] 诊所已回答 `docs/clinic-workflow.md` 第 7 节的全部问题（W1–W18）
+- [x] Phase 1 SQL 初版：`sql/check_available_slots.sql`、`sql/find_test_dates.sql`
+- [ ] Phase 1 测试：按 `sql/README.md` 的测试清单 T1–T11，在 `GPiS_Dev` 上对照 GPiS 画面
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. **Phase 1**：按 `docs/architecture.md` 的"空档计算规则"，写出"查某天某医生空档"的 SQL，在 `GPiS_Dev` 上验证。业务规则已全部确认（`docs/clinic-workflow.md` 第 1、2 节）。
+1. **Phase 1 测试**：在 SSMS（`GPiS_Dev`）先跑 `sql/find_test_dates.sql` 挑日期，再按 `sql/README.md` 的测试清单跑 `sql/check_available_slots.sql`，把结果和 GPiS 画面对照；算错的地方修正 SQL。
+2. 测试通过后进入 Phase 2：用 Python（FastAPI）把空档计算包装成 API。
