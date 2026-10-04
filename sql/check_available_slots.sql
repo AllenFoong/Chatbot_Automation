@@ -210,8 +210,9 @@ SELECT CONVERT(char(5), d.Slot, 108) AS Slot,
             WHEN d.LongBlocked = 1  THEN N'LONG APPT'
             ELSE N'' END              AS Kind,
        d.Booked,
-       CASE WHEN d.IsBreak = 1 OR d.IsAfterHours = 1 THEN NULL ELSE d.Cap END AS Cap,
-       CASE WHEN d.IsBreak = 1 OR d.IsAfterHours = 1 OR d.LongBlocked = 1 THEN 0
+       CASE WHEN d.IsBreak = 1 OR d.IsAfterHours = 1 OR d.LongBlocked = 1 THEN NULL ELSE d.Cap END AS Cap,
+       CASE WHEN @DayStatus NOT IN (N'OK', N'NEEDS_REVIEW')
+              OR d.IsBreak = 1 OR d.IsAfterHours = 1 OR d.LongBlocked = 1 THEN 0
             WHEN d.Cap > d.Booked THEN d.Cap - d.Booked ELSE 0 END          AS Remaining,
        -- 30 分钟预约能不能约
        CASE WHEN @DayStatus IN (N'OK', N'NEEDS_REVIEW')

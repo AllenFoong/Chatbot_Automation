@@ -24,7 +24,7 @@
 5. **不反编译 GPiS、不解密 `sa` 密码、不读取 `Tbl_User`。**
 6. 仓库里不写入任何密码、连接字符串中的密码、access token（用环境变量 / `.env`，并加入 `.gitignore`）。
 
-## 当前进度（2026-10-02）
+## 当前进度（2026-10-04）
 
 - [x] 确认 GPiS 使用 SQL Server 2012 Express，数据库名 `GPiS`
 - [x] 导出表结构，找到预约表 `Tbl_CAH_Appointment` 及相关设置表
@@ -39,10 +39,10 @@
 - [x] 诊所回答 `docs/clinic-workflow.md` 的新问题 W19–W27
 - [x] 诊所已回答 `docs/clinic-workflow.md` 第 7 节的全部问题（W1–W18）
 - [x] Phase 1 SQL 初版：`sql/check_available_slots.sql`、`sql/find_test_dates.sql`
-- [ ] Phase 1 测试：按 `sql/README.md` 的测试清单 T1–T11，在 `GPiS_Dev` 上对照 GPiS 画面
+- [x] Phase 1 测试：全部通过（记录见 `sql/README.md`）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. **Phase 1 测试**：在 SSMS（`GPiS_Dev`）先跑 `sql/find_test_dates.sql` 挑日期，再按 `sql/README.md` 的测试清单跑 `sql/check_available_slots.sql`，把结果和 GPiS 画面对照；算错的地方修正 SQL。
-2. 测试通过后进入 Phase 2：用 Python（FastAPI）把空档计算包装成 API。
+1. **Phase 2**：用 Python（FastAPI）把 `sql/check_available_slots.sql` 的逻辑做成 `check_available_slots()` API，读 `GPiS_Dev`（连接字符串放 `.env`，不进仓库）。
+2. 设计主机 ↔ 本系统的数据读取方式（`docs/architecture.md` A1）：`GPiS_Dev` 只是 9 月 28 日的快照，正式上线必须读主机的实时数据。
