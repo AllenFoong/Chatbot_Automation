@@ -94,7 +94,7 @@ GPiS 的预约**可能被删除**（W26），所以每次都重新读 GPiS，不
 ```
 ```
 
-### 空档计算规则（初版，待统计查询 B 验证）
+### 空档计算规则（已按统计查询和诊所回答确认；Phase 1 实作：`sql/check_available_slots.sql`）
 
 业务规则来源见 [`clinic-workflow.md`](clinic-workflow.md)。原则：**宁可少推荐，也不要重复预约**；不确定的情况转人工。
 
@@ -141,7 +141,7 @@ GPiS 的预约**可能被删除**（W26），所以每次都重新读 GPiS，不
 | Phase | 内容 |
 |---|---|
 | 0 | 建测试环境：开发电脑还原 `GPiS_Dev`，跑统计查询（进行中） |
-| 1 | 在 `GPiS_Dev` 上写出"查某天某医生空档"的 SQL |
+| 1 | 在 `GPiS_Dev` 上写出"查某天某医生空档"的 SQL（`sql/check_available_slots.sql`，测试清单见 `sql/README.md`） |
 | 2 | FastAPI 封装 `check_available_slots()` 等 API |
 | 3 | PostgreSQL：customers / conversations / messages / appointment_requests |
 | 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等） |
