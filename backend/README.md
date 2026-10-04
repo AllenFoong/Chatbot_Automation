@@ -91,3 +91,22 @@ uvicorn app.main:app --reload
 
 7c 会多一栏 `Occupies`（算不算病人），SQL 没有这栏，其余应该一样。
 输出没有病人资料，可以直接贴回来；有不一样的地方，贴那一天两边的结果。
+
+## 对照记录（2026-10-05，`GPiS_Dev` = 2026-09-28 的快照）
+
+开发电脑（Windows、Python 3.11.9、ODBC Driver 18）连 `GPiS_Dev`，`python -m app.cli` 的结果和 `sql/README.md` 的 Phase 1 测试记录逐一对照：
+
+| # | 日期 / 医生 / 疗程 | 结果 |
+|---|---|---|
+| 0 | 2026-10-09 PHANG S+P | ✅ `OK`，2 人；12:00、12:30 `BREAK`；16:30 `can_60 = 1` |
+| T1 | 2026-09-01 PHANG | ✅ `DOCTOR_NOT_WORKING`，没有时段 |
+| T2 | 2026-09-03 GOH | ✅ `DOCTOR_NOT_WORKING` |
+| T3 | 2026-09-03 PHANG S+P | ✅ `OK`，15 人；`can_60` 只在下一格也空时为 1 |
+| T4 | 2026-09-01 GOH S+P | ✅ 8 人；午休 12:00、12:30；15:30 `can_60 = 1` |
+| T6 | 2026-09-02 PHANG S+P | ✅ 25 人；09:00、11:30、15:30 满 3 人；09:30、11:00、15:00、16:00 `cap = 2` |
+| T7 | 2026-09-02 PHANG C/UP | ✅ 全部 `cap = 2` |
+| T8 | 2026-09-09 PHANG S+P | ✅ 25 人；16:00、16:30 `LONG APPT`；17:00 有员工另排的 1 人 |
+| T9 | 2026-09-18 GOH | ✅ `OFFDAY_IN_GPIS`，全部 `remaining = 0` |
+| T10 | 2026-09-30 PHANG S+P | ✅ `NEEDS_REVIEW`，4 人；11:00 的诊所联系人记录不算 |
+
+结论：Python 版和 SQL 版结果一致，Phase 2 完成。

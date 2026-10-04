@@ -142,7 +142,7 @@ GPiS 的预约**可能被删除**（W26），所以每次都重新读 GPiS，不
 |---|---|
 | 0 | 建测试环境：开发电脑还原 `GPiS_Dev`，跑统计查询（完成） |
 | 1 | 在 `GPiS_Dev` 上写出"查某天某医生空档"的 SQL（`sql/check_available_slots.sql`，测试清单见 `sql/README.md`）（完成） |
-| 2 | FastAPI 封装 `check_available_slots()`：`backend/`（`GET /availability`，用法见 `backend/README.md`）（进行中：等开发电脑对照 SQL 结果） |
+| 2 | FastAPI 封装 `check_available_slots()`：`backend/`（`GET /availability`，用法见 `backend/README.md`）（完成：10 个测试日期和 SQL 结果一致） |
 | 3 | PostgreSQL：customers / conversations / messages / appointment_requests |
 | 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等） |
 | 5 | WhatsApp Cloud API（Webhook）；预约前一天自动提醒（模板消息，要读 GPiS 明天的预约，和 A1 一起设计）。员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 的 AI Agent 更早上线 |
