@@ -12,6 +12,8 @@
 | [`docs/architecture.md`](docs/architecture.md) | 系统架构、技术选型、开发路线、人工介入设计 |
 | [`docs/decisions.md`](docs/decisions.md) | 做过的决定和原因、数据安全规则 |
 | [`docs/clinic-workflow.md`](docs/clinic-workflow.md) | 营业时间、医生排班、staff 如何使用 GPiS 预约、Remarks 治疗代码、待确认问题 |
+| [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
+| [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API、安装和对照步骤 |
 
 开始新 session 时先读这四个文件。
 
@@ -40,9 +42,11 @@
 - [x] 诊所已回答 `docs/clinic-workflow.md` 第 7 节的全部问题（W1–W18）
 - [x] Phase 1 SQL 初版：`sql/check_available_slots.sql`、`sql/find_test_dates.sql`
 - [x] Phase 1 测试：全部通过（记录见 `sql/README.md`）
+- [x] Phase 2 初版：`backend/`（FastAPI `GET /availability`，假数据单元测试 39 个通过）
+- [ ] Phase 2 对照：开发电脑连 `GPiS_Dev`，和 Phase 1 SQL 的测试日期结果逐一对照（`backend/README.md`）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. **Phase 2**：用 Python（FastAPI）把 `sql/check_available_slots.sql` 的逻辑做成 `check_available_slots()` API，读 `GPiS_Dev`（连接字符串放 `.env`，不进仓库）。
+1. **Phase 2 对照**：在开发电脑跑 `backend/`，用 `sql/README.md` 测试记录的日期对照 SQL 和 API 的结果，必须完全一样。改规则时 SQL 和 `backend/app/availability.py` 要一起改。
 2. 设计主机 ↔ 本系统的数据读取方式（`docs/architecture.md` A1）：`GPiS_Dev` 只是 9 月 28 日的快照，正式上线必须读主机的实时数据。

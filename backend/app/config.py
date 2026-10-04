@@ -1,0 +1,27 @@
+"""从环境变量 / backend/.env 读取设置。.env 不进仓库（见 .env.example）。"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+
+@dataclass(frozen=True)
+class Settings:
+    gpis_connection_string: str
+    gpis_expected_database: str
+
+
+def get_settings() -> Settings:
+    conn = os.environ.get("GPIS_CONNECTION_STRING", "").strip()
+    if not conn:
+        raise RuntimeError("没有设置 GPIS_CONNECTION_STRING：复制 backend/.env.example 为 backend/.env 再填写")
+    return Settings(
+        gpis_connection_string=conn,
+        gpis_expected_database=os.environ.get("GPIS_EXPECTED_DATABASE", "GPiS_Dev").strip(),
+    )
