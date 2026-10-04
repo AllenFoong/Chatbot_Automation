@@ -1,0 +1,20 @@
+# 密码 / 连接字符串
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# 数据库、备份、病人资料：绝不进仓库
+*.bak
+*.mdf
+*.ldf
+*.7z
+*.zip
+*.csv
+*.xlsx
