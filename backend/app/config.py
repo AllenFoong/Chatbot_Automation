@@ -25,3 +25,11 @@ def get_settings() -> Settings:
         gpis_connection_string=conn,
         gpis_expected_database=os.environ.get("GPIS_EXPECTED_DATABASE", "GPiS_Dev").strip(),
     )
+
+
+def get_database_url() -> str:
+    """本系统的 PostgreSQL（Phase 3）。"""
+    url = os.environ.get("DATABASE_URL", "").strip()
+    if not url:
+        raise RuntimeError("没有设置 DATABASE_URL：在 backend/.env 加上（格式见 .env.example）")
+    return url

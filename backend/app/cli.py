@@ -1,6 +1,7 @@
 """在终端印出某天的空档，格式和 SQL 的 7a / 7b / 7c 一样，方便对照。
 
 用法（在 backend/ 里）：python -m app.cli 2026-09-02 PHANG S+P
+预约读 GPiS（GPIS_CONNECTION_STRING），诊所设置读本系统的 PostgreSQL（DATABASE_URL）。
 输出不含病人名字和 Remarks。
 """
 
@@ -10,7 +11,8 @@ import sys
 from datetime import date
 
 from .availability import check_available_slots
-from .clinic_rules import DEFAULT_RULES
+from .db.rules import load_clinic_rules
+from .db.session import new_session
 from .main import _default_reader
 
 
@@ -19,7 +21,9 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 2
     day, doctor, service = date.fromisoformat(argv[0]), argv[1], argv[2]
-    r = check_available_slots(day, doctor, service, _default_reader().appointments_for(day, doctor), DEFAULT_RULES)
+    with new_session() as session:
+        rules = load_clinic_rules(session)
+    r = check_available_slots(day, doctor, service, _default_reader().appointments_for(day, doctor), rules)
 
     print(f"7a  {r.date} {r.weekday}  {r.doctor}  {r.service}  {r.day_status}  Patients={r.patients}")
     if r.note:

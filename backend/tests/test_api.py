@@ -1,16 +1,21 @@
-"""API 测试：用假的 GPiS 资料代替数据库。"""
+"""API 测试：用假的 GPiS 资料、固定的诊所设置代替数据库。"""
 
 from datetime import date
 
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
 
 from app.availability import GpisAppointment
+from app.db.rules import RulesNotConfigured
+from app.db.session import get_session
 from app.gpis import WrongDatabaseError, ensure_expected_database
-from app.main import app, get_appointment_source
+from app.main import app, get_appointment_source, get_rules
+from tests.rules import RULES
 
 import pytest
 
 SECRET_REMARK = "TEST PATIENT NAME 1 HOUR"
+PARAMS = {"date": "2026-09-02", "doctor": "PHANG", "service": "S+P"}
 
 
 class FakeSource:
@@ -26,6 +31,7 @@ class FakeSource:
 
 @pytest.fixture
 def client():
+    app.dependency_overrides[get_rules] = lambda: RULES     # 不连 PostgreSQL
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -81,3 +87,35 @@ def test_bad_date_is_rejected(client):
     use(FakeSource())
     r = client.get("/availability", params={"date": "2026-02-30", "doctor": "PHANG", "service": "S+P"})
     assert r.status_code == 422
+
+
+def use_settings_loader(monkeypatch, loader):
+    """不用固定设置，改成走 get_rules → load_clinic_rules（换成假的）。"""
+    del app.dependency_overrides[get_rules]
+    app.dependency_overrides[get_session] = lambda: "fake session"
+    monkeypatch.setattr("app.main.load_clinic_rules", loader)
+
+
+def test_settings_come_from_database(client, monkeypatch):
+    use(FakeSource())
+    seen = []
+    use_settings_loader(monkeypatch, lambda session: seen.append(session) or RULES)
+    assert client.get("/availability", params=PARAMS).status_code == 200
+    assert seen == ["fake session"]
+
+
+@pytest.mark.parametrize("error,shown", [
+    (RulesNotConfigured("数据库里还没有诊所设置：先执行 python -m app.db.seed"), "app.db.seed"),
+    (OperationalError("SELECT 1", {}, Exception("password=hunter2")), "服务器日志"),
+])
+def test_settings_database_errors(client, monkeypatch, error, shown):
+    use(FakeSource())
+
+    def broken(session):
+        raise error
+
+    use_settings_loader(monkeypatch, broken)
+    r = client.get("/availability", params=PARAMS)
+    assert r.status_code == 503
+    assert shown in r.json()["detail"]
+    assert "hunter2" not in r.text

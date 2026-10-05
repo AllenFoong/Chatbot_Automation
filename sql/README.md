@@ -18,7 +18,7 @@ DECLARE @DoctorID nvarchar(20) = N'PHANG';
 DECLARE @Service  nvarchar(20) = N'S+P';
 ```
 
-下面的"设置"（排班、午休、每格上限、能当第 3 人的疗程、公共假期、医生请假）将来会搬到本系统的 PostgreSQL，由员工在 Admin Platform 修改；现在先写在 SQL 里。
+下面的"设置"（排班、午休、每格上限、能当第 3 人的疗程、公共假期、医生请假）已经搬到本系统的 PostgreSQL（Phase 3，`backend/app/db/`），系统用的是数据库里的设置。SQL 里这一份只是对照用的副本：数据库的设置改了之后，要对照就先把这里改成一样。
 
 ### 输出
 

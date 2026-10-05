@@ -1,6 +1,6 @@
 # 系统架构与技术选型
 
-> 最后更新：2026-09-30
+> 最后更新：2026-10-05
 
 ## 1. 需求
 
@@ -52,30 +52,42 @@
 | AI | LLM + **Tool Calling** | 第二阶段加入 |
 | 部署 | Docker → 云端（AWS 等） | 云端测试只用假数据 |
 
-### 本系统数据库（初步）
+### 本系统数据库（Phase 3；表结构以 `backend/app/db/models.py` 为准）
 
 ```
-customers             id, name, phone, gpis_contact_id (nullable), created_at
-conversations         id, customer_id, mode (BOT / HUMAN / CLOSED), assigned_staff_id, created_at
-messages              id, conversation_id, direction (IN / OUT), sender (CUSTOMER / BOT / STAFF), body, wa_message_id, created_at
-appointment_requests  id, customer_id, conversation_id, service, preferred_date, preferred_slot, doctor_id,
-                      status (PENDING / CONFIRMED / REJECTED / CANCELLED), handled_by,
-                      gpis_appointment_id (nullable，员工录入 GPiS 后填上；改期时 ID 不变),
-                      group_id (nullable，一起来的多位病人共用，对应 Remarks 的 WITH), created_at
-staff                 id, name, role, password_hash, created_at
+-- WhatsApp 对话和预约请求（会存病人资料：开发、测试只用假数据）
+wa_contacts           id, wa_phone (unique，国际格式、只有数字), profile_name (WhatsApp 上的名字), created_at
+                      一个 WhatsApp 号码。家人共用号码（B11），所以对话按号码分，不按病人分（D17）
+conversations         id, wa_contact_id, mode (BOT / HUMAN / CLOSED), assigned_staff_id, handover_reason, created_at, closed_at
+                      同一个号码同时最多一段没结束的对话（partial unique index）
+messages              id, conversation_id, sender (CUSTOMER = 收到 / BOT / STAFF = 发出), staff_id, body,
+                      wa_message_id (unique：WhatsApp 重复送来的同一条消息只存一次), created_at
+customers             id, name, phone (国际格式，不唯一), gpis_contact_id (nullable, unique), created_at
+appointment_requests  id, customer_id (帮哪一位病人约), conversation_id (nullable：员工自己建的没有),
+                      service_code, doctor_id, preferred_date, preferred_slot, duration_minutes (30 / 60),
+                      status (PENDING / CONFIRMED / REJECTED / CANCELLED), notes,
+                      group_id (nullable，一起来的多位病人共用，对应 Remarks 的 WITH),
+                      gpis_appointment_id (nullable：改期时 ID 不变；GPiS 画面不显示这个 ID，见 A8),
+                      handled_by, handled_at (最后一次改状态), created_at
+staff                 id, username, name, role (ADMIN / STAFF), password_hash (Phase 4 才用), active, created_at
 
--- 诊所设置（GPiS 没有，由本系统配置，员工可在 Admin Platform 修改）
-doctors               id (= GPiS DoctorID), display_name, remark_tag ('P' / 'G'), active
+-- 诊所设置（GPiS 没有，由本系统配置，员工可在 Admin Platform 修改；初始值见 backend/app/db/seed.py）
+doctors               id (= GPiS DoctorID), display_name, remark_tag ('P' / 'G'), active (离职 = false，不删除)
 doctor_schedules      doctor_id, weekday (1=一 … 7=日), is_working, start_time, last_slot, break_start, break_end
 services              code ('OR', 'S+P', 'RCT' …), name,
-                      may_need_1h (可能要 1 hour，由员工看情况决定), can_be_third (能否当一格的第 3 人), multi_step,
-                      ai_can_book (AI 能否自己推荐时段；否 = 收集需求后转员工，见 D16), active
-clinic_closures       date, reason                         -- 假期管理模块维护：全国 + Johor 公共假期、农历新年多休的日子、诊所自定休息日
+                      can_be_third (能否当一格的第 3 人), may_need_1h (可能要 1 hour，由员工看情况决定),
+                      ai_can_book (AI 能否自己推荐时段；否 = 收集需求后转员工，见 D16),
+                      treatment_group (IMPLANT / DENTURE / ORTHO / RCT：多步骤疗程，后续预约要同一位医生，D21), active
+clinic_closures       closure_date, reason                 -- 假期管理模块维护：全国 + Johor 公共假期、农历新年多休的日子、诊所自定休息日
                                                            -- 每年可用程序预填公共假期（如 Python `holidays` 套件），员工再核对、补上多休的日子
-settings              max_per_slot（默认 3）、max_per_slot_for_ai（默认 3；改成 2 = AI 不用第 3 个名额）等
+doctor_leaves         doctor_id, leave_date, reason        -- 本系统记录的医生请假（备用，W25）
+clinic_settings       只有一行：max_per_slot（3）、max_per_slot_for_ai（3；改成 2 = AI 不用第 3 个名额）、clinic_contact_id（34094）
 ```
 
-`appointment_requests.service` 使用 GPiS Remarks 的同一套治疗代码（`C/UP`、`S+P`、`OR` …，见 [`clinic-workflow.md`](clinic-workflow.md) 第 6 节），员工录入 GPiS 时可以直接照抄。
+`appointment_requests.service_code` 使用 GPiS Remarks 的同一套治疗代码（`C/UP`、`S+P`、`OR` …，见 [`clinic-workflow.md`](clinic-workflow.md) 第 6 节），员工录入 GPiS 时可以直接照抄。
+
+能写成数据库约束的规则都写成约束（D19）：时间在 30 分钟格上、排班开始 ≤ 最后一格、每格上限 1–3、代码大写、`PENDING` 的请求没有 `handled_at` 等。
+收发消息、转人工、请求状态的规则在 `backend/app/db/` 的函数里（`backend/README.md`「本系统的数据库」）。
 
 ### AI Agent 工具（初步）
 
@@ -91,8 +103,8 @@ handover_to_human(reason)                  → conversation.mode = HUMAN，通�
 
 GPiS 的预约**可能被删除**（W26），所以每次都重新读 GPiS，不缓存旧结果；`appointment_requests.gpis_appointment_id` 在 GPiS 找不到时，在 Admin Platform 提醒员工。
 
-```
-```
+Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_human`（`backend/app/db/`）；
+`get_customer_by_phone` 的号码标准化在 `backend/app/phone.py`，本系统里的病人用 `find_customers_by_phone` 找。
 
 ### 空档计算规则（已按统计查询和诊所回答确认；Phase 1 实作：`sql/check_available_slots.sql`）
 
@@ -143,7 +155,7 @@ GPiS 的预约**可能被删除**（W26），所以每次都重新读 GPiS，不
 | 0 | 建测试环境：开发电脑还原 `GPiS_Dev`，跑统计查询（完成） |
 | 1 | 在 `GPiS_Dev` 上写出"查某天某医生空档"的 SQL（`sql/check_available_slots.sql`，测试清单见 `sql/README.md`）（完成） |
 | 2 | FastAPI 封装 `check_available_slots()`：`backend/`（`GET /availability`，用法见 `backend/README.md`）（完成：10 个测试日期和 SQL 结果一致） |
-| 3 | PostgreSQL：customers / conversations / messages / appointment_requests |
+| 3 | PostgreSQL：customers / conversations / messages / appointment_requests，诊所设置搬进数据库（`backend/app/db/`）（完成：开发电脑 104 个测试通过，10 个测试日期和 Phase 2 结果一致） |
 | 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等） |
 | 5 | WhatsApp Cloud API（Webhook）；预约前一天自动提醒（模板消息，要读 GPiS 明天的预约，和 A1 一起设计）。员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 的 AI Agent 更早上线 |
 | 6 | AI Agent（Tool Calling）+ 转人工规则 |
@@ -161,3 +173,4 @@ GPiS 的预约**可能被删除**（W26），所以每次都重新读 GPiS，不
 | A5 | 是否已获得诊所 / GPiS 开发商对这种数据使用方式的书面同意？ |
 | A6 | 项目性质（学习 / 毕业项目 / 正式上线）、时间与预算（LLM、WhatsApp API 费用）？ |
 | A7 | 病人已经习惯用诊所现有的 WhatsApp 号码，诊所用的是 **WhatsApp Business App**（W18）。候选：Meta 的 **Coexistence**，同一个号码同时用 Business App 和 Cloud API，保留聊天记录，员工仍可在手机上回复（第三方资料显示马来西亚已支持）。已知限制：每秒最多 20 条消息；不支持群组、广播列表、语音 / 视频通话、目录（catalog）、限时消息等。**待验证**：以 Meta 官方文件为准；员工在手机上发的消息，本系统能不能看到（Admin Platform 要显示完整对话） |
+| A8 | **还没录入 GPiS 的预约请求要不要算进空档**：空档现在只看 GPiS。AI 把 10:00 推荐给病人 A（`PENDING`）之后、员工录入 GPiS 之前，病人 B 来问，10:00 仍然显示有空。建议在 Phase 6（AI 推荐时段）之前：`PENDING` 和刚 `CONFIRMED`、GPiS 里还看不到的请求都算占用（宁可少推荐）。难处：要把请求和 GPiS 的预约对上（日期、时段、医生、病人），否则员工录入后会算两次；GPiS 画面不显示 `AppointmentID`，`gpis_appointment_id` 也要靠系统自动对上。改规则时 SQL 和 `availability.py` 要一起改 |
