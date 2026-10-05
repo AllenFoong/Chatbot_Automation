@@ -47,12 +47,12 @@
 - [x] Phase 3 初版：`backend/app/db/`（PostgreSQL 12 张表 + Alembic migration；诊所设置搬进数据库；云端容器 PostgreSQL 16 上 104 个测试通过，全部假数据）
 - [x] Phase 3 对照：开发电脑装 PostgreSQL 18，`pytest` 104 个通过、没有 skipped；10 个测试日期结果和 Phase 2 一样（记录见 `backend/README.md`）
 - [x] Phase 4a 初版：员工登录（ADMIN / STAFF）+ Admin API（`backend/app/api/`，migration `0002`；云端容器 131 个测试通过，全部假数据）
-- [ ] Phase 4a 测试：开发电脑 `alembic upgrade head` → `0002`，`pytest` 131 个通过，`/docs` 登录试用（`backend/README.md`「Phase 4a 完成的条件」）
+- [x] Phase 4a 测试：开发电脑 `0002 (head)`，`pytest` 131 个通过、没有 skipped，`/docs` 登录试用 5 项正常（记录见 `backend/README.md`）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. **Phase 4a 测试**（开发电脑）。
+1. 把 Phase 4a 合并进 `main`。
 2. **Phase 4b**：React + TypeScript 网页（英文画面），调用 4a 的 API。需要在开发电脑装 Node.js。
 3. 设计主机 ↔ 本系统的数据读取方式（`docs/architecture.md` A1）：`GPiS_Dev` 只是 9 月 28 日的快照，正式上线必须读主机的实时数据。
 4. 上线前：用 Admin Platform 导入公共假期、补上农历新年多休的日子（`clinic_closures` 现在是空的）。

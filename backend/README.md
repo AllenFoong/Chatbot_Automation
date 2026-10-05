@@ -258,3 +258,21 @@ python -m app.db.demo                    # 放假资料（4 段对话、4 个预
 
 云端容器里的记录（2026-10-05，PostgreSQL 16、只用假数据）：`pytest` 131 个通过；在 `chatbot_dev` 实际跑过
 升级 → 建 ADMIN → 放假资料 → 用 curl 登录、看对话和请求、导入 2026 年公共假期（23 天）。
+
+### Phase 4a 测试记录（2026-10-05，开发电脑：Windows、PostgreSQL 18）
+
+- `alembic upgrade head` → `0002 (head)`；`create_staff` 建 ADMIN；`demo` 放假资料。
+- `pytest`：**131 passed，没有 skipped**。
+- `/docs` 试用全部正常：
+
+| # | API | 结果 |
+|---|---|---|
+| 1 | `POST /api/auth/login` | ✅ 200，`role = ADMIN` |
+| 2 | `GET /api/conversations` | ✅ 3 段没结束的假对话（Demo SG 是 HUMAN） |
+| 3 | `GET /api/requests` | ✅ 3 个待确认请求（Demo Kid A、Demo Kid B、Demo Patient） |
+| 4 | `POST /api/closures/import-holidays`（2026） | ✅ 导入 23 天公共假期 |
+| 5 | `GET /api/closures?year=2026` | ✅ 列出导入的假期 |
+
+另外：`POST /api/closures` 的 `closure_date` 只填 `"2026"` 回 `422`（日期格式检查有效）。
+
+结论：Phase 4a 完成。
