@@ -16,7 +16,7 @@ DECLARE @Date     date         = '2026-10-09';
 DECLARE @DoctorID nvarchar(20) = N'PHANG';     -- PHANG / GOH
 DECLARE @Service  nvarchar(20) = N'S+P';       -- 要预约的疗程代码；决定能不能用第 3 个名额
 
-/* ---------- 2. 设置：将来放在本系统 PostgreSQL（doctor_schedules、services、clinic_closures） ---------- */
+/* ---------- 2. 设置：系统用的是本系统 PostgreSQL 里的设置（Phase 3）；这里是对照用的副本，要和数据库一致 ---------- */
 DECLARE @MaxPerSlot      int = 3;      -- 每格最多几人（W22）
 DECLARE @MaxPerSlotForAI int = 3;      -- 改成 2 = AI 不用第 3 个名额
 DECLARE @ClinicContactID int = 34094;  -- 诊所自己当联系人（统计 B6）

@@ -8,15 +8,19 @@ from functools import lru_cache
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from .availability import check_available_slots
-from .clinic_rules import DEFAULT_RULES, ClinicRules
+from .clinic_rules import ClinicRules
 from .config import get_settings
+from .db.rules import RulesNotConfigured, load_clinic_rules
+from .db.session import get_session
 from .gpis import AppointmentSource, GpisReader, WrongDatabaseError
 
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="Chatbot_Automation API", version="0.2.0")
+app = FastAPI(title="Chatbot_Automation API", version="0.3.0")
 
 
 class SlotOut(BaseModel):
@@ -65,8 +69,15 @@ def get_appointment_source() -> AppointmentSource:
     return _default_reader()
 
 
-def get_rules() -> ClinicRules:
-    return DEFAULT_RULES
+def get_rules(session: Session = Depends(get_session)) -> ClinicRules:
+    """诊所设置每次都从 PostgreSQL 读：员工改了马上生效。"""
+    try:
+        return load_clinic_rules(session)
+    except RulesNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except SQLAlchemyError as e:  # 不把连接字符串或 driver 的详细错误回给调用方
+        log.exception("读取本系统设置失败")
+        raise HTTPException(status_code=503, detail="读取本系统设置失败，请看服务器日志") from e
 
 
 @app.get("/health")

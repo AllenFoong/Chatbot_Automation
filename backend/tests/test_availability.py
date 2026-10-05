@@ -6,10 +6,11 @@ from itertools import count
 import pytest
 
 from app.availability import GpisAppointment, check_available_slots, duration_slots, normalize_remarks
-from app.clinic_rules import DEFAULT_RULES, ClinicRules
+from app.clinic_rules import ClinicRules
+from tests.rules import RULES
 
 TUE, WED, THU, FRI = date(2026, 9, 1), date(2026, 9, 2), date(2026, 9, 3), date(2026, 9, 4)
-CLINIC = DEFAULT_RULES.clinic_contact_id
+CLINIC = RULES.clinic_contact_id
 _ids = count(1)
 
 
@@ -17,7 +18,7 @@ def appt(slot, remarks="S+P", status="Booked", contact_id=1):
     return GpisAppointment(next(_ids), slot, status, contact_id, remarks)
 
 
-def run(day, doctor, appts=(), service="S+P", rules=DEFAULT_RULES):
+def run(day, doctor, appts=(), service="S+P", rules=RULES):
     return check_available_slots(day, doctor, service, list(appts), rules)
 
 
@@ -93,7 +94,7 @@ def test_t7_non_third_service_caps_at_two():
 
 
 def test_max_per_slot_for_ai_setting():
-    rules = ClinicRules(**{**DEFAULT_RULES.__dict__, "max_per_slot_for_ai": 2})
+    rules = ClinicRules(**{**RULES.__dict__, "max_per_slot_for_ai": 2})
     r = run(WED, "PHANG", service="S+P", rules=rules)
     assert {s.cap for s in r.slots if s.cap is not None} == {2}
 
@@ -172,7 +173,7 @@ def test_unparsed_hour_needs_review():
 
 def test_closure_and_leave():
     rules = ClinicRules(**{
-        **DEFAULT_RULES.__dict__,
+        **RULES.__dict__,
         "closures": {WED: "Public holiday"},
         "doctor_leaves": frozenset({("GOH", FRI)}),
     })

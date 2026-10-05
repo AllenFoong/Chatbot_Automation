@@ -1,7 +1,8 @@
-"""诊所的设置：排班、午休、每格上限、能当第 3 人的疗程、休息日、请假。
+"""诊所设置在程序里的样子（availability.py 用）：排班、午休、每格上限、能当第 3 人的疗程、休息日、请假。
 
-和 sql/check_available_slots.sql 第 2 节一样。将来会搬到本系统的 PostgreSQL
-（doctor_schedules、services、clinic_closures、settings），由员工在 Admin Platform 修改。
+真正的设置存在本系统的 PostgreSQL（app/db/models.py：doctor_schedules、services、clinic_closures、
+doctor_leaves、clinic_settings），由 app/db/rules.py 读出来变成 ClinicRules；初始值在 app/db/seed.py。
+改设置要改数据库（Phase 4 在 Admin Platform 改），不是改这里。
 规则来源：docs/clinic-workflow.md 第 1、2 节（W13、W15、W20、W21、W22）。
 """
 
@@ -30,45 +31,8 @@ WeekSchedule = dict[int, DaySchedule | None]
 class ClinicRules:
     schedules: dict[str, WeekSchedule]
     can_be_third: frozenset[str]
+    max_per_slot: int                # 每格最多几人（W22）
+    max_per_slot_for_ai: int         # 改成 2 = AI 不用第 3 个名额
+    clinic_contact_id: int           # GPiS 里诊所自己当联系人的 ContactID（统计 B6）
     closures: dict[date, str] = field(default_factory=dict)
     doctor_leaves: frozenset[tuple[str, date]] = frozenset()
-    max_per_slot: int = 3            # W22
-    max_per_slot_for_ai: int = 3     # 改成 2 = AI 不用第 3 个名额
-    clinic_contact_id: int = 34094   # 诊所自己当联系人（统计 B6）
-
-
-def _t(hhmm: str) -> time:
-    return time.fromisoformat(hhmm)
-
-
-_PHANG_DAY = DaySchedule(_t("09:00"), _t("16:30"), _t("12:00"), _t("13:00"))
-_GOH_DAY = DaySchedule(_t("09:00"), _t("15:30"), _t("13:00"), _t("14:00"))
-_GOH_TUESDAY = DaySchedule(_t("09:00"), _t("15:30"), _t("12:00"), _t("13:00"))
-
-DEFAULT_RULES = ClinicRules(
-    schedules={
-        "PHANG": {
-            1: _PHANG_DAY,
-            2: None,            # 星期二休息
-            3: _PHANG_DAY,
-            4: _PHANG_DAY,
-            5: _PHANG_DAY,
-            6: _PHANG_DAY,
-            7: _PHANG_DAY,
-        },
-        "GOH": {
-            1: _GOH_DAY,
-            2: _GOH_TUESDAY,    # 星期二午休 12:00
-            3: None,            # 星期三休息
-            4: None,            # 星期四休息
-            5: _GOH_DAY,
-            6: _GOH_DAY,
-            7: _GOH_DAY,
-        },
-    },
-    can_be_third=frozenset({"OR", "S+P", "F", "RETAINER"}),  # W15
-    # 全国 + Johor 公共假期、农历新年多休的日子（W1、W14），例：{date(2026, 12, 25): "Christmas"}
-    closures={},
-    # 本系统记录的医生请假（备用；GPiS 里的 OFF DAY 也会检查，W25），例：{("GOH", date(2026, 10, 10))}
-    doctor_leaves=frozenset(),
-)
