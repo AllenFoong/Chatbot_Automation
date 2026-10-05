@@ -10,11 +10,12 @@ from __future__ import annotations
 import os
 
 import pytest
+from argon2 import PasswordHasher
 from sqlalchemy import create_engine, make_url
 from sqlalchemy.orm import Session
 
 import app.config  # noqa: F401  载入 backend/.env
-from tests.database import drop_all_tables, upgrade_to_head
+from tests.database import PASSWORD, drop_all_tables, upgrade_to_head
 
 
 @pytest.fixture(autouse=True)
@@ -54,3 +55,37 @@ def session(db_engine):
         finally:
             s.close()
             trans.rollback()
+
+
+@pytest.fixture
+def client_for(session, monkeypatch):
+    """client_for(username)：已经登录的 TestClient，连测试数据库。每个员工一个（各有自己的 cookie）。
+
+    用法：add_staff(session, "amy", password=PASSWORD)，再 client_for("amy")。
+    """
+    from fastapi.testclient import TestClient
+
+    from app.db.session import get_session
+    from app.main import app
+
+    # 测试里密码加密用低成本参数，跑得快（正式的设置在 app/auth.py）
+    monkeypatch.setattr("app.auth._hasher", PasswordHasher(time_cost=1, memory_cost=1024, parallelism=1))
+
+    def use_test_session():
+        try:
+            yield session
+        except Exception:
+            session.rollback()       # 和正式的一样：出错时取消这个请求的改动
+            raise
+
+    app.dependency_overrides[get_session] = use_test_session
+
+    def make(username: str | None = None, password: str = PASSWORD) -> TestClient:
+        client = TestClient(app)
+        if username is not None:
+            r = client.post("/api/auth/login", json={"username": username, "password": password})
+            assert r.status_code == 200, r.text
+        return client
+
+    yield make
+    app.dependency_overrides.clear()

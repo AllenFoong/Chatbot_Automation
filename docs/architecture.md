@@ -69,7 +69,8 @@ appointment_requests  id, customer_id (帮哪一位病人约), conversation_id (
                       group_id (nullable，一起来的多位病人共用，对应 Remarks 的 WITH),
                       gpis_appointment_id (nullable：改期时 ID 不变；GPiS 画面不显示这个 ID，见 A8),
                       handled_by, handled_at (最后一次改状态), created_at
-staff                 id, username, name, role (ADMIN / STAFF), password_hash (Phase 4 才用), active, created_at
+staff                 id, username (小写), name, role (ADMIN / STAFF), password_hash (Argon2), active, created_at
+staff_sessions        id, staff_id, token_hash (登录 cookie 的 SHA-256，不存 token 本身), created_at, expires_at (12 小时)  -- Phase 4
 
 -- 诊所设置（GPiS 没有，由本系统配置，员工可在 Admin Platform 修改；初始值见 backend/app/db/seed.py）
 doctors               id (= GPiS DoctorID), display_name, remark_tag ('P' / 'G'), active (离职 = false，不删除)
@@ -156,7 +157,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | 1 | 在 `GPiS_Dev` 上写出"查某天某医生空档"的 SQL（`sql/check_available_slots.sql`，测试清单见 `sql/README.md`）（完成） |
 | 2 | FastAPI 封装 `check_available_slots()`：`backend/`（`GET /availability`，用法见 `backend/README.md`）（完成：10 个测试日期和 SQL 结果一致） |
 | 3 | PostgreSQL：customers / conversations / messages / appointment_requests，诊所设置搬进数据库（`backend/app/db/`）（完成：开发电脑 104 个测试通过，10 个测试日期和 Phase 2 结果一致） |
-| 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等） |
+| 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等）。分两步：**4a** 员工登录 + Admin API（`backend/app/api/`，初版完成，待开发电脑测试）；**4b** React + TypeScript 网页（英文画面） |
 | 5 | WhatsApp Cloud API（Webhook）；预约前一天自动提醒（模板消息，要读 GPiS 明天的预约，和 A1 一起设计）。员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 的 AI Agent 更早上线 |
 | 6 | AI Agent（Tool Calling）+ 转人工规则 |
 | 7 | Docker 化，部署到云端（假数据） |

@@ -185,6 +185,28 @@ class Staff(Base):
     active: Mapped[bool] = mapped_column(server_default=true())
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
+    __table_args__ = (
+        # 登录时会把输入转成小写再比对
+        CheckConstraint("username = lower(btrim(username)) AND username <> ''", name="username_lower"),
+    )
+
+
+class StaffSession(Base):
+    """员工登录后的 session（Phase 4）。
+
+    Cookie 里放随机 token；数据库只存它的 SHA-256，数据库外泄也不能拿来登录。
+    """
+
+    __tablename__ = "staff_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    staff_id: Mapped[int] = mapped_column(ForeignKey("staff.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    expires_at: Mapped[datetime]
+
+    staff: Mapped[Staff] = relationship()
+
 
 class WaContact(Base):
     """一个 WhatsApp 号码。一个号码可能代表几位病人（家人共用，统计 B11），所以对话按号码分，不按病人分。"""
@@ -231,6 +253,7 @@ class Conversation(Base):
     closed_at: Mapped[datetime | None]
 
     wa_contact: Mapped[WaContact] = relationship(back_populates="conversations")
+    assigned_staff: Mapped[Staff | None] = relationship()
     messages: Mapped[list[Message]] = relationship(back_populates="conversation", order_by="Message.id")
 
     __table_args__ = (

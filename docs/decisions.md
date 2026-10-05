@@ -28,6 +28,11 @@
 | D21 | `services.multi_step`（是 / 否）改成 `treatment_group`（`IMPLANT` / `DENTURE` / `ORTHO` / `RCT`） | `get_treatment_doctor` 要找"上一次**同类**疗程"的医生（W9），光有是 / 否不知道哪些代码是同一类 |
 | D22 | 员工在 `BOT` 模式的对话里回复，**等于接手**（mode 改成 `HUMAN`），AI 不再回复 | 避免 AI 和员工同时回复同一位病人 |
 | D23 | `messages` 不存 `direction`，由 `sender` 决定（`CUSTOMER` = 收到，`BOT` / `STAFF` = 发出）；WhatsApp 24 小时规则从 `messages` 算出来，不另外存一栏 | 同一件事只存一次，不会互相矛盾 |
+| D24 | Admin Platform **画面用英文**，前端用 **React + TypeScript**；Phase 4 分两步：4a 后端 API，4b 网页 | 员工习惯 GPiS 和疗程代码的英文；TypeScript 打错栏位名字时编辑器会提醒；每一步小一点比较好测试 |
+| D25 | 员工分 **ADMIN / STAFF**：STAFF 处理对话和预约请求；只有 ADMIN 能改排班、疗程、假期、请假、每格上限、员工账号；至少要留一个 active 的 ADMIN | 设置改错会影响所有病人的空档；最少权限原则 |
+| D26 | 登录用**服务器端 session**：密码用 Argon2 加密；cookie 是 HttpOnly + SameSite=Strict、12 小时失效；数据库只存 token 的 SHA-256；员工停用、重设密码时，已登录的马上失效（不用 JWT） | 网页里有病人资料；HttpOnly 防 XSS 偷 token，SameSite 防 CSRF；服务器端 session 可以马上撤销，JWT 做不到 |
+| D27 | 公共假期用 Python `holidays` 套件预填（马来西亚 + Johor），**只加没有的日子**；农历新年多休的日子由员工自己加 | 每年手动输入容易漏；回教节日是预估日期、诊所多休的日子套件不知道，所以导入后要员工核对 |
+| D28 | 员工在 Admin Platform **回复病人**的功能等 Phase 5 接上 WhatsApp 才做 | 现在存一条"发出"的消息，病人其实收不到，会误导员工 |
 
 ## 数据安全规则（病人资料，受马来西亚 PDPA 保护）
 
