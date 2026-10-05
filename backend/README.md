@@ -1,19 +1,24 @@
-# Backend（Phase 2：空档 API；Phase 3：本系统的 PostgreSQL）
+# Backend（Phase 2：空档 API；Phase 3：本系统的 PostgreSQL；Phase 4a：Admin Platform 的 API）
 
 - **Phase 2**：把 `sql/check_available_slots.sql` 的计算搬到 Python（FastAPI），让之后的 WhatsApp 和 AI Agent 可以调用。
   **只读** GPiS，计算规则和 SQL 完全一样；改规则时两边要一起改。
 - **Phase 3**：本系统自己的 PostgreSQL（读写）：诊所设置（从代码搬进数据库）、WhatsApp 对话、预约请求。
   每张表的说明见 [`docs/architecture.md`](../docs/architecture.md) 第 4 节。
+- **Phase 4a**：员工登录 + Admin Platform 要用的 API（`/api/...`）。网页（4b）之后做。
 
 | 文件 | 内容 |
 |---|---|
 | `app/clinic_rules.py` | 诊所设置在程序里的样子（`ClinicRules`）；设置本身存在 PostgreSQL |
 | `app/availability.py` | 空档计算（= SQL 第 3–7 节），不连接数据库 |
 | `app/gpis.py` | 读 `Tbl_CAH_Appointment`：只有一条 `SELECT`；数据库名字不是 `GPIS_EXPECTED_DATABASE` 就拒绝 |
-| `app/main.py` | API：`GET /availability`、`GET /health` |
+| `app/main.py` | API 入口：`GET /availability`、`GET /health`，加上 `app/api/` 的 Admin API |
+| `app/auth.py` | 员工登录：Argon2 加密密码、session cookie、ADMIN / STAFF 权限 |
+| `app/api/` | Admin API：登录、对话、预约请求、设置（医生、排班、疗程、假期、请假）、员工账号 |
+| `app/db/create_staff.py` | 建员工账号（第一个 ADMIN 用这个建） |
+| `app/db/demo.py` | 放假资料到 `chatbot_dev`，方便看画面（只能用在 `_dev` 数据库） |
 | `app/cli.py` | 在终端印出和 SQL 7a / 7b / 7c 一样格式的结果，方便对照 |
 | `app/phone.py` | 手机号转成国际格式（例 `60123456789`），WhatsApp 的号码和员工输入的号码才能比对 |
-| `app/db/models.py` | 本系统的 12 张表（表结构以这里为准） |
+| `app/db/models.py` | 本系统的 13 张表（表结构以这里为准；Phase 4 加了 `staff_sessions`） |
 | `app/db/seed.py` | 设置的初始值（= SQL 第 2 节 + 疗程代码）；`python -m app.db.seed` 写入 |
 | `app/db/rules.py` | 从 PostgreSQL 读设置 → `ClinicRules` |
 | `app/db/conversations.py` | 收 / 发 WhatsApp 消息、转人工、WhatsApp 24 小时规则 |
@@ -111,6 +116,45 @@ uvicorn app.main:app --reload
 
 读 GPiS 或本系统的 PostgreSQL 失败时回 `503`，不会把连接字符串或错误细节回给调用方（细节在终端日志里）。
 
+## Admin Platform 的 API（Phase 4a）
+
+### 更新（Phase 3 已经装好的电脑）
+
+在 `backend` 里（先启用 venv）：
+
+```powershell
+pip install -r requirements-dev.txt      # 新的套件：argon2-cffi（密码加密）、holidays（公共假期）
+alembic upgrade head                     # 0001 -> 0002：加上登录用的 staff_sessions 表
+python -m app.db.create_staff boss "Your Name" --admin     # 第一个 ADMIN 账号，密码会问两次
+python -m app.db.demo                    # 放假资料（4 段对话、4 个预约请求），方便看
+```
+
+`.env` 可以加上 `COOKIE_SECURE=false`（见 `.env.example`；不加也是 false）。上线用 https 时要改成 `true`。
+
+### 试用
+
+启动 `uvicorn app.main:app --reload`，打开 <http://127.0.0.1:8000/docs>：
+
+1. `POST /api/auth/login` → *Try it out*，填 `{"username": "boss", "password": "…"}` → *Execute*。
+   浏览器会记住登录（cookie），之后的 API 都可以直接试。
+2. `GET /api/conversations`、`GET /api/requests` 看假资料；`POST /api/closures/import-holidays` 填 `{"year": 2026}` 导入公共假期。
+
+| API | 谁能用 | 做什么 |
+|---|---|---|
+| `/api/auth/login`、`logout`、`me`、`password` | 所有人 | 登录、登出、看自己、改自己的密码 |
+| `GET /api/conversations`（`?mode=`）、`/{id}` | STAFF | 对话列表（最近的在前；不填 mode = 没结束的）、完整对话 |
+| `POST /api/conversations/{id}/take-over`、`hand-back`、`close` | STAFF | 接手（AI 停止回复）、交回 AI、结束 |
+| `GET /api/requests`（`?status=`）、`POST /{id}/confirm`、`reject`、`cancel` | STAFF | 预约请求（默认 PENDING，先来的在前）；确认时可以填 GPiS 的 AppointmentID |
+| `GET /api/doctors`、`services`、`closures`、`leaves`、`settings` | STAFF | 看设置 |
+| 上面这些设置的 `POST` / `PUT` / `PATCH` / `DELETE` | **ADMIN** | 改医生、排班（一次 7 天）、疗程、休息日、请假、每格上限 |
+| `POST /api/closures/import-holidays` | **ADMIN** | 预填一年的全国 + Johor 公共假期；农历新年多休的日子要自己加，回教节日是预估日期要核对 |
+| `/api/staff` | **ADMIN** | 员工账号：新增、改权限、停用、重设密码（至少要留一个 ADMIN） |
+
+- 员工回复病人要等 Phase 5 接上 WhatsApp 才有（现在存一条"发出"的消息，病人其实收不到）。
+- 数据库约束挡下的错误值回 `422`，重复的资料回 `409`，回应里的 `rule` 是哪一条约束。
+- 登录：密码只存 Argon2 加密的结果；cookie 是 HttpOnly + SameSite=Strict，12 小时后要重新登录；
+  员工停用、重设密码后，已经登录的也马上失效。
+
 ## 本系统的数据库（Phase 3）
 
 由数据库保证的规则（就算程序有 bug、两个请求同时到，也不会被违反）：
@@ -203,3 +247,32 @@ uvicorn app.main:app --reload
 | T10 | 2026-09-30 PHANG S+P | ✅ `NEEDS_REVIEW`，4 人（诊所联系人 ID 从 PostgreSQL 读出，判断正确） |
 
 结论：设置搬进 PostgreSQL 之后，空档结果和 Phase 2 一致，Phase 3 完成。
+
+## Phase 4a 完成的条件
+
+在开发电脑上：
+
+1. `alembic upgrade head` 之后 `alembic current` 显示 `0002 (head)`。
+2. `pytest` → `131 passed`，没有 skipped。
+3. 照「试用」登录 `/docs`，看得到假资料；用 STAFF 账号改设置会被拒绝（403）。
+
+云端容器里的记录（2026-10-05，PostgreSQL 16、只用假数据）：`pytest` 131 个通过；在 `chatbot_dev` 实际跑过
+升级 → 建 ADMIN → 放假资料 → 用 curl 登录、看对话和请求、导入 2026 年公共假期（23 天）。
+
+### Phase 4a 测试记录（2026-10-05，开发电脑：Windows、PostgreSQL 18）
+
+- `alembic upgrade head` → `0002 (head)`；`create_staff` 建 ADMIN；`demo` 放假资料。
+- `pytest`：**131 passed，没有 skipped**。
+- `/docs` 试用全部正常：
+
+| # | API | 结果 |
+|---|---|---|
+| 1 | `POST /api/auth/login` | ✅ 200，`role = ADMIN` |
+| 2 | `GET /api/conversations` | ✅ 3 段没结束的假对话（Demo SG 是 HUMAN） |
+| 3 | `GET /api/requests` | ✅ 3 个待确认请求（Demo Kid A、Demo Kid B、Demo Patient） |
+| 4 | `POST /api/closures/import-holidays`（2026） | ✅ 导入 23 天公共假期 |
+| 5 | `GET /api/closures?year=2026` | ✅ 列出导入的假期 |
+
+另外：`POST /api/closures` 的 `closure_date` 只填 `"2026"` 回 `422`（日期格式检查有效）。
+
+结论：Phase 4a 完成。

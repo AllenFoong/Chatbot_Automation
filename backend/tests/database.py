@@ -11,7 +11,8 @@ from sqlalchemy import Connection, Engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db.models import Staff
+from app.auth import hash_password
+from app.db.models import Staff, StaffRole
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -62,8 +63,13 @@ def assert_rejected(session: Session, obj) -> None:
             session.add(obj)
 
 
-def add_staff(session: Session, username: str = "amy") -> Staff:
-    staff = Staff(username=username, name=f"{username} (test)")
+PASSWORD = "test-password-123"
+
+
+def add_staff(session: Session, username: str = "amy", role: StaffRole = StaffRole.STAFF,
+              password: str | None = None) -> Staff:
+    staff = Staff(username=username, name=f"{username} (test)", role=role,
+                  password_hash=hash_password(password) if password else None)
     session.add(staff)
     session.flush()
     return staff

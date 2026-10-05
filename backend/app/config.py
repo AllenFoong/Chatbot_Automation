@@ -27,6 +27,11 @@ def get_settings() -> Settings:
     )
 
 
+def cookie_secure() -> bool:
+    """登录 cookie 只经 https 传送。开发电脑用 http://localhost，所以默认 false；上线（https）时改成 true。"""
+    return os.environ.get("COOKIE_SECURE", "false").strip().lower() == "true"
+
+
 def get_database_url() -> str:
     """本系统的 PostgreSQL（Phase 3）。"""
     url = os.environ.get("DATABASE_URL", "").strip()

@@ -6,11 +6,14 @@ import logging
 from datetime import date
 from functools import lru_cache
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from .api import auth as auth_api
+from .api import conversations, requests, settings, staff
 from .availability import check_available_slots
 from .clinic_rules import ClinicRules
 from .config import get_settings
@@ -20,7 +23,19 @@ from .gpis import AppointmentSource, GpisReader, WrongDatabaseError
 
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="Chatbot_Automation API", version="0.3.0")
+app = FastAPI(title="Chatbot_Automation API", version="0.4.0")
+for module in (auth_api, conversations, requests, settings, staff):
+    app.include_router(module.router)
+
+
+@app.exception_handler(IntegrityError)
+def database_rule_violated(request: Request, exc: IntegrityError) -> JSONResponse:
+    """数据库约束挡下的资料（重复、违反 CHECK、找不到对应的医生 …）：回 409 / 422，告诉是哪一条规则。"""
+    sqlstate = getattr(exc.orig, "sqlstate", None)
+    rule = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
+    if sqlstate == "23505":
+        return JSONResponse(status_code=409, content={"detail": "Already exists", "rule": rule})
+    return JSONResponse(status_code=422, content={"detail": "Rejected by a database rule", "rule": rule})
 
 
 class SlotOut(BaseModel):

@@ -5,3 +5,5 @@ python-dotenv>=1.0
 SQLAlchemy>=2.0
 alembic>=1.13
 psycopg[binary]>=3.2
+argon2-cffi>=23.1
+holidays>=0.60
