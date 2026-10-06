@@ -133,8 +133,9 @@ def test_parse_statuses_with_error():
     assert statuses[1].error == "131047: Re-engagement message – More than 24 hours have passed"
 
 
-def test_parse_ignores_other_numbers_and_other_notifications():
+def test_parse_ignores_other_numbers_and_other_notifications(caplog):
     assert parse_webhook(payload([text("w1")], phone_number_id="999"), NUMBER_ID) == ([], [])
+    assert "WHATSAPP_PHONE_NUMBER_ID" in caplog.text            # 不是安静地丢掉：视窗里看得到原因
     assert parse_webhook({"object": "page", "entry": []}, NUMBER_ID) == ([], [])
     other_field = payload([text("w1")])
     other_field["entry"][0]["changes"][0]["field"] = "account_update"

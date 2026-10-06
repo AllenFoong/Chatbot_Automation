@@ -120,7 +120,10 @@ def parse_webhook(payload: dict, phone_number_id: str) -> tuple[list[IncomingMes
             value = change.get("value") or {}
             if change.get("field") != "messages":
                 continue
-            if (value.get("metadata") or {}).get("phone_number_id") != phone_number_id:
+            other = (value.get("metadata") or {}).get("phone_number_id")
+            if other != phone_number_id:
+                # 常见原因：.env 的 WHATSAPP_PHONE_NUMBER_ID 填错（填成电话号码或 WABA ID）。号码 ID 不是病人资料
+                log.warning("webhook 是给另一个号码 ID（%s）的，不处理：检查 .env 的 WHATSAPP_PHONE_NUMBER_ID", other)
                 continue
             names = {c.get("wa_id"): (c.get("profile") or {}).get("name") for c in value.get("contacts") or []}
             for m in value.get("messages") or []:
