@@ -398,7 +398,7 @@ npm run dev
 | 2 | 在这段对话下面输入回复 → *Send* | 手机收到；画面上这条消息显示 *Sending…* → *Delivered*；在手机上打开后变 *Read*；对话显示由你负责 |
 | 3 | 输入回复后按 `Ctrl + Enter` | 一样送出 |
 | 4 | 用手机传一张照片（加一句说明） | 画面显示 `[Image] 说明` |
-| 5 | 打开假资料的 *Demo Mum*，回复 `Hello` | 红字 *This number is not in WHATSAPP_ALLOWED_RECIPIENTS*；没有发出去 |
+| 5 | 把 `.env` 的 `WHATSAPP_ALLOWED_RECIPIENTS=` 暂时改成空的 → 重开视窗 1 → 在你自己的对话回复 `Hello`；做完改回来、再重开视窗 1 | 红字 *This number is not in WHATSAPP_ALLOWED_RECIPIENTS*；手机收不到（允许名单这道保险有效） |
 | 6 | 浏览器打开 `https://….trycloudflare.com/docs` 和 `…/api/auth/me` | 都是 `{"detail":"Not Found"}`：网上只看得到 webhook |
 | 7 | 视窗 2 的日志 | 只有 `POST /webhook … 200`，没有消息内容和电话号码 |
 
