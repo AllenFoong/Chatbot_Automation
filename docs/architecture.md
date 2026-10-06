@@ -1,6 +1,6 @@
 # 系统架构与技术选型
 
-> 最后更新：2026-10-05
+> 最后更新：2026-10-06
 
 ## 1. 需求
 
@@ -47,7 +47,7 @@
 | Backend | Python + **FastAPI** | 适合 REST API 与 Webhook，方便接入 LLM |
 | 本系统数据库 | **PostgreSQL** | 存 WhatsApp 对话、消息、预约请求、员工账号 |
 | 读取 GPiS | **SQL Server** via `pyodbc` / SQLAlchemy | 专用只读账号，只开放预约相关表 |
-| Admin Platform | **React** | 员工查看对话、接手、审批 |
+| Admin Platform | **React + TypeScript**（Vite） | 员工查看对话、接手、审批、改设置（`frontend/`，英文画面）。开发时 Vite 把 `/api` 转给 FastAPI（同一个网址，D29） |
 | 消息入口 | **WhatsApp Cloud API** | Webhook 收消息，API 发消息 |
 | AI | LLM + **Tool Calling** | 第二阶段加入 |
 | 部署 | Docker → 云端（AWS 等） | 云端测试只用假数据 |
@@ -78,7 +78,7 @@ doctor_schedules      doctor_id, weekday (1=一 … 7=日), is_working, start_ti
 services              code ('OR', 'S+P', 'RCT' …), name,
                       can_be_third (能否当一格的第 3 人), may_need_1h (可能要 1 hour，由员工看情况决定),
                       ai_can_book (AI 能否自己推荐时段；否 = 收集需求后转员工，见 D16),
-                      treatment_group (IMPLANT / DENTURE / ORTHO / RCT：多步骤疗程，后续预约要同一位医生，D21), active
+                      treatment_group (IMPLANT / DENTURE / ORTHO / RCT / CROWN / BRIDGE：多步骤疗程，后续预约要同一位医生，D21、D33), active
 clinic_closures       closure_date, reason                 -- 假期管理模块维护：全国 + Johor 公共假期、农历新年多休的日子、诊所自定休息日
                                                            -- 每年可用程序预填公共假期（如 Python `holidays` 套件），员工再核对、补上多休的日子
 doctor_leaves         doctor_id, leave_date, reason        -- 本系统记录的医生请假（备用，W25）
@@ -137,7 +137,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
         AI 用的上限 = min(上限, max_per_slot_for_ai)
 ```
 
-- `duration = 60` 给 Admin Platform 用，帮员工找 1 hour 空档。AI 只推荐 30 分钟、`ai_can_book` 的疗程；`may_need_1h` 的疗程和 implant、denture、RCT 的后续步骤，由员工决定，AI 收集需求后转员工（D15、D16）。
+- `duration = 60` 给 Admin Platform 用，帮员工找 1 hour 空档。AI 只推荐 30 分钟、`ai_can_book` 的疗程；`may_need_1h` 的疗程和 implant、denture、RCT、crown、bridge 的后续步骤，由员工决定，AI 收集需求后转员工（D15、D16、D33）。
 - AI 可以用第 3 个名额，但只限 `can_be_third` 的疗程；员工最后仍要确认（D6）。
 - 多人一起来（Remarks 的 `WITH`）：AI 先找一格剩余名额够所有人的时段，找不到就转员工。
 
@@ -157,7 +157,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | 1 | 在 `GPiS_Dev` 上写出"查某天某医生空档"的 SQL（`sql/check_available_slots.sql`，测试清单见 `sql/README.md`）（完成） |
 | 2 | FastAPI 封装 `check_available_slots()`：`backend/`（`GET /availability`，用法见 `backend/README.md`）（完成：10 个测试日期和 SQL 结果一致） |
 | 3 | PostgreSQL：customers / conversations / messages / appointment_requests，诊所设置搬进数据库（`backend/app/db/`）（完成：开发电脑 104 个测试通过，10 个测试日期和 Phase 2 结果一致） |
-| 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等）。分两步：**4a** 员工登录 + Admin API（`backend/app/api/`，完成：开发电脑 131 个测试通过）；**4b** React + TypeScript 网页（英文画面） |
+| 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等）。分两步：**4a** 员工登录 + Admin API（`backend/app/api/`，完成：开发电脑 131 个测试通过）；**4b** React + TypeScript 网页（英文画面，`frontend/`，完成：Vitest 31 个测试通过，开发电脑测试清单全部通过） |
 | 5 | WhatsApp Cloud API（Webhook）；预约前一天自动提醒（模板消息，要读 GPiS 明天的预约，和 A1 一起设计）。员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 的 AI Agent 更早上线 |
 | 6 | AI Agent（Tool Calling）+ 转人工规则 |
 | 7 | Docker 化，部署到云端（假数据） |

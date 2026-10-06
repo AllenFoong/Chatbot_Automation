@@ -120,7 +120,7 @@ class Service(Base):
     can_be_third: Mapped[bool] = mapped_column(server_default=false())     # 能当一格的第 3 人（W15）
     may_need_1h: Mapped[bool] = mapped_column(server_default=false())      # 可能要 1 hour，由员工看情况决定（W16、W17）
     ai_can_book: Mapped[bool] = mapped_column(server_default=false())      # AI 能自己推荐时段；否 = 收集需求后转员工（D15、D16）
-    # 属于哪一种多步骤疗程：IMPLANT / DENTURE / ORTHO / RCT（不是多步骤 = NULL）。
+    # 属于哪一种多步骤疗程：IMPLANT / DENTURE / ORTHO / RCT / CROWN / BRIDGE（不是多步骤 = NULL）。
     # 后续预约要找"上一次同类疗程"的医生（W9、D16），所以要知道哪些代码是同一类
     treatment_group: Mapped[str | None] = mapped_column(String(20))
     active: Mapped[bool] = mapped_column(server_default=true())

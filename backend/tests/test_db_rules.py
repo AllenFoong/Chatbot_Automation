@@ -21,7 +21,7 @@ def test_seeded_settings_equal_phase2_rules(session):
 
 
 def test_seed_twice_adds_nothing_and_keeps_staff_changes(session):
-    assert seed(session) == {"doctors": 2, "doctor_schedules": 14, "services": 24, "clinic_settings": 1}
+    assert seed(session) == {"doctors": 2, "doctor_schedules": 14, "services": 26, "clinic_settings": 1}
     session.get(ClinicSettings, 1).max_per_slot_for_ai = 2
     session.get(Service, "XLA").active = False
     session.flush()

@@ -1,7 +1,7 @@
 # 决定记录
 
 > 每条决定写明原因。推翻某条决定时，不删除原记录，新增一条并注明取代哪一条。
-> 最后更新：2026-10-05
+> 最后更新：2026-10-06
 
 | # | 决定 | 原因 |
 |---|---|---|
@@ -33,6 +33,11 @@
 | D26 | 登录用**服务器端 session**：密码用 Argon2 加密；cookie 是 HttpOnly + SameSite=Strict、12 小时失效；数据库只存 token 的 SHA-256；员工停用、重设密码时，已登录的马上失效（不用 JWT） | 网页里有病人资料；HttpOnly 防 XSS 偷 token，SameSite 防 CSRF；服务器端 session 可以马上撤销，JWT 做不到 |
 | D27 | 公共假期用 Python `holidays` 套件预填（马来西亚 + Johor），**只加没有的日子**；农历新年多休的日子由员工自己加 | 每年手动输入容易漏；回教节日是预估日期、诊所多休的日子套件不知道，所以导入后要员工核对 |
 | D28 | 员工在 Admin Platform **回复病人**的功能等 Phase 5 接上 WhatsApp 才做 | 现在存一条"发出"的消息，病人其实收不到，会误导员工 |
+| D29 | 网页和 `/api` 放在**同一个网址**：开发时用 Vite 的 proxy（`localhost:5173/api` → `127.0.0.1:8000`），上线时由同一个服务器提供 `dist/` 和 `/api`（Phase 7）；后端**不开 CORS** | 登录 cookie 是 `SameSite=Strict`（D26），不同网址的请求不会带上它；开 CORS 还要允许带 cookie，多一个设错就被别的网站利用的地方 |
+| D30 | 前端只用 **React、React Router** 两个执行时套件：不用 UI 套件、状态管理或资料请求套件；版本固定在 `package-lock.json`，全部支持 Node 22.13 | 画面不多，自己写比较容易看懂、维护；套件越少，供应链风险越小，升级也少出问题 |
+| D31 | 浏览器**不存任何资料**（不用 localStorage / sessionStorage）：登录状态每次问 `/api/auth/me`，任何 API 回 401 就回到登录画面；时间一律显示马来西亚时间（`Asia/Kuala_Lumpur`）。按角色隐藏按钮只是方便，**权限由后端决定** | 网页里有病人资料，诊所电脑可能多人共用；cookie 是 HttpOnly，JavaScript 本来就碰不到；前端的检查谁都能绕过，只有后端的检查算数 |
+| D32 | 对话、请求用**定时重新读取**（对话 10 秒、列表 15 秒、选单数字 30 秒；分页不在前景时不读），不用 WebSocket | 员工人数少，这样最简单；Phase 5 接上 WhatsApp、消息变多时再评估要不要即时推送 |
+| D33 | 牙冠、牙桥也算多步骤疗程：疗程类别加 `CROWN`（`SC` → `ISSUE CROWN`）、`BRIDGE`（`SCAN B` → `ISSUE BRIDGE`），后续的 `ISSUE` 只找原来那位医生、转人工（`ai_can_book` = 否）（扩展 D16、D21） | 都是分两次做、要同一位医生（W29）；戴上的日子要等牙冠 / 牙桥做好，和 implant、denture 一样 AI 判断不了 |
 
 ## 数据安全规则（病人资料，受马来西亚 PDPA 保护）
 

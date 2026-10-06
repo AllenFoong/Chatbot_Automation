@@ -34,8 +34,9 @@ SCHEDULES = {
 }
 
 # (代码, 名字, 能当第 3 人, 可能要 1 hour, AI 能自己推荐时段, 多步骤疗程类别)
-# 能当第 3 人：W15。可能要 1 hour：W16（诊所举的例子，不一定完整）。
-# AI 能推荐：S+P、F、C/UP 和矫正的后续预约（OR、RB、RETAINER）；其他收集需求后转员工（D15、D16）。
+# 能当第 3 人：W15。可能要 1 hour：W16（诊所举的例子，不一定完整）；ISSUE BRIDGE 不用（W30）。
+# AI 能推荐：S+P、F、C/UP 和矫正的后续预约（OR、RB、RETAINER）；其他收集需求后转员工（D15、D16、D33）。
+# 牙冠、牙桥分两次（扫描 → 戴上），要同一位医生（W29、D33）。
 SERVICES = [
     ("C/UP", "Check up", False, False, True, None),
     ("F", "Filling", True, False, True, None),
@@ -45,8 +46,10 @@ SERVICES = [
     ("WHITENING", "Whitening", False, False, False, None),
     ("VENEER", "Veneer", False, True, False, None),
     ("INVISALIGN", "Invisalign", False, False, False, None),
-    ("SC", "Scan crown", False, False, False, None),
-    ("SCAN B", "Scan bridge", False, True, False, None),
+    ("SC", "Scan crown", False, False, False, "CROWN"),
+    ("ISSUE CROWN", "Issue crown", False, False, False, "CROWN"),
+    ("SCAN B", "Scan bridge", False, True, False, "BRIDGE"),
+    ("ISSUE BRIDGE", "Issue bridge", False, False, False, "BRIDGE"),
     ("RCT", "Root canal treatment", False, True, False, "RCT"),
     ("IMPLANT", "Implant", False, True, False, "IMPLANT"),
     ("STO", "Suture take out", False, False, False, "IMPLANT"),

@@ -18,3 +18,6 @@ venv/
 *.zip
 *.csv
 *.xlsx
+
+# 前端（Phase 4b）
+node_modules/

@@ -169,6 +169,7 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 
 - **牙位**：数字是牙齿编号，采用 FDI 两位数编号（第一位为象限 1–4，第二位为 1–8；例 `36` = 左下第一大臼齿）。`33-37` 表示 33 到 37 的范围（牙桥）。
 - **`(P)` / `(G)`**：负责医生（P = PHANG，G = GOH）。虽然和 Doctor Name 重复，员工照样会写。
+- **代码照员工的写法，不要自己统一**：有的是缩写（`SC` = Scan Crown），有的是全写（`ISSUE CROWN`、`ISSUE BRIDGE`，W28）。本系统的代码要和 Remarks 一模一样，员工录入 GPiS 时才能直接照抄。
 
 ### 单次治疗
 
@@ -190,14 +191,17 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 | `RCT (D)` | Drain |
 | `RCT (C)` | Complete |
 
-### 牙冠 / 牙桥
-
-| 代码 | 含义 |
-|---|---|
-| `SC` | Scan Crown（牙冠扫描） |
-| `SCAN B` | Scan Bridge（牙桥扫描） |
-
 ### 多步骤疗程（按顺序）
+
+**Crown（牙冠），2 步**（W28）
+
+1. `SC`：扫描（Scan Crown）
+2. `ISSUE CROWN`：戴牙冠（牙冠做好后）
+
+**Bridge（牙桥），2 步**（W28）
+
+1. `SCAN B`：扫描（Scan Bridge）
+2. `ISSUE BRIDGE`：戴牙桥（牙桥做好后）
 
 **Implant（植牙），5 步**
 
@@ -228,9 +232,9 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 - AI 收集需求时，`appointment_requests.service` 使用**同一套代码**，员工录入 GPiS 时可以直接照抄到 Remarks。
 - 疗程代码也决定每格能排几人和占几格（第 2 节），每个代码的"可能要 1 hour""能否当第 3 人"记在 `services` 设置表，员工可以调整。
 - 改期不改 `AppointmentID`，所以本系统记下 GPiS 的 `AppointmentID` 后，就能一直追踪同一个预约。
-- 多步骤疗程（implant、denture、ortho、RCT）**必须由同一位医生做完**（W9）。后续的预约只能找原来那位医生的空档：从 GPiS 找这位病人上一次同类疗程的预约，取它的医生（DoctorID，或 Remarks 的 `(P)` / `(G)`）。
+- 多步骤疗程（implant、denture、ortho、RCT、crown、bridge）**必须由同一位医生做完**（W9、W29）。后续的预约只能找原来那位医生的空档：从 GPiS 找这位病人上一次同类疗程的预约，取它的医生（DoctorID，或 Remarks 的 `(P)` / `(G)`）。
 - 交给 AI 的：简单、30 分钟的预约（`S+P`、`F`、`C/UP`），以及矫正的后续预约（`OR`、`RETAINER`、`RB`，只推荐病人原来的矫正医生）。
-- 转人工的：可能要 1 hour 的疗程，以及 implant、denture、RCT 的后续步骤（D15、D16）。
+- 转人工的：可能要 1 hour 的疗程，以及 implant、denture、RCT、crown、bridge 的后续步骤（D15、D16、D33）。
 
 ## 7. 向诊所确认的问题
 
@@ -266,6 +270,9 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 | W25 | 医生请假会记进 GPiS 吗？ | **会**（2026-10-02）。但整个历史只有约 31 条 `OFF DAY`，写法也不统一，所以本系统仍保留"医生请假"功能作为备用 |
 | W26 | 员工以前会 `Delete` 预约吗？ | **会**（2026-10-02）。和统计 B9 的约 25,000 个空号一致；改期仍是 `Edit`（W5） |
 | W27 | GOH 能从 15:30 开始 1 hour 预约吗？ | **能**（做到 16:30）（2026-10-02） |
+| W28 | 牙冠 / 牙桥做好后，戴上的那一次 Remarks 写什么？ | `ISSUE CROWN`、`ISSUE BRIDGE`，**全写**，不是缩写（2026-10-06 补上：之前的代码表漏了） |
+| W29 | `ISSUE CROWN` / `ISSUE BRIDGE` 要和扫描（`SC` / `SCAN B`）同一位医生吗？ | **要**（和 W9 一样）（2026-10-06） |
+| W30 | `ISSUE BRIDGE` 会要 1 hour 吗？ | **不用**，一般 30 分钟（2026-10-06） |
 
 ### 待确认
 
