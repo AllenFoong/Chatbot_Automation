@@ -318,7 +318,8 @@ Meta 的画面常改，名字可能不完全一样；找不到时看 App Dashboa
 
 1. 到 <https://developers.facebook.com/>，用自己的 Facebook 帐号登录，注册成为开发者。
 2. *My Apps* → *Create App*，用途选 WhatsApp（*Connect with customers through WhatsApp*）。
-   要选 Business portfolio 的话，自己建一个测试用的，不要用诊所的。
+   要选 Business portfolio 的话，自己建一个测试用的（例 `Chatbot Test`），**不要用诊所的**（D34）：
+   开发和诊所的帐号分开，以后诊所的号码接上时，开发用的 App 碰不到真的病人消息；测试出错也不会连累诊所的帐号。
 3. App 里 *WhatsApp* → *API Setup*：
    - 会有一个**测试号码**（*From*），下面是它的 **Phone number ID**。
    - *To* → *Manage phone number list* → 加上**自己的手机号码**（WhatsApp 会传验证码来）。
