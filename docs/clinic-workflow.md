@@ -169,6 +169,7 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 
 - **牙位**：数字是牙齿编号，采用 FDI 两位数编号（第一位为象限 1–4，第二位为 1–8；例 `36` = 左下第一大臼齿）。`33-37` 表示 33 到 37 的范围（牙桥）。
 - **`(P)` / `(G)`**：负责医生（P = PHANG，G = GOH）。虽然和 Doctor Name 重复，员工照样会写。
+- **代码照员工的写法，不要自己统一**：有的是缩写（`SC` = Scan Crown），有的是全写（`ISSUE CROWN`、`ISSUE BRIDGE`，W28）。本系统的代码要和 Remarks 一模一样，员工录入 GPiS 时才能直接照抄。
 
 ### 单次治疗
 
@@ -269,7 +270,7 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 | W25 | 医生请假会记进 GPiS 吗？ | **会**（2026-10-02）。但整个历史只有约 31 条 `OFF DAY`，写法也不统一，所以本系统仍保留"医生请假"功能作为备用 |
 | W26 | 员工以前会 `Delete` 预约吗？ | **会**（2026-10-02）。和统计 B9 的约 25,000 个空号一致；改期仍是 `Edit`（W5） |
 | W27 | GOH 能从 15:30 开始 1 hour 预约吗？ | **能**（做到 16:30）（2026-10-02） |
-| W28 | 牙冠 / 牙桥做好后，戴上的那一次 Remarks 写什么？ | `ISSUE CROWN`、`ISSUE BRIDGE`（2026-10-06 补上：之前的代码表漏了） |
+| W28 | 牙冠 / 牙桥做好后，戴上的那一次 Remarks 写什么？ | `ISSUE CROWN`、`ISSUE BRIDGE`，**全写**，不是缩写（2026-10-06 补上：之前的代码表漏了） |
 | W29 | `ISSUE CROWN` / `ISSUE BRIDGE` 要和扫描（`SC` / `SCAN B`）同一位医生吗？ | **要**（和 W9 一样）（2026-10-06） |
 | W30 | `ISSUE BRIDGE` 会要 1 hour 吗？ | **不用**，一般 30 分钟（2026-10-06） |
 
