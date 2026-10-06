@@ -52,12 +52,12 @@
 - [x] Phase 4a 合并进 `main`（PR #8）
 - [x] Phase 4b 初版：`frontend/`（React + TypeScript + Vite，英文画面；Vite proxy 把 `/api` 转给 FastAPI；Vitest 31 个测试通过；云端容器用 Node 22.13 和浏览器点过测试清单，全部假数据）
 - [x] 补上漏掉的疗程代码 `ISSUE CROWN`、`ISSUE BRIDGE`；牙冠、牙桥算多步骤疗程（类别 `CROWN`、`BRIDGE`，W28–W30、D33）
-- [ ] Phase 4b 测试：开发电脑照 `frontend/README.md` 的测试清单点一次，再开 PR
+- [x] Phase 4b 测试：开发电脑（Node.js v22.13.0）照 `frontend/README.md` 的条件和测试清单全部通过（记录见 `frontend/README.md`）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. **Phase 4b 测试**：开发电脑 `cd frontend` → `npm ci` → `npm test` → 开 `uvicorn` 和 `npm run dev`，照 `frontend/README.md` 的清单点一次；通过后开 PR。
+1. 把 Phase 4b 合并进 `main`。
 2. Phase 5：WhatsApp Cloud API（先确认 A7 的 Coexistence）。
 3. 设计主机 ↔ 本系统的数据读取方式（`docs/architecture.md` A1）：`GPiS_Dev` 只是 9 月 28 日的快照，正式上线必须读主机的实时数据。
 4. 上线前：用 Admin Platform（*Settings → Clinic closures*）导入公共假期、补上农历新年多休的日子（`clinic_closures` 现在是空的）。

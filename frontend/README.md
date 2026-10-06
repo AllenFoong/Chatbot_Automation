@@ -134,4 +134,9 @@ cookie 才会带上；那时要用 https 并把 `COOKIE_SECURE=true`。现在先
 - 补上 `ISSUE CROWN`、`ISSUE BRIDGE` 后：模拟旧的 `chatbot_dev`（24 个疗程）再跑 `seed` → `services: 新增 2 行`；在网页把 `SC`、`SCAN B` 的 *Group* 改成 `CROWN`、`BRIDGE`，重新整理后还在。
 - 用 headless Chromium 连 `npm run dev` + `uvicorn` + `chatbot_dev`（seed + demo 假资料）点过上面清单 1–12，全部正常，浏览器 console 没有 React 警告。
 
-开发电脑：（待测）
+开发电脑（2026-10-06，Windows、Node.js v22.13.0、PostgreSQL 18，`chatbot_dev` 的假资料）：
+
+- 「Phase 4b 完成的条件」1–5 全部通过：`npm ci`、`npm test`、`npm run build`、后端 `pytest`、`seed` 补上 2 个疗程代码。
+- 测试清单 1–12 项全部正常（包括 `SC`、`SCAN B` 的 *Group* 改成 `CROWN`、`BRIDGE`）。
+
+结论：Phase 4b 完成。

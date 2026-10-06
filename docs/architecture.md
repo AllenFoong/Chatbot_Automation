@@ -157,7 +157,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | 1 | 在 `GPiS_Dev` 上写出"查某天某医生空档"的 SQL（`sql/check_available_slots.sql`，测试清单见 `sql/README.md`）（完成） |
 | 2 | FastAPI 封装 `check_available_slots()`：`backend/`（`GET /availability`，用法见 `backend/README.md`）（完成：10 个测试日期和 SQL 结果一致） |
 | 3 | PostgreSQL：customers / conversations / messages / appointment_requests，诊所设置搬进数据库（`backend/app/db/`）（完成：开发电脑 104 个测试通过，10 个测试日期和 Phase 2 结果一致） |
-| 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等）。分两步：**4a** 员工登录 + Admin API（`backend/app/api/`，完成：开发电脑 131 个测试通过）；**4b** React + TypeScript 网页（英文画面，`frontend/`，初版完成：Vitest 31 个测试通过，等开发电脑测试） |
+| 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等）。分两步：**4a** 员工登录 + Admin API（`backend/app/api/`，完成：开发电脑 131 个测试通过）；**4b** React + TypeScript 网页（英文画面，`frontend/`，完成：Vitest 31 个测试通过，开发电脑测试清单全部通过） |
 | 5 | WhatsApp Cloud API（Webhook）；预约前一天自动提醒（模板消息，要读 GPiS 明天的预约，和 A1 一起设计）。员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 的 AI Agent 更早上线 |
 | 6 | AI Agent（Tool Calling）+ 转人工规则 |
 | 7 | Docker 化，部署到云端（假数据） |
