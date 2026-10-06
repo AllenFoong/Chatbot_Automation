@@ -333,10 +333,26 @@ Meta 的画面常改，名字可能不完全一样；找不到时看 App Dashboa
    token、secret 只写在 `.env`，不要贴到对话或截图里（截图时遮住）。
 6. 装 tunnel 工具 cloudflared（只做一次）：`winget install --id Cloudflare.cloudflared`，装好后重开 PowerShell。
 7. 照下面「使用」开 4 个视窗，复制 cloudflared 印出的 `https://….trycloudflare.com`。
-   Meta App → *WhatsApp* → *Configuration* → *Webhook* → *Edit*：
-   - *Callback URL*：`https://….trycloudflare.com/webhook`
+   **先自己用浏览器试**（等 cloudflared 印出网址后 30 秒左右）：
+   - `https://….trycloudflare.com/health` → 应该看到 `{"status":"ok"}`（tunnel 和视窗 2 都正常）
+   - `https://….trycloudflare.com/webhook?hub.mode=subscribe&hub.verify_token=你的暗号&hub.challenge=hello`
+     → 应该只看到 `hello`（暗号和 `.env` 一样）
+   两个都对了，再到 Meta App → *WhatsApp* → *Configuration*（或 *Quickstart* 的 *Configure Webhooks*）→ *Edit*：
+   - *Callback URL*：`https://….trycloudflare.com/webhook`（**最后一定要有 `/webhook`**）
    - *Verify token*：和 `WHATSAPP_VERIFY_TOKEN` 一样
    - 按 *Verify and save*，再到 *Webhook fields* 把 `messages` 打开（*Subscribe*）。
+8. **把 App 发布（Publish / Live）**：App 没发布时，Meta 只送 dashboard 上按 *Test* 的假 webhook，
+   **你手机传的消息不会送来**（画面上的黄色提示）。
+   - 先要有一个公开的隐私政策网址（*Privacy Policy URL*）：例如把隐私政策的文字放在 GitHub Gist，复制网址。
+   - *App settings* → *Basic* → 填 *Privacy Policy URL*（有要求的话也选 *Category*、放 *App icon*）→ *Save changes*。
+   - 按画面上的 *Publish*（或把 *App Mode* 从 *Development* 改成 *Live*）。
+   - 发布不会让别人碰到测试号码：它仍然只能和你登记的号码互传（D34）。
+9. 发布后手机传的消息还是没有出现在视窗 2：把 App 订阅到测试的 WhatsApp Business Account（WABA）。
+   *API Setup* 上有 *WhatsApp Business Account ID*，在 PowerShell 执行（`…` 换成自己的值；token 不要贴到对话里）：
+   ```powershell
+   curl.exe -X POST "https://graph.facebook.com/v26.0/<WABA ID>/subscribed_apps" -H "Authorization: Bearer <access token>"
+   ```
+   回 `{"success":true}` 就好了。
 
 ### 使用（4 个 PowerShell 视窗）
 
@@ -357,6 +373,17 @@ npm run dev
 - 视窗 1、2 都要先 `cd backend`、启用 venv。改了 `.env` 要重开视窗 1、2。
 - cloudflared 每次重开，网址都会变：要回到 Meta 的 *Configuration* 改 *Callback URL* 再 *Verify and save*。
 - 测完把视窗 3（tunnel）关掉（`Ctrl + C`）。
+
+### 常见问题
+
+| 情况 | 原因、怎么办 |
+|---|---|
+| Meta：*The callback URL or verify token couldn't be validated* | *Callback URL* 最后少了 `/webhook`；或暗号和 `.env` 不一样；或改了 `.env` 没重开视窗 2。先照第 7 步用浏览器试 |
+| 浏览器试 `/health` 看到 Cloudflare 的错误页（例 1033、502） | 视窗 2（port 8001）没开，或 cloudflared 指错 port |
+| 试 `/webhook?...` 看到 `Wrong verify token` | 网址里的暗号和 `.env` 不一样；改了 `.env` 要重开视窗 2 |
+| 试 `/webhook?...` 看到 `WHATSAPP_VERIFY_TOKEN is not set` | `.env` 没有这一行，或视窗 2 在 `.env` 加好之前就开了 |
+| Meta 的 *Test* 按钮送得到，手机传的消息送不到 | App 还没发布（第 8 步）；或 App 没订阅 WABA（第 9 步） |
+| 视窗 2 出现 `401` | `WHATSAPP_APP_SECRET` 填错（签名对不上） |
 
 ### Phase 5a 完成的条件（在开发电脑上测试）
 
