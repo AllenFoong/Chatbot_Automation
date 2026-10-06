@@ -203,7 +203,6 @@ describe("conversations", () => {
     renderApp("/conversations/5");
     expect(await screen.findByText("Hi, can I book scaling?")).toBeInTheDocument();
     expect(screen.getByText("The AI is replying to this conversation.")).toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument(); // 还不能回复（D28）
 
     await userEvent.setup().click(screen.getByRole("button", { name: "Take over" }));
     expect(await screen.findByText(/Staff is handling this conversation \(Demo Amy\)/)).toBeInTheDocument();
@@ -211,5 +210,81 @@ describe("conversations", () => {
     // 选单上的数字马上更新，不用等 30 秒
     expect(await screen.findByRole("link", { name: "Conversations 1" })).toBeInTheDocument();
     expect(calls.some((c) => c.method === "POST" && c.path === "/api/conversations/5/take-over")).toBe(true);
+  });
+});
+
+describe("replying to the patient", () => {
+  it("sends the reply and shows its delivery status", async () => {
+    let replied = false;
+    const sent = fakeConversation({ mode: "HUMAN", assigned_staff_name: "Demo Amy" });
+    sent.messages.push({
+      id: 3, sender: "STAFF", staff_id: 2, body: "See you Friday!", wa_status: "DELIVERED", wa_error: null,
+      created_at: "2026-10-06T02:00:00Z",
+    });
+    const { calls } = fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      ...counts,
+      "GET /api/conversations": ok([fakeConversation()]),
+      "GET /api/conversations/5": () => ok(replied ? sent : fakeConversation()),
+      "POST /api/conversations/5/reply": () => {
+        replied = true;
+        return ok(sent);
+      },
+    });
+    renderApp("/conversations/5");
+    const user = userEvent.setup();
+    const box = await screen.findByLabelText("Reply on WhatsApp");
+    expect(screen.getByText(/Replying takes over this conversation from the AI/)).toBeInTheDocument();
+
+    await user.type(box, "See you Friday!");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(/Delivered/)).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "POST")?.body).toEqual({ body: "See you Friday!" });
+    expect(screen.getByLabelText("Reply on WhatsApp")).toHaveValue(""); // 送出后清空
+  });
+
+  it("keeps the text and shows why when WhatsApp refuses", async () => {
+    fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      ...counts,
+      "GET /api/conversations": ok([fakeConversation()]),
+      "GET /api/conversations/5": ok(fakeConversation()),
+      "POST /api/conversations/5/reply": err(502, "WhatsApp did not accept the message: Recipient not in allowed list"),
+    });
+    renderApp("/conversations/5");
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Reply on WhatsApp"), "Hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Recipient not in allowed list");
+    expect(screen.getByLabelText("Reply on WhatsApp")).toHaveValue("Hello"); // 没送出去：字还在
+  });
+
+  it("explains the 24-hour rule instead of showing the reply box", async () => {
+    fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      ...counts,
+      "GET /api/conversations": ok([fakeConversation()]),
+      "GET /api/conversations/5": ok(fakeConversation({ reply_window_ends_at: "2026-10-01T00:00:00Z" })),
+    });
+    renderApp("/conversations/5");
+    expect(await screen.findByText(/More than 24 hours since the patient's last message/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Reply on WhatsApp")).not.toBeInTheDocument();
+  });
+
+  it("shows why a message was not delivered", async () => {
+    const c = fakeConversation({ mode: "HUMAN" });
+    c.messages.push({
+      id: 3, sender: "STAFF", staff_id: 2, body: "Hello", wa_status: "FAILED",
+      wa_error: "131047: Re-engagement message", created_at: "2026-10-06T02:00:00Z",
+    });
+    fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      ...counts,
+      "GET /api/conversations": ok([c]),
+      "GET /api/conversations/5": ok(c),
+    });
+    renderApp("/conversations/5");
+    expect(await screen.findByText(/Not delivered/)).toBeInTheDocument();
+    expect(screen.getByText("131047: Re-engagement message")).toBeInTheDocument();
   });
 });

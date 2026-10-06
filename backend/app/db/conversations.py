@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..phone import normalize_phone
-from .models import Conversation, ConversationMode, Message, Sender, Staff, WaContact
+from .models import Conversation, ConversationMode, Message, Sender, Staff, WaContact, WaStatus
 
 # WhatsApp 24 小时规则：病人最后一条消息之后 24 小时内才能发一般消息，之后只能发模板消息
 CUSTOMER_SERVICE_WINDOW = timedelta(hours=24)
@@ -111,8 +111,12 @@ def record_outgoing_message(
     body: str,
     staff: Staff | None = None,
     wa_message_id: str | None = None,
+    wa_status: WaStatus | None = None,
 ) -> Message:
-    """存一条发给病人的消息。sender = BOT（AI）或 STAFF（员工；staff = None 表示在手机 App 上发的）。"""
+    """存一条发给病人的消息。sender = BOT（AI）或 STAFF（员工；staff = None 表示在手机 App 上发的）。
+
+    经 WhatsApp API 发出的，wa_status = ACCEPTED，之后由 status webhook 更新（update_message_status）。
+    """
     if sender == Sender.CUSTOMER:
         raise ValueError("病人的消息用 record_incoming_message")
     if sender == Sender.BOT and staff is not None:
@@ -122,6 +126,8 @@ def record_outgoing_message(
         raise BotMuted("员工已接手，AI 不能回复")
     if sender == Sender.STAFF and conversation.mode == ConversationMode.BOT:
         take_over(session, conversation, staff)     # 员工回复 = 接手，AI 停止回复
+    elif sender == Sender.STAFF and staff is not None and conversation.assigned_staff_id is None:
+        conversation.assigned_staff_id = staff.id   # 转给员工、还没有人负责的对话：谁先回复就由谁负责
 
     message = Message(
         conversation_id=conversation.id,
@@ -129,8 +135,32 @@ def record_outgoing_message(
         staff_id=staff.id if staff else None,
         body=body,
         wa_message_id=wa_message_id,
+        wa_status=wa_status,
     )
     session.add(message)
+    session.flush()
+    return message
+
+
+# 送到哪一步只会往前走：WhatsApp 的 webhook 不一定照顺序到（可能先收到 read，再收到 delivered）
+_STATUS_ORDER = {WaStatus.ACCEPTED: 0, WaStatus.SENT: 1, WaStatus.DELIVERED: 2, WaStatus.READ: 3}
+
+
+def update_message_status(
+    session: Session, wa_message_id: str, status: WaStatus, error: str | None = None
+) -> Message | None:
+    """WhatsApp 告诉我们一条发出的消息送到哪一步（status webhook）。
+
+    找不到这条消息（不是本系统发的、或还没存进数据库）就不管，回传 None。FAILED 之后不会再变。
+    """
+    message = session.scalars(select(Message).where(Message.wa_message_id == wa_message_id)).one_or_none()
+    if message is None or message.sender == Sender.CUSTOMER or message.wa_status == WaStatus.FAILED:
+        return None
+    if status == WaStatus.FAILED:
+        message.wa_status = WaStatus.FAILED
+        message.wa_error = error or "Unknown error"
+    elif message.wa_status is None or _STATUS_ORDER[status] > _STATUS_ORDER[message.wa_status]:
+        message.wa_status = status
     session.flush()
     return message
 
@@ -169,8 +199,8 @@ def close_conversation(session: Session, conversation: Conversation) -> None:
     session.flush()
 
 
-def customer_service_window_open(session: Session, wa_contact_id: int, now: datetime | None = None) -> bool:
-    """现在能不能发一般消息给这个号码（WhatsApp 24 小时规则）。
+def customer_service_window_ends_at(session: Session, wa_contact_id: int) -> datetime | None:
+    """到什么时候还能发一般消息给这个号码（WhatsApp 24 小时规则）；病人从来没发过消息 = None。
 
     从 messages 算出来，不另外存一栏：不会和消息记录对不上。AI、员工发的消息不会延长 24 小时。
     """
@@ -179,9 +209,13 @@ def customer_service_window_open(session: Session, wa_contact_id: int, now: date
         .join(Message.conversation)
         .where(Conversation.wa_contact_id == wa_contact_id, Message.sender == Sender.CUSTOMER)
     )
-    if last is None:
-        return False
-    return (now or datetime.now(timezone.utc)) - last < CUSTOMER_SERVICE_WINDOW
+    return None if last is None else last + CUSTOMER_SERVICE_WINDOW
+
+
+def customer_service_window_open(session: Session, wa_contact_id: int, now: datetime | None = None) -> bool:
+    """现在能不能发一般消息给这个号码（WhatsApp 24 小时规则）。"""
+    ends = customer_service_window_ends_at(session, wa_contact_id)
+    return ends is not None and (now or datetime.now(timezone.utc)) < ends
 
 
 def _require_open(conversation: Conversation) -> None:

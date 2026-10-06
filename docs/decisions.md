@@ -38,6 +38,11 @@
 | D31 | 浏览器**不存任何资料**（不用 localStorage / sessionStorage）：登录状态每次问 `/api/auth/me`，任何 API 回 401 就回到登录画面；时间一律显示马来西亚时间（`Asia/Kuala_Lumpur`）。按角色隐藏按钮只是方便，**权限由后端决定** | 网页里有病人资料，诊所电脑可能多人共用；cookie 是 HttpOnly，JavaScript 本来就碰不到；前端的检查谁都能绕过，只有后端的检查算数 |
 | D32 | 对话、请求用**定时重新读取**（对话 10 秒、列表 15 秒、选单数字 30 秒；分页不在前景时不读），不用 WebSocket | 员工人数少，这样最简单；Phase 5 接上 WhatsApp、消息变多时再评估要不要即时推送 |
 | D33 | 牙冠、牙桥也算多步骤疗程：疗程类别加 `CROWN`（`SC` → `ISSUE CROWN`）、`BRIDGE`（`SCAN B` → `ISSUE BRIDGE`），后续的 `ISSUE` 只找原来那位医生、转人工（`ai_can_book` = 否）（扩展 D16、D21） | 都是分两次做、要同一位医生（W29）；戴上的日子要等牙冠 / 牙桥做好，和 implant、denture 一样 AI 判断不了 |
+| D34 | Phase 5 开发**只用 Meta 的测试号码**，而且只发给 `WHATSAPP_ALLOWED_RECIPIENTS` 里的号码（没设定 = 谁都不能发；`*` = 谁都可以，只有上线才用）。检查放在最底层的发送函数 | 规则 4：测试号码只能和自己登记的最多 5 个号码互传，真的病人碰不到；5b 会读 `GPiS_Dev` 里真的电话号码，就算程序有 bug 也不能发出去 |
+| D35 | 收 webhook 的是**单独的小程序**（`app/webhook_main.py`，port 8001）：只有 `/webhook`、`/health`，没有 `/docs`，只连本系统的 PostgreSQL、不连 GPiS。开发时只把它经 tunnel（cloudflared）放上网 | Meta 要连到公开的 https 网址；Admin API、`/availability`（读 `GPiS_Dev`、不用登录）不能放上网。每个 webhook 都检查 Meta 的签名，不是 Meta 送来的不处理 |
+| D36 | 员工回复：**先经 WhatsApp 发出，WhatsApp 收下了才存**；送达状态 `ACCEPTED → SENT → DELIVERED → READ` 只往前走，`FAILED` 存原因给员工看（实现 D28 等的功能） | D28 的顾虑：画面上的"发出"消息一定真的发出去了；送不到（例如超过 24 小时）要让员工知道，不能以为病人收到了 |
+| D37 | 还没有 AI（`AI_REPLIES_ENABLED=false`）时，病人的新对话**直接交给员工**（`HUMAN`，写明原因）；转给员工、还没有人负责的对话，第一个回复的员工负责 | 不然对话停在 `BOT`，画面说"AI 在回复"，其实没有人回 |
+| D38 | 病人传的照片、语音、文件**先不下载**，只存 `[Image]`、`[Voice message]` 等说明；程序日志也不记消息内容和电话号码 | 是病人资料（可能是伤口照片）；存在哪里、保留多久要先决定（A9）。日志常常被复制、贴出去，不能有病人资料 |
 
 ## 数据安全规则（病人资料，受马来西亚 PDPA 保护）
 
@@ -46,6 +51,7 @@
 - ✅ 传输前用 **7-Zip AES 加密**（勾选"加密文件名"），密码不和文件放在一起
 - ✅ 网盘中转后**删除文件并清空回收站**；公司电脑上退出私人账号
 - ✅ 云端测试一律用**假数据**
+- ✅ WhatsApp 开发只用 Meta 的测试号码和自己的手机（D34）；程序日志不记消息内容和电话号码（D38）
 - ✅ 给 AI 看 GPiS 截图前，先遮住 Patient Name、HP No、NRIC、House No 等栏位（或者用 `GPiS_Dev` 的假数据截图）
 
 ### 记录：备份的传输方式

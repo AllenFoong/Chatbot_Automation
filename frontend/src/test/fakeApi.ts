@@ -83,9 +83,11 @@ export function fakeConversation(overrides: Partial<ConversationDetail> = {}): C
   return {
     ...base,
     messages: [
-      { id: 1, sender: "CUSTOMER", staff_id: null, body: "Hi, can I book scaling?", created_at: "2026-10-06T01:47:00Z" },
-      { id: 2, sender: "BOT", staff_id: null, body: "Noted. Our staff will confirm shortly.", created_at: "2026-10-06T01:48:00Z" },
+      { id: 1, sender: "CUSTOMER", staff_id: null, body: "Hi, can I book scaling?", wa_status: null, wa_error: null, created_at: "2026-10-06T01:47:00Z" },
+      { id: 2, sender: "BOT", staff_id: null, body: "Noted. Our staff will confirm shortly.", wa_status: null, wa_error: null, created_at: "2026-10-06T01:48:00Z" },
     ],
+    // 24 小时规则：默认还能回复（20 小时后才截止）
+    reply_window_ends_at: new Date(Date.now() + 20 * 3600_000).toISOString(),
     ...overrides,
   };
 }

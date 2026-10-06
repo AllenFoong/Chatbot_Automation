@@ -26,14 +26,15 @@ React 19 + TypeScript + Vite。只多用了一个套件 React Router（网址 �
 | 网址 | 谁能用 | 做什么 |
 |---|---|---|
 | `/conversations` | 所有员工 | 对话列表（Open / Needs staff / AI replying / Closed），每 15 秒更新 |
-| `/conversations/12` | 所有员工 | 完整对话；**Take over**（AI 停止回复）、**Hand back to AI**、**Close** |
+| `/conversations/12` | 所有员工 | 完整对话；**Take over**（AI 停止回复）、**Hand back to AI**、**Close**、经 WhatsApp 回复（Phase 5a） |
 | `/requests` | 所有员工 | 预约请求；**Confirm**（先在 GPiS 录入，可以填 GPiS AppointmentID）、**Reject**、**Patient cancelled** |
 | `/settings/...` | 看：所有员工；改：**ADMIN** | 医生和排班、疗程、假期（一键导入公共假期）、医生请假、每格上限 |
 | `/staff` | **ADMIN** | 员工账号：新增、改权限、停用、重设密码 |
 | `/account` | 所有员工 | 改自己的密码 |
 
 - 选单上的红色数字：要员工处理的对话（`HUMAN`）、待确认的请求（`PENDING`），每 30 秒更新。
-- 回复病人要等 Phase 5 接上 WhatsApp（D28）：对话画面先没有输入框。
+- 回复病人（Phase 5a）：对话下面的 *Reply on WhatsApp*，`Ctrl + Enter` 也能送出。病人最后一条消息 24 小时之后不能回（WhatsApp 的规定），画面会说明。
+  发出的消息下面显示送到哪一步：*Sending…* / *Sent* / *Delivered* / *Read* / *Not delivered*（红字是原因）。设定 WhatsApp 的步骤见 [`backend/README.md`](../backend/README.md)「Phase 5a」。
 - STAFF 看不到修改的按钮，但**真正挡住的是后端**（STAFF 直接呼叫 API 会得到 403）。
 
 ## 在开发电脑上安装（Windows，只做一次）
@@ -75,7 +76,7 @@ npm run dev
 ## 测试
 
 ```powershell
-npm test            # Vitest：31 个测试，假后端、假资料，不需要开 uvicorn
+npm test            # Vitest：35 个测试，假后端、假资料，不需要开 uvicorn
 npm run build       # TypeScript 检查 + 打包到 dist\（不进仓库）
 ```
 

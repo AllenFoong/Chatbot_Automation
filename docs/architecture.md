@@ -61,7 +61,8 @@ wa_contacts           id, wa_phone (unique，国际格式、只有数字), profi
 conversations         id, wa_contact_id, mode (BOT / HUMAN / CLOSED), assigned_staff_id, handover_reason, created_at, closed_at
                       同一个号码同时最多一段没结束的对话（partial unique index）
 messages              id, conversation_id, sender (CUSTOMER = 收到 / BOT / STAFF = 发出), staff_id, body,
-                      wa_message_id (unique：WhatsApp 重复送来的同一条消息只存一次), created_at
+                      wa_message_id (unique：WhatsApp 重复送来的同一条消息只存一次),
+                      wa_status (发出的消息送到哪一步：ACCEPTED / SENT / DELIVERED / READ / FAILED), wa_error, created_at  -- Phase 5
 customers             id, name, phone (国际格式，不唯一), gpis_contact_id (nullable, unique), created_at
 appointment_requests  id, customer_id (帮哪一位病人约), conversation_id (nullable：员工自己建的没有),
                       service_code, doctor_id, preferred_date, preferred_slot, duration_minutes (30 / 60),
@@ -158,7 +159,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | 2 | FastAPI 封装 `check_available_slots()`：`backend/`（`GET /availability`，用法见 `backend/README.md`）（完成：10 个测试日期和 SQL 结果一致） |
 | 3 | PostgreSQL：customers / conversations / messages / appointment_requests，诊所设置搬进数据库（`backend/app/db/`）（完成：开发电脑 104 个测试通过，10 个测试日期和 Phase 2 结果一致） |
 | 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等）。分两步：**4a** 员工登录 + Admin API（`backend/app/api/`，完成：开发电脑 131 个测试通过）；**4b** React + TypeScript 网页（英文画面，`frontend/`，完成：Vitest 31 个测试通过，开发电脑测试清单全部通过） |
-| 5 | WhatsApp Cloud API（Webhook）；预约前一天自动提醒（模板消息，要读 GPiS 明天的预约，和 A1 一起设计）。员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 的 AI Agent 更早上线 |
+| 5 | WhatsApp Cloud API。分三步：**5a** 收消息（webhook）、员工在 Admin Platform 回复、送达状态，开发只用 Meta 测试号码（`backend/` 的 `whatsapp.py`、`webhook_main.py`；初版完成，等开发电脑测试）；**5b** 模板消息 + 预约前一天自动提醒（要读 GPiS 明天的预约，和 A1 一起设计；员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 更早上线）；**5c** 上线时把诊所的号码接上（Coexistence，A7） |
 | 6 | AI Agent（Tool Calling）+ 转人工规则 |
 | 7 | Docker 化，部署到云端（假数据） |
 | 8 | 解决主机 ↔ 云端同步，再评估是否写入 GPiS |
@@ -173,5 +174,6 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | A4 | 各服务的时长？✅ 一般 30 分钟；`RCT`、`IMPLANT`、`SCAN B`、`VENEER` 等可能要 1 hour，由员工看情况在 Remarks 写 `1 hour`（`clinic-workflow.md` 第 2 节） |
 | A5 | 是否已获得诊所 / GPiS 开发商对这种数据使用方式的书面同意？ |
 | A6 | 项目性质（学习 / 毕业项目 / 正式上线）、时间与预算（LLM、WhatsApp API 费用）？ |
-| A7 | 病人已经习惯用诊所现有的 WhatsApp 号码，诊所用的是 **WhatsApp Business App**（W18）。候选：Meta 的 **Coexistence**，同一个号码同时用 Business App 和 Cloud API，保留聊天记录，员工仍可在手机上回复（第三方资料显示马来西亚已支持）。已知限制：每秒最多 20 条消息；不支持群组、广播列表、语音 / 视频通话、目录（catalog）、限时消息等。**待验证**：以 Meta 官方文件为准；员工在手机上发的消息，本系统能不能看到（Admin Platform 要显示完整对话） |
+| A7 | 病人已经习惯用诊所现有的 WhatsApp 号码，诊所用的是 **WhatsApp Business App**（W18）。候选：Meta 的 **Coexistence**，同一个号码同时用 Business App 和 Cloud API，保留聊天记录，员工仍可在手机上回复（第三方资料显示马来西亚已支持）。已知限制：每秒最多 20 条消息；不支持群组、广播列表、语音 / 视频通话、目录（catalog）、限时消息等。2026-10-06 再查（第三方资料：BSP 文件、搜索结果；Meta 官方网站在云端容器打不开）：① 员工在手机 App 发的消息会经 **`smb_message_echoes`** webhook 送来 → 本系统看得到（存成 `STAFF`、`staff_id` 空；Phase 3 的 `record_outgoing_message` 已经支持）；② 连上时同步过去 180 天的聊天（`history` webhook）和联系人（`smb_app_state_sync`）；③ Business App **每 14 天至少要打开一次**，否则连接会失效；④ 连上后 App 的撤回、限时消息、view once、即时位置、广播列表、编辑消息不能用；⑤ 要经 **Embedded Signup** 连接：找 BSP，或自己的 Meta App 成为 Tech Provider（要商家验证）。**待决定（5c，上线前）**：用 BSP 还是自己做 Embedded Signup；180 天的历史要不要导入（是病人资料）；以上各点上线前再对照 Meta 官方文件 |
+| A9 | **病人传的照片、语音、文件**：5a 先不下载，只显示 `[Image]` 等（D38）。要不要存？存在哪里、保留多久、谁能看（可能是伤口照片，比文字更敏感）？Phase 6 的 AI 要不要看照片？ |
 | A8 | **还没录入 GPiS 的预约请求要不要算进空档**：空档现在只看 GPiS。AI 把 10:00 推荐给病人 A（`PENDING`）之后、员工录入 GPiS 之前，病人 B 来问，10:00 仍然显示有空。建议在 Phase 6（AI 推荐时段）之前：`PENDING` 和刚 `CONFIRMED`、GPiS 里还看不到的请求都算占用（宁可少推荐）。难处：要把请求和 GPiS 的预约对上（日期、时段、医生、病人），否则员工录入后会算两次；GPiS 画面不显示 `AppointmentID`，`gpis_appointment_id` 也要靠系统自动对上。改规则时 SQL 和 `availability.py` 要一起改 |

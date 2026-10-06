@@ -34,6 +34,15 @@ class Sender(enum.StrEnum):
     STAFF = "STAFF"        # 员工发出的（OUT）
 
 
+class WaStatus(enum.StrEnum):
+    """发出的消息送到哪一步（WhatsApp 的 status webhook 会更新，Phase 5）。"""
+    ACCEPTED = "ACCEPTED"      # WhatsApp 收下了（API 回了消息 ID），还没送出
+    SENT = "SENT"              # 已送出（一个勾）
+    DELIVERED = "DELIVERED"    # 病人手机收到了（两个勾）
+    READ = "READ"              # 病人看过了（蓝色两个勾）
+    FAILED = "FAILED"          # 送不到，原因在 wa_error
+
+
 class RequestStatus(enum.StrEnum):
     PENDING = "PENDING"        # 等员工确认
     CONFIRMED = "CONFIRMED"    # 员工确认，录入 GPiS
@@ -278,11 +287,18 @@ class Message(Base):
     body: Mapped[str] = mapped_column(Text)
     # WhatsApp 的消息 ID：同一条消息 WhatsApp 可能送来两次，用它去重
     wa_message_id: Mapped[str | None] = mapped_column(String(128), unique=True)
+    # 发出的消息送到哪一步（Phase 5）。病人发来的、Phase 5 之前的（假资料）没有
+    wa_status: Mapped[WaStatus | None] = mapped_column(_enum(WaStatus, "message_wa_status"))
+    wa_error: Mapped[str | None] = mapped_column(Text)        # 送不到的原因（WhatsApp 的错误信息，给员工看）
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
 
-    __table_args__ = (CheckConstraint("staff_id IS NULL OR sender = 'STAFF'", name="staff_id_only_for_staff"),)
+    __table_args__ = (
+        CheckConstraint("staff_id IS NULL OR sender = 'STAFF'", name="staff_id_only_for_staff"),
+        CheckConstraint("wa_status IS NULL OR sender <> 'CUSTOMER'", name="wa_status_only_outgoing"),
+        CheckConstraint("wa_error IS NULL OR wa_status = 'FAILED'", name="wa_error_only_failed"),
+    )
 
 
 class AppointmentRequest(Base):

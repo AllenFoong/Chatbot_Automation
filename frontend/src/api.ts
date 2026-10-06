@@ -143,6 +143,9 @@ export const conversations = {
   takeOver: (id: number) => request<ConversationDetail>("POST", `/conversations/${seg(id)}/take-over`),
   handBack: (id: number) => request<ConversationDetail>("POST", `/conversations/${seg(id)}/hand-back`),
   close: (id: number) => request<ConversationDetail>("POST", `/conversations/${seg(id)}/close`),
+  /** 经 WhatsApp 发给病人；在 AI 回复的对话里回复 = 接手 */
+  reply: (id: number, body: string) =>
+    request<ConversationDetail>("POST", `/conversations/${seg(id)}/reply`, { body }),
 };
 
 // ---------- 预约请求 ----------
