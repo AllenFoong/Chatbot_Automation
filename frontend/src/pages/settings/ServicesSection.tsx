@@ -7,8 +7,8 @@ import { Badge, ErrorBox, Loading } from "../../components";
 import { useAction, useLoad } from "../../hooks";
 import type { Service, ServiceIn } from "../../types";
 
-// 多步骤疗程：后续预约要同一位医生（W9、D21）
-const TREATMENT_GROUPS = ["IMPLANT", "DENTURE", "ORTHO", "RCT"] as const;
+// 多步骤疗程：后续预约要同一位医生（W9、D21、D33）。和 backend/app/db/seed.py 用的类别一样
+const TREATMENT_GROUPS = ["IMPLANT", "DENTURE", "ORTHO", "RCT", "CROWN", "BRIDGE"];
 
 const FLAGS = [
   { key: "ai_can_book", label: "AI can book", help: "The AI may suggest a time by itself. If not, the AI collects the request and passes it to staff." },
@@ -19,10 +19,12 @@ const FLAGS = [
 type Draft = ServiceIn & { active: boolean };
 
 function GroupSelect({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  // 数据库里有这里不认识的类别时也要显示出来，不能看起来像 "single visit"
+  const groups = value && !TREATMENT_GROUPS.includes(value) ? [...TREATMENT_GROUPS, value] : TREATMENT_GROUPS;
   return (
     <select aria-label="Treatment group" value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}>
       <option value="">— (single visit)</option>
-      {TREATMENT_GROUPS.map((g) => (
+      {groups.map((g) => (
         <option key={g} value={g}>{g}</option>
       ))}
     </select>

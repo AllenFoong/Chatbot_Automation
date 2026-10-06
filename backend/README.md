@@ -71,8 +71,10 @@
    alembic upgrade head                   # 在 chatbot_dev 建表
    python -m app.db.seed                  # 写入初始设置
    ```
-   `seed` 第一次会印出 `clinic_settings: 新增 1 行`、`doctor_schedules: 新增 14 行`、`doctors: 新增 2 行`、`services: 新增 24 行`。
+   `seed` 第一次会印出 `clinic_settings: 新增 1 行`、`doctor_schedules: 新增 14 行`、`doctors: 新增 2 行`、`services: 新增 26 行`。
    再执行一次会说"没有新增"：它只补上没有的设置，不会覆盖员工改过的值。
+   以后 `seed.py` 加了新的设置（例 2026-10-06 补上 `ISSUE CROWN`、`ISSUE BRIDGE`），再执行一次就会补上；
+   已经在数据库里的设置不会被改，要在 Admin Platform 上改（*Settings*）。
 
 ## 使用
 

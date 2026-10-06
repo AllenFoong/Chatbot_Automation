@@ -75,7 +75,7 @@ npm run dev
 ## 测试
 
 ```powershell
-npm test            # Vitest：30 个测试，假后端、假资料，不需要开 uvicorn
+npm test            # Vitest：31 个测试，假后端、假资料，不需要开 uvicorn
 npm run build       # TypeScript 检查 + 打包到 dist\（不进仓库）
 ```
 
@@ -84,9 +84,11 @@ npm run build       # TypeScript 检查 + 打包到 dist\（不进仓库）
 ## Phase 4b 完成的条件（在开发电脑上测试）
 
 1. `node --version` → v22.13 或以上；`npm ci` → `found 0 vulnerabilities`。
-2. `npm test` → **30 passed**；`npm run build` → `✓ built`，没有错误。
-3. 后端 `pytest` 还是 **131 passed**（4b 没有改后端）。
-4. 开两个视窗，照下面的清单在浏览器上点一次（`chatbot_dev` 的假资料，先跑过 `python -m app.db.demo`）：
+2. `npm test` → **31 passed**；`npm run build` → `✓ built`，没有错误。
+3. 后端 `pytest` 还是 **131 passed**（4b 在后端只改了 `seed.py` 的疗程代码）。
+4. 补上新的疗程代码（2026-10-06，W28–W30）：在 `backend` 跑 `python -m app.db.seed` → `services: 新增 2 行`（`ISSUE CROWN`、`ISSUE BRIDGE`）。
+   `SC`、`SCAN B` 已经在数据库里，`seed` 不会改它们，所以在清单第 7 项用网页改。
+5. 开两个视窗，照下面的清单在浏览器上点一次（`chatbot_dev` 的假资料，先跑过 `python -m app.db.demo`）：
 
 | # | 做什么 | 应该看到 |
 |---|---|---|
@@ -96,7 +98,7 @@ npm run build       # TypeScript 检查 + 打包到 dist\（不进仓库）
 | 4 | *Conversations* → Demo Mum → **Take over** | 黄色横条 *Staff is handling this conversation (你的名字)*；选单 Conversations 的数字 +1 |
 | 5 | **Hand back to AI** | 回到 *The AI is replying …* |
 | 6 | *Settings → Doctors & schedules*：星期六 *Last slot* 选比 *Start* 早的时间 | 红字说明哪里错，*Save schedule* 不能按；改回来 → *Saved.* |
-| 7 | *Treatments* → `C/UP` → Edit → 改名字 → Save | 名字更新（代码里有 `/` 也没问题） |
+| 7 | *Treatments* → `C/UP` → Edit → 改名字 → Save；`SC` → Edit → *Group* 选 `CROWN` → Save；`SCAN B` → *Group* 选 `BRIDGE` | 名字更新（代码里有 `/` 也没问题）；`SC`、`ISSUE CROWN` 都是 `CROWN`，`SCAN B`、`ISSUE BRIDGE` 都是 `BRIDGE` |
 | 8 | *Clinic closures* → **Import public holidays for 2026** | *Added 23 day(s)*（已经在 4a 导入过的话：*Added 0 day(s); 23 were already there*） |
 | 9 | 加一个已经有的日子（例 2026-02-17） | *This date is already a closure day.* |
 | 10 | *Staff accounts* → 加一个 STAFF 账号 → 登出 → 用它登录 | 看不到 *Staff accounts*；*Settings* 显示 *Only an admin can change them*，没有 Edit 按钮 |
@@ -127,8 +129,9 @@ cookie 才会带上；那时要用 https 并把 `COOKIE_SECURE=true`。现在先
 云端容器（2026-10-06，Node 22.22 和 **22.13.0** 各跑一次，PostgreSQL 16，只用假资料）：
 
 - `npm ci` → 133 个套件，`found 0 vulnerabilities`；每个套件的 `engines` 都接受 Node 22.13。
-- `npm test` → 30 passed；`npm run build` → 成功（JS 约 93 kB gzip）。
-- 后端 `pytest` → 131 passed（没有改后端）。
+- `npm test` → 31 passed；`npm run build` → 成功（JS 约 93 kB gzip）。
+- 后端 `pytest` → 131 passed（后端只改了 `seed.py` 的疗程代码）。
+- 补上 `ISSUE CROWN`、`ISSUE BRIDGE` 后：模拟旧的 `chatbot_dev`（24 个疗程）再跑 `seed` → `services: 新增 2 行`；在网页把 `SC`、`SCAN B` 的 *Group* 改成 `CROWN`、`BRIDGE`，重新整理后还在。
 - 用 headless Chromium 连 `npm run dev` + `uvicorn` + `chatbot_dev`（seed + demo 假资料）点过上面清单 1–12，全部正常，浏览器 console 没有 React 警告。
 
 开发电脑：（待测）

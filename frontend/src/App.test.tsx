@@ -87,6 +87,36 @@ describe("roles", () => {
   });
 });
 
+describe("treatments", () => {
+  const service = (code: string, treatment_group: string | null) => ({
+    code, name: code, can_be_third: false, may_need_1h: false, ai_can_book: false, treatment_group, active: true,
+  });
+
+  it("keeps the treatment group when editing, even one the page does not know", async () => {
+    const { calls } = fakeApi({
+      "GET /api/auth/me": ok(ADMIN),
+      ...counts,
+      "GET /api/services": ok([service("ISSUE CROWN", "CROWN"), service("XYZ", "NEWGROUP")]),
+      "PATCH /api/services/XYZ": ok(service("XYZ", "NEWGROUP")),
+    });
+    renderApp("/settings/services");
+    const user = userEvent.setup();
+
+    const row = (code: string) => screen.getByText(code, { selector: "strong" }).closest("tr")!;
+
+    await screen.findByText("ISSUE CROWN", { selector: "strong" });
+    await user.click(within(row("ISSUE CROWN")).getByRole("button", { name: "Edit" }));
+    expect(within(row("ISSUE CROWN")).getByLabelText("Treatment group")).toHaveValue("CROWN");
+    await user.click(within(row("ISSUE CROWN")).getByRole("button", { name: "Cancel" }));
+
+    await user.click(within(row("XYZ")).getByRole("button", { name: "Edit" }));
+    expect(within(row("XYZ")).getByLabelText("Treatment group")).toHaveValue("NEWGROUP");
+    await user.click(within(row("XYZ")).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(calls.some((c) => c.method === "PATCH")).toBe(true));
+    expect(calls.find((c) => c.method === "PATCH")?.body).toMatchObject({ treatment_group: "NEWGROUP" });
+  });
+});
+
 describe("requests", () => {
   it("confirms with the GPiS AppointmentID", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);

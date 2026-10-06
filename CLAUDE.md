@@ -50,7 +50,8 @@
 - [x] Phase 4a 初版：员工登录（ADMIN / STAFF）+ Admin API（`backend/app/api/`，migration `0002`；云端容器 131 个测试通过，全部假数据）
 - [x] Phase 4a 测试：开发电脑 `0002 (head)`，`pytest` 131 个通过、没有 skipped，`/docs` 登录试用 5 项正常（记录见 `backend/README.md`）
 - [x] Phase 4a 合并进 `main`（PR #8）
-- [x] Phase 4b 初版：`frontend/`（React + TypeScript + Vite，英文画面；Vite proxy 把 `/api` 转给 FastAPI；Vitest 30 个测试通过；云端容器用 Node 22.13 和浏览器点过测试清单，全部假数据）
+- [x] Phase 4b 初版：`frontend/`（React + TypeScript + Vite，英文画面；Vite proxy 把 `/api` 转给 FastAPI；Vitest 31 个测试通过；云端容器用 Node 22.13 和浏览器点过测试清单，全部假数据）
+- [x] 补上漏掉的疗程代码 `ISSUE CROWN`、`ISSUE BRIDGE`；牙冠、牙桥算多步骤疗程（类别 `CROWN`、`BRIDGE`，W28–W30、D33）
 - [ ] Phase 4b 测试：开发电脑照 `frontend/README.md` 的测试清单点一次，再开 PR
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
