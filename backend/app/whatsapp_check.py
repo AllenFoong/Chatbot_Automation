@@ -39,6 +39,10 @@ class GraphError(Exception):
     pass
 
 
+# 换 token 的方法（README「Phase 5a」的 System User token：60 天；API Setup 按出来的 token 大约 1 小时就失效）
+RENEW = "照 README「Phase 5a」的「System User 的 access token」换一个新的 token，更新 .env 的 WHATSAPP_ACCESS_TOKEN，再重开视窗 1"
+
+
 class Checker:
     def __init__(self, settings: WhatsAppSettings, http: httpx.Client, out: Callable[[str], None] = print):
         self.s = settings
@@ -124,28 +128,42 @@ class Checker:
         self.ok(".env：4 个值都填了")
         return True
 
+    def debug_token(self) -> dict:
+        """问 Meta 这个 token 是哪个 App 的、权限、什么时候失效。
+
+        先用 token 自己问；不行的话（例如 System User 的 token），用 App 自己的身份（App ID|App secret）再问一次。
+        """
+        params = {"input_token": self.s.access_token}
+        try:
+            return self.graph("debug_token", params=params)["data"]
+        except GraphError as first:
+            try:
+                app_id = self.graph("app")["id"]
+                return self.graph("debug_token", token=f"{app_id}|{self.s.app_secret}", params=params)["data"]
+            except (GraphError, KeyError, TypeError):
+                raise first from None
+
     def check_token(self) -> tuple[str | None, list[str]]:
         try:
-            data = self.graph("debug_token", params={"input_token": self.s.access_token})["data"]
+            data = self.debug_token()
         except (GraphError, KeyError, TypeError) as e:
-            self.bad(f"access token 不能用（{e}）",
-                     "到 API Setup 按 Generate access token（临时的约 24 小时失效），更新 .env 的 WHATSAPP_ACCESS_TOKEN")
+            self.bad(f"access token 不能用（{e}）", RENEW)
             return None, []
         if not data.get("is_valid"):
-            self.bad("access token 已经失效", "到 API Setup 按 Generate access token，更新 .env 的 WHATSAPP_ACCESS_TOKEN")
+            self.bad("access token 已经失效", RENEW)
             return None, []
-        renew = "到 API Setup 按 Generate access token，更新 .env 的 WHATSAPP_ACCESS_TOKEN，再重开视窗 1"
         expires = data.get("expires_at") or 0
         seconds_left = int(expires - time.time()) if expires else None
         if seconds_left is not None and seconds_left < 3600:
-            self.bad(f"access token 有效，但 {max(0, seconds_left) // 60} 分钟后就失效（App ID {data.get('app_id')}）", renew)
+            self.bad(f"access token 有效，但 {max(0, seconds_left) // 60} 分钟后就失效（App ID {data.get('app_id')}）", RENEW)
         else:
-            left = f"，大约 {seconds_left // 3600} 小时后失效" if seconds_left is not None else ""
+            hours = seconds_left // 3600 if seconds_left is not None else None
+            left = "" if hours is None else f"，大约 {hours // 24} 天后失效" if hours >= 48 else f"，大约 {hours} 小时后失效"
             self.ok(f"access token 有效（App ID {data.get('app_id')}{left}）")
         scopes = data.get("scopes")
         if isinstance(scopes, list) and "whatsapp_business_messaging" not in scopes:
             self.bad("access token 没有发消息的权限（whatsapp_business_messaging）：Admin Platform 回复会被拒绝",
-                     "到 API Setup 按 Generate access token（不要用 Graph API Explorer 的 token），更新 .env，再重开视窗 1")
+                     "产生 token 时要勾 whatsapp_business_messaging 和 whatsapp_business_management。" + RENEW)
         self.info("发消息的是视窗 1：它只在启动时读 .env。换了 token 一定要重开视窗 1，不然回复会显示 access token 的错误")
         wabas: list[str] = []
         for scope in data.get("granular_scopes") or []:
@@ -188,7 +206,7 @@ class Checker:
             return None
         if self.messaging_wabas is not None and waba_id not in self.messaging_wabas:
             self.bad(f"access token 不能用 WABA {waba_id} 发消息：Admin Platform 回复会被拒绝",
-                     "在测试号码那个 App 的 API Setup 按 Generate access token，更新 .env，再重开视窗 1")
+                     "System User 要加上这个 WhatsApp 帐号（Assign assets）。" + RENEW)
         try:
             apps = self.graph(f"{waba_id}/subscribed_apps").get("data") or []
         except GraphError as e:

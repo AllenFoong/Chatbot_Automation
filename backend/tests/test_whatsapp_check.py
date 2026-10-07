@@ -27,6 +27,7 @@ class FakeMeta:
     """Meta 的设定，各个测试改其中一项。"""
 
     token_valid: bool = True
+    debug_needs_app_token: bool = False                     # System User 的 token：不能用自己问 debug_token
     expires_at: int = 0                                     # 0 = 不会过期
     scopes: tuple[str, ...] = ("whatsapp_business_management", "whatsapp_business_messaging")
     messaging_wabas: tuple[str, ...] = ("333", WABA_ID)
@@ -42,6 +43,10 @@ class FakeMeta:
         path = request.url.path.removeprefix(f"/{SETTINGS.api_version}/")
         token = request.headers["Authorization"].removeprefix("Bearer ")
         error = httpx.Response(400, json={"error": {"code": 100, "message": "Unsupported request"}})
+        if path == "app" and token == SETTINGS.access_token:
+            return httpx.Response(200, json={"id": APP_ID, "name": "Chatbot Test"})
+        if path == "debug_token" and self.debug_needs_app_token and token != f"{APP_ID}|{self.app_secret}":
+            return httpx.Response(400, json={"error": {"code": 100, "message": "(#100) You must provide an app access token"}})
         if path == "debug_token":
             return httpx.Response(200, json={"data": {
                 "app_id": APP_ID, "is_valid": self.token_valid, "expires_at": self.expires_at,
@@ -190,17 +195,29 @@ def test_token_cannot_send_for_this_waba(check):
 
 def test_token_about_to_expire(check):
     problems, text = check(FakeMeta(expires_at=int(time.time()) + 600))
-    assert len(problems) == 1 and "Generate access token" in problems[0]
+    assert len(problems) == 1 and "System User" in problems[0]
     assert "分钟后就失效" in text
 
     problems, text = check(FakeMeta(expires_at=int(time.time()) + 5 * 3600 + 60))
     assert problems == [] and "大约 5 小时后失效" in text
 
+    problems, text = check(FakeMeta(expires_at=int(time.time()) + 60 * 86400))
+    assert problems == [] and "大约 59 天后失效" in text
+
+
+def test_system_user_token(check):
+    """System User 的 token 不能自己问 debug_token：改用 App 的身份问，结果一样。"""
+    problems, text = check(FakeMeta(debug_needs_app_token=True))
+    assert problems == [] and "access token 有效" in text
+
+    problems, text = check(FakeMeta(debug_needs_app_token=True, app_secret="the-real-secret"))
+    assert len(problems) == 1 and "access token 不能用" in text and "#100" in text
+
 
 def test_expired_token_stops_early(check):
     meta = FakeMeta(token_valid=False)
     problems, _ = check(meta)
-    assert len(problems) == 1 and "Generate access token" in problems[0]
+    assert len(problems) == 1 and "System User" in problems[0]
     assert len(meta.requests) == 1
 
 

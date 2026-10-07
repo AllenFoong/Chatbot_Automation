@@ -310,7 +310,7 @@ python -m app.db.demo                    # 放假资料（4 段对话、4 个预
 ```powershell
 pip install -r requirements-dev.txt      # httpx 搬到 requirements.txt（本来就装了）
 alembic upgrade head                     # 0002 -> 0003：消息的送达状态
-pytest                                   # 应该 180 passed，没有 skipped
+pytest                                   # 应该 181 passed，没有 skipped
 ```
 
 ### 在 Meta 建测试用的 App（只做一次，用自己的 Facebook 帐号，**不要用诊所的**）
@@ -325,11 +325,22 @@ Meta 的画面常改，名字可能不完全一样；找不到时看 App Dashboa
    - 会有一个**测试号码**（*From*），下面是它的 **Phone number ID**。
    - *To* → *Manage phone number list* → 加上**自己的手机号码**（WhatsApp 会传验证码来）。
    - 按 *Send message*，手机应该收到 `hello_world`（确认测试号码能用）。
-   - *Generate access token*：临时 token，大约 24 小时失效，失效了再按一次。
+   - *Generate access token*：很快就失效（2026-10-07 实测大约 1 小时），只用来先试一下；测试时用第 4b 步的 token。
 4. *App settings* → *Basic* → *App secret* → *Show*。
+
+   **4b. System User 的 access token**（60 天，D39）：在**自己的测试 Business portfolio**（第 2 步建的，不是诊所的）：
+   - <https://business.facebook.com/> → 选测试的 portfolio → *Settings* → *Users* → *System users* → *Add*：
+     名字例 `chatbot-dev`，角色选 *Employee*（权限最小；之后 *Generate token* 列不出 App 的话，再改成 *Admin*）。
+   - 这个 System user → *Assign assets*：
+     *Apps* → 测试 App → *Full control*；*WhatsApp accounts* → 测试号码的 WhatsApp 帐号 → *Full control*。只加这两个。
+   - *Generate token* → 选测试 App → *Token expiration* 选 **60 days**（不要选 *Never*）
+     → 只勾 `whatsapp_business_messaging`、`whatsapp_business_management` → *Generate token*。
+   - token 只显示一次：直接贴进 `.env` 的 `WHATSAPP_ACCESS_TOKEN`，不要存在别的地方。
+   - 60 天后，或怀疑 token 外泄：回到这个 System user 按 *Revoke tokens*，再 *Generate token* 一个新的。
 5. 打开 `backend\.env`，照 `.env.example` 加上 WhatsApp 那一段：
    - `WHATSAPP_VERIFY_TOKEN`：自己想一串英文字母和数字（第 7 步要填一样的）。
-   - `WHATSAPP_APP_SECRET`、`WHATSAPP_ACCESS_TOKEN`、`WHATSAPP_PHONE_NUMBER_ID`：第 3、4 步的值。
+   - `WHATSAPP_ACCESS_TOKEN`：第 4b 步的 token。
+   - `WHATSAPP_APP_SECRET`、`WHATSAPP_PHONE_NUMBER_ID`：第 4、3 步的值。
    - `WHATSAPP_ALLOWED_RECIPIENTS`：**只填自己的手机号码**，例 `60123456789`。
    token、secret 只写在 `.env`，不要贴到对话或截图里（截图时遮住）。
 6. 装 tunnel 工具 cloudflared（只做一次）：`winget install --id Cloudflare.cloudflared`，装好后重开 PowerShell。
@@ -400,12 +411,12 @@ npm run dev
 | 试 `/webhook?...` 看到 `WHATSAPP_VERIFY_TOKEN is not set` | `.env` 没有这一行，或视窗 2 在 `.env` 加好之前就开了 |
 | Meta 的 *Test* 按钮送得到，手机传的消息送不到 | App 没订阅 WABA（第 9 步：`python -m app.whatsapp_check --subscribe`）；或 App 还没发布（第 8 步） |
 | 视窗 2 出现 `401` | `WHATSAPP_APP_SECRET` 填错（签名对不上） |
-| 回复时红字 *There was a problem with the access token or permissions …*（code 190、10、200 等） | 视窗 1 用的 token 过期了或是旧的：视窗 1 只在启动时读 `.env`。到 *API Setup* 按 *Generate access token* → 更新 `.env` → **重开视窗 1** → 跑 `python -m app.whatsapp_check` → 再回复。临时 token 大约 24 小时失效，每天测试前都要换 |
+| 回复时红字 *There was a problem with the access token or permissions …*、*Authentication Error*（code 190、10、200 等） | 视窗 1 用的 token 过期了或是旧的：视窗 1 只在启动时读 `.env`。换成第 4b 步的 System User token → 更新 `.env` → **重开视窗 1** → 跑 `python -m app.whatsapp_check` → 再回复。*API Setup* 按出来的 token 大约 1 小时就失效 |
 | 回复时红字 *… not in allowed list*（code 131030） | 收件人不在 Meta 测试号码的 *To* 名单：*API Setup* → *Manage phone number list* 加上自己的号码 |
 
 ### Phase 5a 完成的条件（在开发电脑上测试）
 
-1. `alembic current` → `0003 (head)`；`pytest` → **180 passed**，没有 skipped。
+1. `alembic current` → `0003 (head)`；`pytest` → **181 passed**，没有 skipped。
 2. `frontend` 里 `npm test` → **35 passed**；`npm run build` 成功。
 3. 照「使用」开 4 个视窗，在 Meta 按 *Verify and save* 成功；`python -m app.whatsapp_check` 全部 `[OK]`。
 4. 照下面的清单做一次：
@@ -446,3 +457,9 @@ npm run dev
 - 设定检查加上：token 有没有 `whatsapp_business_messaging`、能不能用这个 WABA 发消息、1 小时内会不会失效；提醒换了 token 要重开视窗 1。
 - 回复失败的红字加上 Meta 的错误代码（例 `(code 190)`）；token 的问题直接说要换 token、重开 Admin API。
 - `pytest` → 180 passed。
+
+### 开发电脑的测试进度（2026-10-07）
+
+- 第 1 项（收消息）、第 2 项（回复、*Delivered* → *Read*）、第 4 项（照片 → `[Image] 说明`）通过。
+- *API Setup* 按出来的 token 大约 1 小时就失效（回复显示 *Authentication Error*），所以改用 System User 的 token（第 4b 步，D39）。
+- 设定检查：System User 的 token 不能自己问 `debug_token`，改用 App 的身份再问；失效时间超过 2 天显示天数。云端 `pytest` → 181 passed。

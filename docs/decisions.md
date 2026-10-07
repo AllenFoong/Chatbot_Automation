@@ -1,7 +1,7 @@
 # 决定记录
 
 > 每条决定写明原因。推翻某条决定时，不删除原记录，新增一条并注明取代哪一条。
-> 最后更新：2026-10-06
+> 最后更新：2026-10-07
 
 | # | 决定 | 原因 |
 |---|---|---|
@@ -43,6 +43,7 @@
 | D36 | 员工回复：**先经 WhatsApp 发出，WhatsApp 收下了才存**；送达状态 `ACCEPTED → SENT → DELIVERED → READ` 只往前走，`FAILED` 存原因给员工看（实现 D28 等的功能） | D28 的顾虑：画面上的"发出"消息一定真的发出去了；送不到（例如超过 24 小时）要让员工知道，不能以为病人收到了 |
 | D37 | 还没有 AI（`AI_REPLIES_ENABLED=false`）时，病人的新对话**直接交给员工**（`HUMAN`，写明原因）；转给员工、还没有人负责的对话，第一个回复的员工负责 | 不然对话停在 `BOT`，画面说"AI 在回复"，其实没有人回 |
 | D38 | 病人传的照片、语音、文件**先不下载**，只存 `[Image]`、`[Voice message]` 等说明；程序日志也不记消息内容和电话号码 | 是病人资料（可能是伤口照片）；存在哪里、保留多久要先决定（A9）。日志常常被复制、贴出去，不能有病人资料 |
+| D39 | 开发用的 WhatsApp access token 用**测试 Business portfolio 里 System User 的 token**：只给测试 App 和测试 WhatsApp 帐号、只有 `whatsapp_business_messaging` + `whatsapp_business_management`、**60 天**失效（不选 *Never*），只存在 `.env`；怀疑外泄就 *Revoke* | *API Setup* 按出来的 token 实测大约 1 小时就失效，测试清单做不完；60 天的 token 外泄了也会自己失效，权限只到测试号码（D34）。上线（5c）的 token 怎么保管，到时再决定 |
 
 ## 数据安全规则（病人资料，受马来西亚 PDPA 保护）
 
