@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 
 import httpx
 import pytest
@@ -207,6 +208,17 @@ def test_webhook_app_only_has_the_webhook(webhook):
     for path in ("/api/conversations", "/api/auth/me", "/availability", "/docs", "/openapi.json"):
         assert webhook.get(path).status_code == 404, path
     assert webhook.get("/health").json() == {"status": "ok"}
+
+
+def test_access_log_hides_verify_token():
+    from app.webhook_main import HideVerifyToken
+
+    record = logging.LogRecord("uvicorn.access", logging.INFO, "", 0, '%s - "%s %s HTTP/%s" %d', (
+        "127.0.0.1:5000", "GET", "/webhook?hub.mode=subscribe&hub.verify_token=my-secret-word&hub.challenge=1", "1.1", 200,
+    ), None)
+    assert HideVerifyToken().filter(record)
+    assert "my-secret-word" not in record.getMessage()
+    assert "hub.verify_token=***&hub.challenge=1" in record.getMessage()
 
 
 def test_webhook_refuses_when_not_set_up(webhook):

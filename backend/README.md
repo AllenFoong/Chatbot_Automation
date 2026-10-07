@@ -16,6 +16,7 @@
 | `app/auth.py` | 员工登录：Argon2 加密密码、session cookie、ADMIN / STAFF 权限 |
 | `app/api/` | Admin API：登录、对话、预约请求、设置（医生、排班、疗程、假期、请假）、员工账号 |
 | `app/whatsapp.py` | WhatsApp Cloud API：检查 webhook 签名、看懂 webhook、发文字消息（只发给允许的号码） |
+| `app/whatsapp_check.py` | 检查 WhatsApp 的设定：手机传的消息为什么没送到 webhook（`python -m app.whatsapp_check`） |
 | `app/webhook.py`、`app/webhook_main.py` | 收 WhatsApp webhook 的小程序（port 8001），开发时只有它经 tunnel 放上网 |
 | `app/db/create_staff.py` | 建员工账号（第一个 ADMIN 用这个建） |
 | `app/db/demo.py` | 放假资料到 `chatbot_dev`，方便看画面（只能用在 `_dev` 数据库） |
@@ -309,7 +310,7 @@ python -m app.db.demo                    # 放假资料（4 段对话、4 个预
 ```powershell
 pip install -r requirements-dev.txt      # httpx 搬到 requirements.txt（本来就装了）
 alembic upgrade head                     # 0002 -> 0003：消息的送达状态
-pytest                                   # 应该 161 passed，没有 skipped
+pytest                                   # 应该 174 passed，没有 skipped
 ```
 
 ### 在 Meta 建测试用的 App（只做一次，用自己的 Facebook 帐号，**不要用诊所的**）
@@ -347,12 +348,14 @@ Meta 的画面常改，名字可能不完全一样；找不到时看 App Dashboa
    - *App settings* → *Basic* → 填 *Privacy Policy URL*（有要求的话也选 *Category*、放 *App icon*）→ *Save changes*。
    - 按画面上的 *Publish*（或把 *App Mode* 从 *Development* 改成 *Live*）。
    - 发布不会让别人碰到测试号码：它仍然只能和你登记的号码互传（D34）。
-9. 发布后手机传的消息还是没有出现在视窗 2：把 App 订阅到测试的 WhatsApp Business Account（WABA）。
-   *API Setup* 上有 *WhatsApp Business Account ID*，在 PowerShell 执行（`…` 换成自己的值；token 不要贴到对话里）：
+9. **跑设定检查**（视窗 2、3 开着；在另一个 PowerShell，`cd backend`、启用 venv）：
    ```powershell
-   curl.exe -X POST "https://graph.facebook.com/v26.0/<WABA ID>/subscribed_apps" -H "Authorization: Bearer <access token>"
+   python -m app.whatsapp_check
    ```
-   回 `{"success":true}` 就好了。
+   它逐项问 Meta，再经 tunnel 打一次视窗 2，每项印 `[OK]` 或 `[!!]` 和怎么改。输出没有 token、secret，电话号码只留最后 4 位，可以贴到对话里。
+   - 最常见的 `[!!]`：**App 没有订阅测试的 WhatsApp Business Account（WABA）**。没订阅时，Meta 只送 dashboard 的 *Test*，手机传的消息不会送来。
+     执行 `python -m app.whatsapp_check --subscribe` 帮你订阅（不用自己打 `curl` 指令：PowerShell 会把打过的指令连 token 存进历史纪录）。
+   - 全部 `[OK]` 再用手机传一条消息。
 
 ### 使用（4 个 PowerShell 视窗）
 
@@ -376,20 +379,33 @@ npm run dev
 
 ### 常见问题
 
+先跑 `python -m app.whatsapp_check`（第 9 步），它会说哪一项不对。手机传了消息之后，看视窗 2 的最后几行：
+
+| 视窗 2 显示 | 原因、怎么办 |
+|---|---|
+| 什么都没有（没有 `POST /webhook`） | Meta 没有送来：App 没订阅 WABA（`--subscribe`）；或 cloudflared 重开过、网址变了（改 *Callback URL*）；或 App 没发布（第 8 步） |
+| `POST /webhook … 401` + `webhook 签名不对` | `WHATSAPP_APP_SECRET` 不对，或改了 `.env` 没重开视窗 2 |
+| `POST /webhook … 503` | 视窗 2 没读到 `WHATSAPP_APP_SECRET`、`WHATSAPP_PHONE_NUMBER_ID`：填好 `.env`、重开视窗 2 |
+| `webhook 是给另一个号码 ID（…）的` | `WHATSAPP_PHONE_NUMBER_ID` 填错（填成电话号码或 WABA ID）：改成 *API Setup* 上的 *Phone number ID*，重开视窗 1、2 |
+| `webhook：1 条新消息` + `POST /webhook … 200` | 已经存进数据库：等 15 秒（*Conversations* 的 *Open* 或 *Needs staff* 分页） |
+| `POST /webhook … 500` | 看上面的错误；多半是 PostgreSQL 没开 |
+
+手机上的两个灰勾只表示 WhatsApp 收下了，**不表示 Meta 有送 webhook**。视窗 2 的日志不印电话号码和消息内容，暗号（`hub.verify_token`）印成 `***`：可以直接贴到对话里。
+
 | 情况 | 原因、怎么办 |
 |---|---|
 | Meta：*The callback URL or verify token couldn't be validated* | *Callback URL* 最后少了 `/webhook`；或暗号和 `.env` 不一样；或改了 `.env` 没重开视窗 2。先照第 7 步用浏览器试 |
 | 浏览器试 `/health` 看到 Cloudflare 的错误页（例 1033、502） | 视窗 2（port 8001）没开，或 cloudflared 指错 port |
 | 试 `/webhook?...` 看到 `Wrong verify token` | 网址里的暗号和 `.env` 不一样；改了 `.env` 要重开视窗 2 |
 | 试 `/webhook?...` 看到 `WHATSAPP_VERIFY_TOKEN is not set` | `.env` 没有这一行，或视窗 2 在 `.env` 加好之前就开了 |
-| Meta 的 *Test* 按钮送得到，手机传的消息送不到 | App 还没发布（第 8 步）；或 App 没订阅 WABA（第 9 步） |
+| Meta 的 *Test* 按钮送得到，手机传的消息送不到 | App 没订阅 WABA（第 9 步：`python -m app.whatsapp_check --subscribe`）；或 App 还没发布（第 8 步） |
 | 视窗 2 出现 `401` | `WHATSAPP_APP_SECRET` 填错（签名对不上） |
 
 ### Phase 5a 完成的条件（在开发电脑上测试）
 
-1. `alembic current` → `0003 (head)`；`pytest` → **161 passed**，没有 skipped。
+1. `alembic current` → `0003 (head)`；`pytest` → **174 passed**，没有 skipped。
 2. `frontend` 里 `npm test` → **35 passed**；`npm run build` 成功。
-3. 照「使用」开 4 个视窗，在 Meta 按 *Verify and save* 成功。
+3. 照「使用」开 4 个视窗，在 Meta 按 *Verify and save* 成功；`python -m app.whatsapp_check` 全部 `[OK]`。
 4. 照下面的清单做一次：
 
 | # | 做什么 | 应该看到 |
@@ -400,7 +416,7 @@ npm run dev
 | 4 | 用手机传一张照片（加一句说明） | 画面显示 `[Image] 说明` |
 | 5 | 把 `.env` 的 `WHATSAPP_ALLOWED_RECIPIENTS=` 暂时改成空的 → 重开视窗 1 → 在你自己的对话回复 `Hello`；做完改回来、再重开视窗 1 | 红字 *This number is not in WHATSAPP_ALLOWED_RECIPIENTS*；手机收不到（允许名单这道保险有效） |
 | 6 | 浏览器打开 `https://….trycloudflare.com/docs` 和 `…/api/auth/me` | 都是 `{"detail":"Not Found"}`：网上只看得到 webhook |
-| 7 | 视窗 2 的日志 | 只有 `POST /webhook … 200`，没有消息内容和电话号码 |
+| 7 | 视窗 2 的日志 | 只有 `POST /webhook … 200`、`GET /webhook?…hub.verify_token=***…`，没有消息内容、电话号码和暗号 |
 
 截图只用自己手机和假资料的对话；token、secret、App 的画面要遮住。
 
@@ -413,3 +429,11 @@ npm run dev
   - 假的 status webhook 把消息变成 *Read*，*failed* 时显示原因。
   - 不在 allowlist 的号码被拒绝，根本没发出去。
   - webhook 小程序的 `/docs`、`/api/...` 都是 404；日志里没有电话号码和消息内容。
+
+### 云端容器的测试记录（2026-10-07：手机的消息没送到 webhook，加设定检查）
+
+- 用真的 uvicorn（port 8001）+ 签了名的假 webhook 走一次：存成 *Needs staff*；签名不对回 `401`；号码 ID 不对印出警告。本系统这一段没问题，所以是 Meta 的设定或 tunnel。
+- 新增 `python -m app.whatsapp_check`：假的 Graph API + 假的 tunnel（后面接真的 webhook 小程序）测了 12 种情况
+  （全部正确、没订阅 WABA、`--subscribe`、App secret 错、tunnel 网址变了、网址少 `/webhook`、没订阅 `messages`、号码 ID 错、改了 `.env` 没重开视窗 2、token 失效、`.env` 没填、自我测试不存任何东西）。
+- 视窗 2 的 access log 不再印出暗号（`hub.verify_token=***`）。
+- `pytest` → 174 passed。
