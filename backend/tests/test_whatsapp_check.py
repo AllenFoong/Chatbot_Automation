@@ -33,6 +33,7 @@ class FakeMeta:
     messaging_wabas: tuple[str, ...] = ("333", WABA_ID)
     app_secret: str = SETTINGS.app_secret
     phone_number_ids: tuple[str, ...] = (NUMBER_ID,)
+    waba_numbers: tuple[str, ...] | None = None              # WABA 里有哪些号码；None = phone_number_ids
     waba_apps: list[str] = field(default_factory=lambda: [APP_ID])
     callback_url: str | None = TUNNEL
     fields: tuple[str, ...] = ("messages",)
@@ -68,7 +69,8 @@ class FakeMeta:
                 return httpx.Response(200, json={"webhook_configuration": {"application": self.callback_url}})
             return httpx.Response(200, json={"display_phone_number": "+1 555 010 4321", "verified_name": "Test Number"})
         if path == f"{WABA_ID}/phone_numbers":
-            return httpx.Response(200, json={"data": [{"id": n} for n in self.phone_number_ids]})
+            numbers = self.phone_number_ids if self.waba_numbers is None else self.waba_numbers
+            return httpx.Response(200, json={"data": [{"id": n} for n in numbers]})
         if path == "333/phone_numbers":
             return httpx.Response(200, json={"data": [{"id": "999"}]})
         if path == f"{WABA_ID}/subscribed_apps":
@@ -136,6 +138,13 @@ def test_app_not_subscribed_to_waba(check):
     problems, text = check(meta, subscribe=True)
     assert problems == []
     assert "刚刚订阅好了" in text and APP_ID in meta.waba_apps
+
+
+def test_token_cannot_see_the_test_waba(check):
+    """System user 加错了 WhatsApp 帐号：token 看得到的 WABA 里没有测试号码。"""
+    problems, text = check(FakeMeta(waba_numbers=()))
+    assert len(problems) == 1 and "Assign assets" in problems[0] and "--waba" in problems[0]
+    assert f"333、{WABA_ID}" in text
 
 
 def test_waba_given_by_hand(check):

@@ -195,14 +195,18 @@ class Checker:
             for candidate in candidates:
                 try:
                     numbers = self.graph(f"{candidate}/phone_numbers", params={"fields": "id"}).get("data") or []
-                except GraphError:
+                except GraphError as e:
+                    self.info(f"问不到 WABA {candidate} 有哪些号码（{e}）")
                     continue
                 if any(n.get("id") == self.s.phone_number_id for n in numbers):
                     waba_id = candidate
                     break
         if waba_id is None:
-            self.bad("找不到测试号码在哪一个 WhatsApp Business Account（WABA）",
-                     "再跑一次：python -m app.whatsapp_check --waba <ID>（ID 是 API Setup 上的 WhatsApp Business Account ID）")
+            seen = "、".join(candidates) or "token 没有列出来"
+            self.bad(f"token 能用的 WhatsApp 帐号（WABA：{seen}）里，找不到测试号码",
+                     "到 API Setup 看测试号码的 WhatsApp Business Account ID，再跑 python -m app.whatsapp_check --waba <ID>。"
+                     "这个 ID 不在上面的清单里的话：System user → Assign assets → WhatsApp accounts 加上它（Full control），"
+                     "再 Generate token 一个新的")
             return None
         if self.messaging_wabas is not None and waba_id not in self.messaging_wabas:
             self.bad(f"access token 不能用 WABA {waba_id} 发消息：Admin Platform 回复会被拒绝",
