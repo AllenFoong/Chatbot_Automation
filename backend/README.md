@@ -321,7 +321,8 @@ Meta 的画面常改，名字可能不完全一样；找不到时看 App Dashboa
 2. *My Apps* → *Create App*，用途选 WhatsApp（*Connect with customers through WhatsApp*）。
    要选 Business portfolio 的话，自己建一个测试用的（例 `Chatbot Test`），**不要用诊所的**（D34）：
    开发和诊所的帐号分开，以后诊所的号码接上时，开发用的 App 碰不到真的病人消息；测试出错也不会连累诊所的帐号。
-3. App 里 *WhatsApp* → *API Setup*：
+3. App 里 *WhatsApp* → *API Setup*（2026 年的新画面没有这个名字：左边 *Connect on WhatsApp* → *Basic setup* → **Step 1. Try it out**，下面都叫 *API Setup*）：
+   - 同一页有 **WhatsApp Business Account ID**（测试号码所在的 *Test WhatsApp Business Account*，`--waba` 要用的就是它）。
    - 会有一个**测试号码**（*From*），下面是它的 **Phone number ID**。
    - *To* → *Manage phone number list* → 加上**自己的手机号码**（WhatsApp 会传验证码来）。
    - 按 *Send message*，手机应该收到 `hello_world`（确认测试号码能用）。
@@ -333,7 +334,7 @@ Meta 的画面常改，名字可能不完全一样；找不到时看 App Dashboa
      名字例 `chatbot-dev`，角色选 *Employee*（权限最小；之后 *Generate token* 列不出 App 的话，再改成 *Admin*）。
    - **先** *Assign assets*（**再** *Generate token*，顺序不能反）：这个 System user → *Assign assets*：
      - *Apps* → 测试 App → *Full control* → **Manage app** 打开 → *Assign*；
-     - *WhatsApp accounts* → 测试号码的 WhatsApp 帐号 → *Full control* → *Manage WhatsApp Business Accounts* 打开 → *Assign*。
+     - *WhatsApp accounts* → **Test WhatsApp Business Account**（测试号码的那个；ID 和第 3 步的一样）→ *Full control* → *Manage WhatsApp Business Accounts* 打开 → *Assign*。
      只加这两个。System user 的页面上 *Assigned assets* 要看得到这两个。
    - 重新整理页面（F5）→ *Generate token* → 选测试 App → *Token expiration* 选 **60 days**（不要选 *Never*）
      → 只勾 `whatsapp_business_messaging`、`whatsapp_business_management` → *Generate token*。

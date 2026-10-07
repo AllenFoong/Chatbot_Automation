@@ -3,7 +3,7 @@
 用法（在 backend/ 里，先启用 venv；视窗 2、3 要开着）：
     python -m app.whatsapp_check                 只检查，不改任何东西
     python -m app.whatsapp_check --subscribe     App 没订阅测试的 WABA 的话，帮你订阅（= README 第 9 步）
-    python -m app.whatsapp_check --waba <ID>     找不到 WABA 时，填 API Setup 上的 WhatsApp Business Account ID
+    python -m app.whatsapp_check --waba <ID>     找不到 WABA 时，填 API Setup（新画面：Basic setup → Step 1. Try it out） 上的 WhatsApp Business Account ID
 
 逐项问 Meta（Graph API），再经 tunnel 打一次自己的 webhook：
 1. .env 的 4 个值都填了
@@ -179,7 +179,7 @@ class Checker:
             info = self.graph(self.s.phone_number_id, params={"fields": "display_phone_number,verified_name"})
         except GraphError as e:
             self.bad(f"WHATSAPP_PHONE_NUMBER_ID 找不到（{e}）",
-                     "填 API Setup 上测试号码下面的 Phone number ID（不是电话号码、不是 WABA ID），再重开视窗 1、2")
+                     "填 API Setup（新画面：Basic setup → Step 1. Try it out） 上测试号码下面的 Phone number ID（不是电话号码、不是 WABA ID），再重开视窗 1、2")
             return None
         number = "".join(c for c in info.get("display_phone_number", "") if c.isdigit())
         self.ok(f"WHATSAPP_PHONE_NUMBER_ID 是测试号码 …{number[-4:]}（{info.get('verified_name', '')}）")
@@ -204,7 +204,7 @@ class Checker:
         if waba_id is None:
             seen = "、".join(candidates) or "token 没有列出来"
             self.bad(f"token 能用的 WhatsApp 帐号（WABA：{seen}）里，找不到测试号码",
-                     "到 API Setup 看测试号码的 WhatsApp Business Account ID，再跑 python -m app.whatsapp_check --waba <ID>。"
+                     "到 API Setup（新画面：Basic setup → Step 1. Try it out） 看测试号码的 WhatsApp Business Account ID，再跑 python -m app.whatsapp_check --waba <ID>。"
                      "这个 ID 不在上面的清单里的话：System user → Assign assets → WhatsApp accounts 加上它（Full control），"
                      "再 Generate token 一个新的")
             return None
@@ -214,7 +214,7 @@ class Checker:
         try:
             apps = self.graph(f"{waba_id}/subscribed_apps").get("data") or []
         except GraphError as e:
-            self.bad(f"问不到 WABA {waba_id} 订阅了哪些 App（{e}）", "确认 --waba 的 ID 是 API Setup 上的 WhatsApp Business Account ID")
+            self.bad(f"问不到 WABA {waba_id} 订阅了哪些 App（{e}）", "确认 --waba 的 ID 是 API Setup（新画面：Basic setup → Step 1. Try it out） 上的 WhatsApp Business Account ID")
             return None
         ours = next((a for a in apps if (a.get("whatsapp_business_api_data") or {}).get("id") == app_id), None)
         others = [(a.get("whatsapp_business_api_data") or {}).get("name") or "?" for a in apps if a is not ours]
@@ -317,7 +317,7 @@ class Checker:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.whatsapp_check", description="检查 WhatsApp 的设定（Phase 5a）")
     parser.add_argument("--subscribe", action="store_true", help="App 没订阅测试的 WABA 的话，帮你订阅（README 第 9 步）")
-    parser.add_argument("--waba", help="WhatsApp Business Account ID（API Setup 上有；通常不用填）")
+    parser.add_argument("--waba", help="WhatsApp Business Account ID（API Setup（新画面：Basic setup → Step 1. Try it out） 上有；通常不用填）")
     args = parser.parse_args(argv)
     with httpx.Client(timeout=20) as http:
         problems = Checker(get_whatsapp_settings(), http).run(waba_id=args.waba, subscribe=args.subscribe)
