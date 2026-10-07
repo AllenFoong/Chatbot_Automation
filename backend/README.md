@@ -331,10 +331,14 @@ Meta 的画面常改，名字可能不完全一样；找不到时看 App Dashboa
    **4b. System User 的 access token**（60 天，D39）：在**自己的测试 Business portfolio**（第 2 步建的，不是诊所的）：
    - <https://business.facebook.com/> → 选测试的 portfolio → *Settings* → *Users* → *System users* → *Add*：
      名字例 `chatbot-dev`，角色选 *Employee*（权限最小；之后 *Generate token* 列不出 App 的话，再改成 *Admin*）。
-   - 这个 System user → *Assign assets*：
-     *Apps* → 测试 App → *Full control*；*WhatsApp accounts* → 测试号码的 WhatsApp 帐号 → *Full control*。只加这两个。
-   - *Generate token* → 选测试 App → *Token expiration* 选 **60 days**（不要选 *Never*）
+   - **先** *Assign assets*（**再** *Generate token*，顺序不能反）：这个 System user → *Assign assets*：
+     - *Apps* → 测试 App → *Full control* → **Manage app** 打开 → *Assign*；
+     - *WhatsApp accounts* → 测试号码的 WhatsApp 帐号 → *Full control* → *Manage WhatsApp Business Accounts* 打开 → *Assign*。
+     只加这两个。System user 的页面上 *Assigned assets* 要看得到这两个。
+   - 重新整理页面（F5）→ *Generate token* → 选测试 App → *Token expiration* 选 **60 days**（不要选 *Never*）
      → 只勾 `whatsapp_business_messaging`、`whatsapp_business_management` → *Generate token*。
+   - *Generate token* 显示 *No permissions available*（*Assign an app role to the system user*）：System user 在 App 上还没有角色。
+     回到上面把 App 的 **Manage app** 打开；还是不行，把 System user 的角色改成 *Admin*，F5 再试。
    - token 只显示一次：直接贴进 `.env` 的 `WHATSAPP_ACCESS_TOKEN`，不要存在别的地方。
    - 60 天后，或怀疑 token 外泄：回到这个 System user 按 *Revoke tokens*，再 *Generate token* 一个新的。
 5. 打开 `backend\.env`，照 `.env.example` 加上 WhatsApp 那一段：
