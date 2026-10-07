@@ -201,9 +201,13 @@ class Checker:
                 if any(n.get("id") == self.s.phone_number_id for n in numbers):
                     waba_id = candidate
                     break
+        if waba_id is None and not candidates:
+            # System User 的 token 常常不列出 WABA：这不代表有问题（手机的消息送得到、回复发得出去，就表示设定对了）
+            self.info("token 没有列出它能用哪些 WhatsApp 帐号（WABA），跳过「App 有没有订阅 WABA」这一项。"
+                      "要检查的话：python -m app.whatsapp_check --waba <ID>")
+            return None
         if waba_id is None:
-            seen = "、".join(candidates) or "token 没有列出来"
-            self.bad(f"token 能用的 WhatsApp 帐号（WABA：{seen}）里，找不到测试号码",
+            self.bad(f"token 能用的 WhatsApp 帐号（WABA：{'、'.join(candidates)}）里，找不到测试号码",
                      "到 API Setup（新画面：Basic setup → Step 1. Try it out） 看测试号码的 WhatsApp Business Account ID，再跑 python -m app.whatsapp_check --waba <ID>。"
                      "这个 ID 不在上面的清单里的话：System user → Assign assets → WhatsApp accounts 加上它（Full control），"
                      "再 Generate token 一个新的")

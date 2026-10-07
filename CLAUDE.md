@@ -55,8 +55,8 @@
 - [x] Phase 4b 测试：开发电脑（Node.js v22.13.0）照 `frontend/README.md` 的条件和测试清单全部通过（记录见 `frontend/README.md`）
 - [x] Phase 4b 合并进 `main`（PR #9）
 - [x] Phase 5a 初版：WhatsApp webhook（`backend/app/webhook_main.py`，port 8001）、员工回复、送达状态（migration `0003`）；开发只用 Meta 测试号码 + allowlist（D34–D38）；云端 `pytest` 161 个、Vitest 35 个通过，全部假数据
-- [x] Phase 5a 设定检查：`python -m app.whatsapp_check`（问 Meta + 经 tunnel 打一次 webhook，找出手机消息没送来的原因；也查 token 能不能发消息）；`pytest` 182 个
-- [ ] Phase 5a 测试：开发电脑建 Meta 测试 App，照 `backend/README.md`「Phase 5a」的清单测一次，再开 PR（第 1、2、4 项已通过；token 改用 System User 的，D39）
+- [x] Phase 5a 设定检查：`python -m app.whatsapp_check`（问 Meta + 经 tunnel 打一次 webhook，找出手机消息没送来的原因；也查 token 能不能发消息）；`pytest` 183 个
+- [ ] Phase 5a 测试：开发电脑建 Meta 测试 App，照 `backend/README.md`「Phase 5a」的清单测一次，再开 PR（清单 1–7 项已通过；token 改用 System User 的，D39；等开发电脑更新到最新程序后的 `pytest`、`npm run build`）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步

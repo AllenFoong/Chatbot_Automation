@@ -31,6 +31,7 @@ class FakeMeta:
     expires_at: int = 0                                     # 0 = 不会过期
     scopes: tuple[str, ...] = ("whatsapp_business_management", "whatsapp_business_messaging")
     messaging_wabas: tuple[str, ...] = ("333", WABA_ID)
+    lists_wabas: bool = True                                # False：debug_token 不列出 WABA（System User 的 token 常常这样）
     app_secret: str = SETTINGS.app_secret
     phone_number_ids: tuple[str, ...] = (NUMBER_ID,)
     waba_numbers: tuple[str, ...] | None = None              # WABA 里有哪些号码；None = phone_number_ids
@@ -53,7 +54,9 @@ class FakeMeta:
                 "app_id": APP_ID, "is_valid": self.token_valid, "expires_at": self.expires_at,
                 "scopes": list(self.scopes),
                 "granular_scopes": [{"scope": "whatsapp_business_management", "target_ids": ["333", WABA_ID]},
-                                    {"scope": "whatsapp_business_messaging", "target_ids": list(self.messaging_wabas)}],
+                                    {"scope": "whatsapp_business_messaging", "target_ids": list(self.messaging_wabas)}]
+                if self.lists_wabas else [{"scope": "whatsapp_business_management"},
+                                          {"scope": "whatsapp_business_messaging"}],
             }})
         if path == f"{APP_ID}/subscriptions":
             if token != f"{APP_ID}|{self.app_secret}":
@@ -145,6 +148,17 @@ def test_token_cannot_see_the_test_waba(check):
     problems, text = check(FakeMeta(waba_numbers=()))
     assert len(problems) == 1 and "Assign assets" in problems[0] and "--waba" in problems[0]
     assert f"333、{WABA_ID}" in text
+
+
+def test_token_does_not_list_wabas(check):
+    """token 没列出 WABA 不算问题：跳过订阅那一项，其他照查；要查就用 --waba。"""
+    meta = FakeMeta(lists_wabas=False)
+    problems, text = check(meta)
+    assert problems == [] and "跳过" in text and "--waba" in text
+    assert not any("subscribed_apps" in r.url.path for r in meta.requests)
+
+    problems, text = check(FakeMeta(lists_wabas=False), waba_id=WABA_ID)
+    assert problems == [] and "App 已订阅 WABA" in text
 
 
 def test_waba_given_by_hand(check):

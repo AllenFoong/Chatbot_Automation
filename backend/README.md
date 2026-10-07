@@ -310,7 +310,7 @@ python -m app.db.demo                    # 放假资料（4 段对话、4 个预
 ```powershell
 pip install -r requirements-dev.txt      # httpx 搬到 requirements.txt（本来就装了）
 alembic upgrade head                     # 0002 -> 0003：消息的送达状态
-pytest                                   # 应该 182 passed，没有 skipped
+pytest                                   # 应该 183 passed，没有 skipped
 ```
 
 ### 在 Meta 建测试用的 App（只做一次，用自己的 Facebook 帐号，**不要用诊所的**）
@@ -421,7 +421,7 @@ npm run dev
 
 ### Phase 5a 完成的条件（在开发电脑上测试）
 
-1. `alembic current` → `0003 (head)`；`pytest` → **182 passed**，没有 skipped。
+1. `alembic current` → `0003 (head)`；`pytest` → **183 passed**，没有 skipped。
 2. `frontend` 里 `npm test` → **35 passed**；`npm run build` 成功。
 3. 照「使用」开 4 个视窗，在 Meta 按 *Verify and save* 成功；`python -m app.whatsapp_check` 全部 `[OK]`。
 4. 照下面的清单做一次：
@@ -465,6 +465,7 @@ npm run dev
 
 ### 开发电脑的测试进度（2026-10-07）
 
-- 第 1 项（收消息）、第 2 项（回复、*Delivered* → *Read*）、第 4 项（照片 → `[Image] 说明`）通过。
+- 清单第 1–7 项全部通过：收消息、回复（*Delivered* → *Read*）、`Ctrl + Enter`、照片 → `[Image] 说明`、
+  允许名单清空时红字且手机收不到、tunnel 上 `/docs` 和 `/api/auth/me` 都是 Not Found、视窗 2 的日志找不到消息内容、电话号码和暗号。
 - *API Setup* 按出来的 token 大约 1 小时就失效（回复显示 *Authentication Error*），所以改用 System User 的 token（第 4b 步，D39）。
-- 设定检查：System User 的 token 不能自己问 `debug_token`，改用 App 的身份再问；失效时间超过 2 天显示天数；找不到 WABA 时印出 token 看得到哪些 WABA。云端 `pytest` → 182 passed。
+- 设定检查：System User 的 token 不能自己问 `debug_token`，改用 App 的身份再问；失效时间超过 2 天显示天数；找不到 WABA 时印出 token 看得到哪些 WABA；token 没列出 WABA（System User 的 token 常常这样）时跳过订阅那一项，不算 `[!!]`。云端 `pytest` → 183 passed。
