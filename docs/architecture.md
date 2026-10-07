@@ -1,6 +1,6 @@
 # 系统架构与技术选型
 
-> 最后更新：2026-10-06
+> 最后更新：2026-10-07
 
 ## 1. 需求
 
@@ -159,7 +159,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | 2 | FastAPI 封装 `check_available_slots()`：`backend/`（`GET /availability`，用法见 `backend/README.md`）（完成：10 个测试日期和 SQL 结果一致） |
 | 3 | PostgreSQL：customers / conversations / messages / appointment_requests，诊所设置搬进数据库（`backend/app/db/`）（完成：开发电脑 104 个测试通过，10 个测试日期和 Phase 2 结果一致） |
 | 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等）。分两步：**4a** 员工登录 + Admin API（`backend/app/api/`，完成：开发电脑 131 个测试通过）；**4b** React + TypeScript 网页（英文画面，`frontend/`，完成：Vitest 31 个测试通过，开发电脑测试清单全部通过） |
-| 5 | WhatsApp Cloud API。分三步：**5a** 收消息（webhook）、员工在 Admin Platform 回复、送达状态，开发只用 Meta 测试号码（`backend/` 的 `whatsapp.py`、`webhook_main.py`；初版完成，等开发电脑测试）；**5b** 模板消息 + 预约前一天自动提醒（要读 GPiS 明天的预约，和 A1 一起设计；员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 更早上线）；**5c** 上线时把诊所的号码接上（Coexistence，A7） |
+| 5 | WhatsApp Cloud API。分三步：**5a** 收消息（webhook）、员工在 Admin Platform 回复、送达状态，开发只用 Meta 测试号码（`backend/` 的 `whatsapp.py`、`webhook_main.py`；完成：开发电脑测试清单全部通过，`python -m app.whatsapp_check` 检查 Meta 的设定）；**5b** 模板消息 + 预约前一天自动提醒（要读 GPiS 明天的预约，和 A1 一起设计；员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 更早上线）；**5c** 上线时把诊所的号码接上（Coexistence，A7） |
 | 6 | AI Agent（Tool Calling）+ 转人工规则 |
 | 7 | Docker 化，部署到云端（假数据） |
 | 8 | 解决主机 ↔ 云端同步，再评估是否写入 GPiS |

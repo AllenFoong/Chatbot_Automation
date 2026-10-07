@@ -56,12 +56,12 @@
 - [x] Phase 4b 合并进 `main`（PR #9）
 - [x] Phase 5a 初版：WhatsApp webhook（`backend/app/webhook_main.py`，port 8001）、员工回复、送达状态（migration `0003`）；开发只用 Meta 测试号码 + allowlist（D34–D38）；云端 `pytest` 161 个、Vitest 35 个通过，全部假数据
 - [x] Phase 5a 设定检查：`python -m app.whatsapp_check`（问 Meta + 经 tunnel 打一次 webhook，找出手机消息没送来的原因；也查 token 能不能发消息）；`pytest` 183 个
-- [ ] Phase 5a 测试：开发电脑建 Meta 测试 App，照 `backend/README.md`「Phase 5a」的清单测一次，再开 PR（清单 1–7 项已通过；token 改用 System User 的，D39；等开发电脑更新到最新程序后的 `pytest`、`npm run build`）
+- [x] Phase 5a 测试：开发电脑（Meta 测试 App 在自己的测试 portfolio，token 用 System User 的，D39）：`0003 (head)`，`pytest` 183 个、`npm test` 35 个通过，`npm run build` 成功，测试清单 1–7 项全部通过（记录见 `backend/README.md`）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. **Phase 5a 测试**：开发电脑在 Meta 建测试 App（自己的帐号，不用诊所的），装 cloudflared，照 `backend/README.md`「Phase 5a」的清单测（手机的消息没送来：先跑 `python -m app.whatsapp_check`）；通过后开 PR。
+1. 把 Phase 5a 合并进 `main`。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
 2. Phase 5b：模板消息 + 预约前一天的提醒（和第 3 点一起设计）；5c：上线时用 Coexistence 接上诊所的号码（A7 待决定：BSP 还是自己做 Embedded Signup）。
 3. 设计主机 ↔ 本系统的数据读取方式（`docs/architecture.md` A1）：`GPiS_Dev` 只是 9 月 28 日的快照，正式上线必须读主机的实时数据。
 4. 上线前：用 Admin Platform（*Settings → Clinic closures*）导入公共假期、补上农历新年多休的日子（`clinic_closures` 现在是空的）。

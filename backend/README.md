@@ -463,9 +463,13 @@ npm run dev
 - 回复失败的红字加上 Meta 的错误代码（例 `(code 190)`）；token 的问题直接说要换 token、重开 Admin API。
 - `pytest` → 180 passed。
 
-### 开发电脑的测试进度（2026-10-07）
+### 开发电脑的测试记录（2026-10-07，Windows、PostgreSQL 18、Meta 测试号码 + 自己的手机）
 
+- `alembic current` → `0003 (head)`；`pytest` → 183 passed，没有 skipped；`npm test` → 35 passed；`npm run build` 成功。
+- `python -m app.whatsapp_check`：没有 `[!!]`（System User 的 token 没列出 WABA，订阅那一项跳过；手机的消息送得到，表示有订阅）。
 - 清单第 1–7 项全部通过：收消息、回复（*Delivered* → *Read*）、`Ctrl + Enter`、照片 → `[Image] 说明`、
   允许名单清空时红字且手机收不到、tunnel 上 `/docs` 和 `/api/auth/me` 都是 Not Found、视窗 2 的日志找不到消息内容、电话号码和暗号。
 - *API Setup* 按出来的 token 大约 1 小时就失效（回复显示 *Authentication Error*），所以改用 System User 的 token（第 4b 步，D39）。
 - 设定检查：System User 的 token 不能自己问 `debug_token`，改用 App 的身份再问；失效时间超过 2 天显示天数；找不到 WABA 时印出 token 看得到哪些 WABA；token 没列出 WABA（System User 的 token 常常这样）时跳过订阅那一项，不算 `[!!]`。云端 `pytest` → 183 passed。
+
+结论：Phase 5a 完成。
