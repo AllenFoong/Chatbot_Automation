@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.db import conversations as conv
-from app.db.models import Conversation, ConversationMode, Message, Sender
+from app.db.models import Conversation, ConversationMode, Message, Sender, WaStatus
 from tests.database import add_staff, assert_rejected
 
 PHONE = "60123456789"
@@ -138,3 +138,41 @@ def test_customer_service_window(session):
     # 从来没收到消息的号码：不能发一般消息
     other = conv.get_or_create_wa_contact(session, "6591234567")
     assert not conv.customer_service_window_open(session, other.id)
+
+
+def test_customer_service_window_ends_24_hours_after_last_patient_message(session):
+    msg, _ = receive(session, "wamid.1")
+    contact_id = msg.conversation.wa_contact_id
+    assert conv.customer_service_window_ends_at(session, contact_id) == msg.created_at + timedelta(hours=24)
+    assert conv.customer_service_window_ends_at(session, conv.get_or_create_wa_contact(session, "6591234567").id) \
+        is None
+
+
+def test_delivery_status_only_moves_forward(session):
+    msg, _ = receive(session, "wamid.in")
+    sent = conv.record_outgoing_message(session, msg.conversation, Sender.STAFF, "Hello",
+                                        staff=add_staff(session), wa_message_id="wamid.out",
+                                        wa_status=WaStatus.ACCEPTED)
+    conv.update_message_status(session, "wamid.out", WaStatus.READ)
+    conv.update_message_status(session, "wamid.out", WaStatus.DELIVERED)     # 比 read 晚到：不能退回去
+    assert sent.wa_status == WaStatus.READ
+
+    conv.update_message_status(session, "wamid.out", WaStatus.FAILED, "131047: Re-engagement message")
+    conv.update_message_status(session, "wamid.out", WaStatus.SENT)          # 失败了就不会再变
+    assert (sent.wa_status, sent.wa_error) == (WaStatus.FAILED, "131047: Re-engagement message")
+
+
+def test_delivery_status_ignores_unknown_and_incoming_messages(session):
+    msg, _ = receive(session, "wamid.in")
+    assert conv.update_message_status(session, "wamid.unknown", WaStatus.SENT) is None
+    assert conv.update_message_status(session, "wamid.in", WaStatus.READ) is None
+    assert msg.wa_status is None
+
+
+def test_database_rules_for_delivery_status(session):
+    msg, _ = receive(session, "wamid.in")
+    c = msg.conversation
+    # 病人发来的消息没有送达状态；只有 FAILED 才有错误原因
+    assert_rejected(session, Message(conversation_id=c.id, sender=Sender.CUSTOMER, body="x", wa_status=WaStatus.SENT))
+    assert_rejected(session, Message(conversation_id=c.id, sender=Sender.BOT, body="x", wa_status=WaStatus.SENT,
+                                     wa_error="oops"))

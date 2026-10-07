@@ -6,6 +6,8 @@ export type Role = "ADMIN" | "STAFF";
 export type ConversationMode = "BOT" | "HUMAN" | "CLOSED";
 export type Sender = "CUSTOMER" | "BOT" | "STAFF";
 export type RequestStatus = "PENDING" | "CONFIRMED" | "REJECTED" | "CANCELLED";
+/** 发出的消息送到哪一步（Phase 5）：ACCEPTED = WhatsApp 收下了，还没送出 */
+export type WaStatus = "ACCEPTED" | "SENT" | "DELIVERED" | "READ" | "FAILED";
 
 // ---------- 登录、员工（app/api/auth.py、staff.py） ----------
 
@@ -38,6 +40,8 @@ export interface Message {
   sender: Sender;
   staff_id: number | null;
   body: string;
+  wa_status: WaStatus | null;
+  wa_error: string | null;
   created_at: string;
 }
 
@@ -57,6 +61,8 @@ export interface Conversation {
 }
 
 export interface ConversationDetail extends Conversation {
+  /** WhatsApp 24 小时规则：这个时间之前才能回复（病人最后一条消息 + 24 小时）；病人没发过消息 = null */
+  reply_window_ends_at: string | null;
   messages: Message[];
 }
 

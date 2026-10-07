@@ -1,21 +1,26 @@
-"""对话：看列表、看完整对话、接手、交回 AI、结束（docs/architecture.md 第 5 节）。
+"""对话：看列表、看完整对话、接手、交回 AI、结束、回复病人（docs/architecture.md 第 5 节）。
 
-员工回复病人要等 Phase 5 接上 WhatsApp 才做：现在存一条"发出"的消息，病人其实收不到，会误导员工。
+回复病人（Phase 5）：经 WhatsApp Cloud API 真的发出去，再存进 messages；送达状态由 webhook 更新。
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..auth import current_staff
 from ..db import conversations as conv
-from ..db.models import Conversation, ConversationMode, Message, Sender, Staff
+from ..db.models import Conversation, ConversationMode, Message, Sender, Staff, WaStatus
 from ..db.session import get_session
+from ..whatsapp import MAX_TEXT_LENGTH, RecipientNotAllowed, WhatsAppClient, WhatsAppError, WhatsAppNotConfigured, \
+    get_whatsapp_client
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"], dependencies=[Depends(current_staff)])
 
@@ -27,6 +32,8 @@ class MessageOut(BaseModel):
     sender: Sender
     staff_id: int | None
     body: str
+    wa_status: WaStatus | None
+    wa_error: str | None
     created_at: datetime
 
 
@@ -46,7 +53,13 @@ class ConversationOut(BaseModel):
 
 
 class ConversationDetailOut(ConversationOut):
+    # WhatsApp 24 小时规则：到这个时间之前才能回复一般消息（病人最后一条消息 + 24 小时）；没收过消息 = null
+    reply_window_ends_at: datetime | None
     messages: list[MessageOut]
+
+
+class ReplyIn(BaseModel):
+    body: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
 
 
 def _out(c: Conversation, last: Message | None) -> dict:
@@ -107,6 +120,7 @@ def get_conversation(conversation_id: int, session: Session = Depends(get_sessio
     c = _get(session, conversation_id)
     messages = c.messages
     return {**_out(c, messages[-1] if messages else None),
+            "reply_window_ends_at": conv.customer_service_window_ends_at(session, c.wa_contact_id),
             "messages": [MessageOut.model_validate(m, from_attributes=True) for m in messages]}
 
 
@@ -138,3 +152,47 @@ def hand_back(conversation_id: int, session: Session = Depends(get_session)) -> 
 def close(conversation_id: int, session: Session = Depends(get_session)) -> dict:
     """结束对话。病人之后再发消息会开一段新的对话。"""
     return _act(session, conversation_id, lambda c: conv.close_conversation(session, c))
+
+
+@router.post("/{conversation_id}/reply", response_model=ConversationDetailOut)
+def reply(
+    conversation_id: int,
+    body: ReplyIn,
+    staff: Staff = Depends(current_staff),
+    session: Session = Depends(get_session),
+    whatsapp: WhatsAppClient = Depends(get_whatsapp_client),
+) -> dict:
+    """员工回复病人。在 AI 回复的对话里回复 = 接手（D22）。
+
+    先发出去，WhatsApp 收下了才存进数据库：存进去的消息一定是真的发出去了（D36）。
+    """
+    text = body.body.strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="The message is empty")
+    c = _get(session, conversation_id)
+    if c.mode == ConversationMode.CLOSED:
+        raise HTTPException(status_code=409, detail="This conversation is already closed")
+    if not conv.customer_service_window_open(session, c.wa_contact_id):
+        raise HTTPException(
+            status_code=409,
+            detail="More than 24 hours since the patient's last message. WhatsApp only allows approved "
+                   "template messages now, which are not available yet.",
+        )
+    try:
+        wa_message_id = whatsapp.send_text(c.wa_contact.wa_phone, text)
+    except RecipientNotAllowed as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except WhatsAppNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except WhatsAppError as e:
+        raise HTTPException(status_code=502, detail=f"WhatsApp did not accept the message: {e}") from e
+
+    try:
+        conv.record_outgoing_message(session, c, Sender.STAFF, text, staff=staff,
+                                     wa_message_id=wa_message_id, wa_status=WaStatus.ACCEPTED)
+        session.commit()
+    except Exception:
+        # 病人已经收到了，但记录没存进去：留下消息 ID，方便查
+        log.exception("消息已经发出，但存进数据库失败（%s）", wa_message_id)
+        raise
+    return get_conversation(conversation_id, session)

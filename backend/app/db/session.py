@@ -13,7 +13,8 @@ from ..config import get_database_url
 
 @lru_cache
 def get_engine() -> Engine:
-    return create_engine(get_database_url(), pool_pre_ping=True)
+    # hide_parameters：数据库出错时，错误信息不带 SQL 的参数（可能是消息内容、电话号码），日志里才没有病人资料（D38）
+    return create_engine(get_database_url(), pool_pre_ping=True, hide_parameters=True)
 
 
 @lru_cache

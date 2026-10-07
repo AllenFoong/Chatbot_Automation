@@ -606,3 +606,38 @@ form.inline {
 ul.error {
   padding-left: 28px;
 }
+
+/* ---------- 回复病人（Phase 5） ---------- */
+
+.reply {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.reply textarea {
+  font: inherit;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  resize: vertical;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.reply .row-between {
+  align-items: center;
+}
+
+.status-read {
+  color: var(--primary);
+}
+
+.status-failed {
+  color: var(--danger);
+  font-weight: 600;
+}
