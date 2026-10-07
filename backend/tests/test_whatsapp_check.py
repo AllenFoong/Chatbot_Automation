@@ -6,6 +6,7 @@ tunnel 后面接的是真的 webhook 小程序（app/webhook_main.py），所以
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field, replace
 
 import httpx
@@ -26,6 +27,9 @@ class FakeMeta:
     """Meta 的设定，各个测试改其中一项。"""
 
     token_valid: bool = True
+    expires_at: int = 0                                     # 0 = 不会过期
+    scopes: tuple[str, ...] = ("whatsapp_business_management", "whatsapp_business_messaging")
+    messaging_wabas: tuple[str, ...] = ("333", WABA_ID)
     app_secret: str = SETTINGS.app_secret
     phone_number_ids: tuple[str, ...] = (NUMBER_ID,)
     waba_apps: list[str] = field(default_factory=lambda: [APP_ID])
@@ -40,8 +44,10 @@ class FakeMeta:
         error = httpx.Response(400, json={"error": {"code": 100, "message": "Unsupported request"}})
         if path == "debug_token":
             return httpx.Response(200, json={"data": {
-                "app_id": APP_ID, "is_valid": self.token_valid, "expires_at": 0,
-                "granular_scopes": [{"scope": "whatsapp_business_management", "target_ids": ["333", WABA_ID]}],
+                "app_id": APP_ID, "is_valid": self.token_valid, "expires_at": self.expires_at,
+                "scopes": list(self.scopes),
+                "granular_scopes": [{"scope": "whatsapp_business_management", "target_ids": ["333", WABA_ID]},
+                                    {"scope": "whatsapp_business_messaging", "target_ids": list(self.messaging_wabas)}],
             }})
         if path == f"{APP_ID}/subscriptions":
             if token != f"{APP_ID}|{self.app_secret}":
@@ -169,6 +175,26 @@ def test_window2_not_restarted_after_env_change(check):
 
     problems, _ = check(FakeMeta(), window2_settings=replace(SETTINGS, phone_number_id="999"))
     assert len(problems) == 1 and "WHATSAPP_PHONE_NUMBER_ID" in problems[0]
+
+
+def test_token_without_permission_to_send(check):
+    problems, text = check(FakeMeta(scopes=("whatsapp_business_management",)))
+    assert len(problems) == 1 and "重开视窗 1" in problems[0]
+    assert "whatsapp_business_messaging" in text
+
+
+def test_token_cannot_send_for_this_waba(check):
+    problems, _ = check(FakeMeta(messaging_wabas=("333",)))
+    assert len(problems) == 1 and "重开视窗 1" in problems[0]
+
+
+def test_token_about_to_expire(check):
+    problems, text = check(FakeMeta(expires_at=int(time.time()) + 600))
+    assert len(problems) == 1 and "Generate access token" in problems[0]
+    assert "分钟后就失效" in text
+
+    problems, text = check(FakeMeta(expires_at=int(time.time()) + 5 * 3600 + 60))
+    assert problems == [] and "大约 5 小时后失效" in text
 
 
 def test_expired_token_stops_early(check):

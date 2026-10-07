@@ -8,6 +8,7 @@
 逐项问 Meta（Graph API），再经 tunnel 打一次自己的 webhook：
 1. .env 的 4 个值都填了
 2. access token 有效，是哪一个 App 的
+   有没有发消息的权限（whatsapp_business_messaging）、是不是快过期了
 3. WHATSAPP_PHONE_NUMBER_ID 真的是测试号码的 ID；Meta 把这个号码的 webhook 送到哪个网址
 4. App 有没有订阅测试号码所在的 WhatsApp Business Account（WABA）：没有 = 手机的消息不会送来
 5. App secret 对不对；App 的 webhook 有没有订阅 messages
@@ -44,6 +45,7 @@ class Checker:
         self.http = http
         self.out = out
         self.problems: list[str] = []
+        self.messaging_wabas: list[str] | None = None     # token 能发消息的 WABA；None = 没有列出来（= 全部）
 
     # ---------- 印出结果 ----------
 
@@ -132,13 +134,25 @@ class Checker:
         if not data.get("is_valid"):
             self.bad("access token 已经失效", "到 API Setup 按 Generate access token，更新 .env 的 WHATSAPP_ACCESS_TOKEN")
             return None, []
+        renew = "到 API Setup 按 Generate access token，更新 .env 的 WHATSAPP_ACCESS_TOKEN，再重开视窗 1"
         expires = data.get("expires_at") or 0
-        left = f"，大约 {max(0, int(expires - time.time())) // 3600} 小时后失效" if expires else ""
-        self.ok(f"access token 有效（App ID {data.get('app_id')}{left}）")
+        seconds_left = int(expires - time.time()) if expires else None
+        if seconds_left is not None and seconds_left < 3600:
+            self.bad(f"access token 有效，但 {max(0, seconds_left) // 60} 分钟后就失效（App ID {data.get('app_id')}）", renew)
+        else:
+            left = f"，大约 {seconds_left // 3600} 小时后失效" if seconds_left is not None else ""
+            self.ok(f"access token 有效（App ID {data.get('app_id')}{left}）")
+        scopes = data.get("scopes")
+        if isinstance(scopes, list) and "whatsapp_business_messaging" not in scopes:
+            self.bad("access token 没有发消息的权限（whatsapp_business_messaging）：Admin Platform 回复会被拒绝",
+                     "到 API Setup 按 Generate access token（不要用 Graph API Explorer 的 token），更新 .env，再重开视窗 1")
+        self.info("发消息的是视窗 1：它只在启动时读 .env。换了 token 一定要重开视窗 1，不然回复会显示 access token 的错误")
         wabas: list[str] = []
         for scope in data.get("granular_scopes") or []:
             if scope.get("scope") in ("whatsapp_business_management", "whatsapp_business_messaging"):
                 wabas += [w for w in scope.get("target_ids") or [] if w not in wabas]
+            if scope.get("scope") == "whatsapp_business_messaging" and scope.get("target_ids"):
+                self.messaging_wabas = list(scope["target_ids"])
         return data.get("app_id"), wabas
 
     def check_phone_number(self) -> dict | None:
@@ -172,6 +186,9 @@ class Checker:
             self.bad("找不到测试号码在哪一个 WhatsApp Business Account（WABA）",
                      "再跑一次：python -m app.whatsapp_check --waba <ID>（ID 是 API Setup 上的 WhatsApp Business Account ID）")
             return None
+        if self.messaging_wabas is not None and waba_id not in self.messaging_wabas:
+            self.bad(f"access token 不能用 WABA {waba_id} 发消息：Admin Platform 回复会被拒绝",
+                     "在测试号码那个 App 的 API Setup 按 Generate access token，更新 .env，再重开视窗 1")
         try:
             apps = self.graph(f"{waba_id}/subscribed_apps").get("data") or []
         except GraphError as e:

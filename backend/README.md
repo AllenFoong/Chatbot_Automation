@@ -310,7 +310,7 @@ python -m app.db.demo                    # 放假资料（4 段对话、4 个预
 ```powershell
 pip install -r requirements-dev.txt      # httpx 搬到 requirements.txt（本来就装了）
 alembic upgrade head                     # 0002 -> 0003：消息的送达状态
-pytest                                   # 应该 174 passed，没有 skipped
+pytest                                   # 应该 180 passed，没有 skipped
 ```
 
 ### 在 Meta 建测试用的 App（只做一次，用自己的 Facebook 帐号，**不要用诊所的**）
@@ -400,10 +400,12 @@ npm run dev
 | 试 `/webhook?...` 看到 `WHATSAPP_VERIFY_TOKEN is not set` | `.env` 没有这一行，或视窗 2 在 `.env` 加好之前就开了 |
 | Meta 的 *Test* 按钮送得到，手机传的消息送不到 | App 没订阅 WABA（第 9 步：`python -m app.whatsapp_check --subscribe`）；或 App 还没发布（第 8 步） |
 | 视窗 2 出现 `401` | `WHATSAPP_APP_SECRET` 填错（签名对不上） |
+| 回复时红字 *There was a problem with the access token or permissions …*（code 190、10、200 等） | 视窗 1 用的 token 过期了或是旧的：视窗 1 只在启动时读 `.env`。到 *API Setup* 按 *Generate access token* → 更新 `.env` → **重开视窗 1** → 跑 `python -m app.whatsapp_check` → 再回复。临时 token 大约 24 小时失效，每天测试前都要换 |
+| 回复时红字 *… not in allowed list*（code 131030） | 收件人不在 Meta 测试号码的 *To* 名单：*API Setup* → *Manage phone number list* 加上自己的号码 |
 
 ### Phase 5a 完成的条件（在开发电脑上测试）
 
-1. `alembic current` → `0003 (head)`；`pytest` → **174 passed**，没有 skipped。
+1. `alembic current` → `0003 (head)`；`pytest` → **180 passed**，没有 skipped。
 2. `frontend` 里 `npm test` → **35 passed**；`npm run build` 成功。
 3. 照「使用」开 4 个视窗，在 Meta 按 *Verify and save* 成功；`python -m app.whatsapp_check` 全部 `[OK]`。
 4. 照下面的清单做一次：
@@ -437,3 +439,10 @@ npm run dev
   （全部正确、没订阅 WABA、`--subscribe`、App secret 错、tunnel 网址变了、网址少 `/webhook`、没订阅 `messages`、号码 ID 错、改了 `.env` 没重开视窗 2、token 失效、`.env` 没填、自我测试不存任何东西）。
 - 视窗 2 的 access log 不再印出暗号（`hub.verify_token=***`）。
 - `pytest` → 174 passed。
+
+### 云端容器的测试记录（2026-10-07：开发电脑清单第 1 项通过；第 2 项回复被拒，红字是 access token 的问题）
+
+- 原因：发消息的是视窗 1，它只在启动时读 `.env`；设定检查只问 Meta 的读取 API，所以没发现视窗 1 的 token 过期 / 是旧的，或 token 没有发消息的权限。
+- 设定检查加上：token 有没有 `whatsapp_business_messaging`、能不能用这个 WABA 发消息、1 小时内会不会失效；提醒换了 token 要重开视窗 1。
+- 回复失败的红字加上 Meta 的错误代码（例 `(code 190)`）；token 的问题直接说要换 token、重开 Admin API。
+- `pytest` → 180 passed。

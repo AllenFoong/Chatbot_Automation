@@ -19,7 +19,7 @@ from app.db import conversations as conv
 from app.db.models import ConversationMode, Message, Sender, WaStatus
 from app.db.session import get_session
 from app.webhook import AI_OFF_REASON
-from app.whatsapp import (RecipientNotAllowed, WhatsAppClient, WhatsAppError, WhatsAppNotConfigured,
+from app.whatsapp import (TOKEN_HINT, RecipientNotAllowed, WhatsAppClient, WhatsAppError, WhatsAppNotConfigured,
                           parse_webhook, valid_signature)
 from tests.database import add_staff
 
@@ -268,6 +268,17 @@ def test_send_error_explains_without_token():
     with pytest.raises(WhatsAppError) as e:
         client.send_text(PHONE, "Hello!")
     assert "not in allowed list" in str(e.value) and "test-access-token" not in str(e.value)
+    assert "(code 131030)" in str(e.value) and TOKEN_HINT not in str(e.value)
+
+
+@pytest.mark.parametrize("code", [190, 10, 200])
+def test_send_error_says_when_the_token_is_the_problem(code):
+    client, _ = client_with(lambda r: httpx.Response(401, json={"error": {
+        "message": "There was a problem with the access token or permissions you are using for the API call.",
+        "code": code}}))
+    with pytest.raises(WhatsAppError) as e:
+        client.send_text(PHONE, "Hello!")
+    assert f"(code {code})" in str(e.value) and TOKEN_HINT in str(e.value)
 
 
 def test_send_when_whatsapp_unreachable():

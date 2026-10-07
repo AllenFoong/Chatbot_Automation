@@ -24,6 +24,7 @@ log = logging.getLogger(__name__)
 
 GRAPH_URL = "https://graph.facebook.com"
 MAX_TEXT_LENGTH = 4096          # WhatsApp 一条文字消息最长 4096 个字
+TOKEN_HINT = "Check WHATSAPP_ACCESS_TOKEN on the server: renew it, then restart the Admin API."
 
 
 class WhatsAppError(Exception):
@@ -185,12 +186,23 @@ class WhatsAppClient:
         if r.status_code != 200:
             error = data.get("error") or {}
             details = (error.get("error_data") or {}).get("details")
-            log.warning("WhatsApp 不接受消息：HTTP %s，code %s", r.status_code, error.get("code"))
-            raise WhatsAppError(details or error.get("message") or f"HTTP {r.status_code}")
+            code = error.get("code")
+            log.warning("WhatsApp 不接受消息：HTTP %s，code %s", r.status_code, code)
+            text = details or error.get("message") or f"HTTP {r.status_code}"
+            if code is not None:
+                text += f" (code {code})"
+            if _token_problem(code):
+                text += f" {TOKEN_HINT}"
+            raise WhatsAppError(text)
         try:
             return data["messages"][0]["id"]
         except (KeyError, IndexError, TypeError):
             raise WhatsAppError("WhatsApp did not return a message ID") from None
+
+
+def _token_problem(code) -> bool:
+    """Meta 的错误代码：0 / 190 = token 不对或过期；3、10、200–299 = token 没有权限（例如没有 whatsapp_business_messaging）。"""
+    return isinstance(code, int) and (code in (0, 3, 10, 190) or 200 <= code <= 299)
 
 
 @lru_cache
