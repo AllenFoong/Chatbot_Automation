@@ -9,7 +9,7 @@
 | 文件 | 内容 |
 |---|---|
 | [`docs/gpis-database.md`](docs/gpis-database.md) | GPiS 数据库：表、字段、跑过的 SQL、结果、待验证的问题 |
-| [`docs/architecture.md`](docs/architecture.md) | 系统架构、技术选型、开发路线、人工介入设计；第 8 节：Phase 5b 预约提醒的设计（草稿）；第 9 节：A1 怎么读主机的方案比较（草稿） |
+| [`docs/architecture.md`](docs/architecture.md) | 系统架构、技术选型、开发路线、人工介入设计；第 8 节：Phase 5b 预约提醒的设计（草稿）；第 9 节：A1 怎么读主机的方案比较；第 10 节：5c 接上诊所号码、第三方平台、费用和 Plan B（草稿） |
 | [`docs/decisions.md`](docs/decisions.md) | 做过的决定和原因、数据安全规则 |
 | [`docs/clinic-workflow.md`](docs/clinic-workflow.md) | 营业时间、医生排班、staff 如何使用 GPiS 预约、Remarks 治疗代码、待确认问题 |
 | [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
@@ -64,13 +64,15 @@
 - [x] 第二轮问卷整理好（中英对照，在 claude.ai 上）：W40a–d（病人同意，附登记表例句）、W46–W47（提醒）、W48–W53（A1）；已知柜台 2 台电脑，主机 A 24 小时开着
 - [x] 诊所回答第二轮问卷（2026-10-08）：诊所不能放新电脑 → 5b 先装在柜台另一台电脑（D53）；同意在主机 A 开只读帐号（D52）；`VENEER` 也要 `*C`（D51）；旧病人的同意是「告知」不是「问同意」，要请律师看（`architecture.md` 8.8）
 - [ ] 等诊所：W40b（空白登记表的照片）、W54（柜台另一台可不可以一直装着、不关机）
+- [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
+- [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
 1. 下次去诊所：看柜台另一台电脑的 Windows 版本、内存、硬盘，和 `GPiS.exe.config` 的 `Database.Server` 那一行（W51，不看密码那一行）；收 W40b 的空白登记表照片（确认上面没有病人资料）。
-2. 确认之后，下一个 session 写 5b 的程序：先做「只看名单、不发送」（preview：拿 `GPiS_Dev` 的某一天当「明天」；第一版模板没有按钮，D48）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
-3. 5b 对真的病人发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（读主机的实时预约）、病人同意（W40、D46）。
+2. 写 5b 的程序：先做「只看名单、不发送」（preview：拿 `GPiS_Dev` 的某一天当「明天」），再加「Open in WhatsApp」（D54：读 `GPiS_Dev` 时不显示）；第一版模板没有按钮（D48）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
+3. 员工按「Open in WhatsApp」发，只要 A1 做好（第 4 点）。系统用模板自动发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（读主机的实时预约）、病人同意（W40、D46）。
 4. A1：5b 先把本系统装在柜台另一台电脑（D53），主机 A 的只读帐号照 D52 做（脚本先在开发电脑试）。Phase 6 之前决定长期放哪里（W54、`docs/architecture.md` 9.4）。
 5. 上线前：用 Admin Platform（*Settings → Clinic closures*）导入公共假期、补上农历新年多休的日子（`clinic_closures` 现在是空的；提醒也要靠它决定假期前提早发）。
 6. Phase 6（AI 推荐时段）之前要解决 A8：还没录入 GPiS 的预约请求要算进空档。

@@ -1,6 +1,6 @@
 # 系统架构与技术选型
 
-> 最后更新：2026-10-08（第 8、9 节按诊所两轮问卷更新）
+> 最后更新：2026-10-08（第 8、9 节按诊所两轮问卷更新；第 10 节 5c 和 Plan B）
 
 ## 1. 需求
 
@@ -174,7 +174,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | A4 | 各服务的时长？✅ 一般 30 分钟；`RCT`、`IMPLANT`、`SCAN B`、`VENEER` 等可能要 1 hour，由员工看情况在 Remarks 写 `1 hour`（`clinic-workflow.md` 第 2 节） |
 | A5 | 是否已获得诊所 / GPiS 开发商对这种数据使用方式的书面同意？ |
 | A6 | 项目性质（学习 / 毕业项目 / 正式上线）、时间与预算（LLM、WhatsApp API 费用）？ |
-| A7 | 病人已经习惯用诊所现有的 WhatsApp 号码，诊所用的是 **WhatsApp Business App**（W18）。候选：Meta 的 **Coexistence**，同一个号码同时用 Business App 和 Cloud API，保留聊天记录，员工仍可在手机上回复（第三方资料显示马来西亚已支持）。已知限制：每秒最多 20 条消息；不支持群组、广播列表、语音 / 视频通话、目录（catalog）、限时消息等。2026-10-06 再查（第三方资料：BSP 文件、搜索结果；Meta 官方网站在云端容器打不开）：① 员工在手机 App 发的消息会经 **`smb_message_echoes`** webhook 送来 → 本系统看得到（存成 `STAFF`、`staff_id` 空；Phase 3 的 `record_outgoing_message` 已经支持）；② 连上时同步过去 180 天的聊天（`history` webhook）和联系人（`smb_app_state_sync`）；③ Business App **每 14 天至少要打开一次**，否则连接会失效；④ 连上后 App 的撤回、限时消息、view once、即时位置、广播列表、编辑消息不能用；⑤ 要经 **Embedded Signup** 连接：找 BSP，或自己的 Meta App 成为 Tech Provider（要商家验证）。**待决定（5c，上线前）**：用 BSP 还是自己做 Embedded Signup；180 天的历史要不要导入（是病人资料）；以上各点上线前再对照 Meta 官方文件 |
+| A7 | 病人已经习惯用诊所现有的 WhatsApp 号码，诊所用的是 **WhatsApp Business App**（W18）。候选：Meta 的 **Coexistence**，同一个号码同时用 Business App 和 Cloud API，保留聊天记录，员工仍可在手机上回复（第三方资料显示马来西亚已支持）。已知限制：每秒最多 20 条消息；不支持群组、广播列表、语音 / 视频通话、目录（catalog）、限时消息等。2026-10-06 再查（第三方资料：BSP 文件、搜索结果；Meta 官方网站在云端容器打不开）：① 员工在手机 App 发的消息会经 **`smb_message_echoes`** webhook 送来 → 本系统看得到（存成 `STAFF`、`staff_id` 空；Phase 3 的 `record_outgoing_message` 已经支持）；② 连上时同步过去 180 天的聊天（`history` webhook）和联系人（`smb_app_state_sync`）；③ Business App **每 14 天至少要打开一次**，否则连接会失效；④ 连上后 App 的撤回、限时消息、view once、即时位置、广播列表、编辑消息不能用；⑤ 要经 **Embedded Signup** 连接：找 BSP，或自己的 Meta App 成为 Tech Provider（要商家验证）。**待决定（5c，上线前）**：用 BSP 还是自己做 Embedded Signup；180 天的历史要不要导入（是病人资料）；以上各点上线前再对照 Meta 官方文件。**Coexistence 行不通时的 Plan B、第三方平台、费用见第 10 节** |
 | A9 | **病人传的照片、语音、文件**：5a 先不下载，只显示 `[Image]` 等（D38）。要不要存？存在哪里、保留多久、谁能看（可能是伤口照片，比文字更敏感）？Phase 6 的 AI 要不要看照片？ |
 | A8 | **还没录入 GPiS 的预约请求要不要算进空档**：空档现在只看 GPiS。AI 把 10:00 推荐给病人 A（`PENDING`）之后、员工录入 GPiS 之前，病人 B 来问，10:00 仍然显示有空。建议在 Phase 6（AI 推荐时段）之前：`PENDING` 和刚 `CONFIRMED`、GPiS 里还看不到的请求都算占用（宁可少推荐）。难处：要把请求和 GPiS 的预约对上（日期、时段、医生、病人），否则员工录入后会算两次；GPiS 画面不显示 `AppointmentID`，`gpis_appointment_id` 也要靠系统自动对上。改规则时 SQL 和 `availability.py` 要一起改 |
 | A10 | **病人资料在本系统保留多久**（PDPA 的保留原则）：`messages`、5b 的 `reminders` 都有病人名字、号码和预约。建议：提醒的内容 90 天后删掉、只留统计；对话的保留期限和 A9 一起决定。要诊所同意 |
@@ -217,6 +217,13 @@ GPiS（只读）──读「明天」的预约──→ Backend：排除不是�
 
 **对真的病人发之前要先有三件事**：① 5c 把诊所的号码接上 Cloud API（病人只认得诊所的号码，测试号码只能发给自己）；
 ② A1：读得到主机的**实时**预约（8.7）；③ 病人的同意（8.8）。在那之前，5b 只用 Meta 测试号码 + 假资料，`GPiS_Dev` 只能「只看名单」。
+
+**不用等 5c 的做法**（D54）：名单的每一行有 *Open in WhatsApp* 按钮（第 10 节的 Plan B3）：打开 WhatsApp 里那位病人的对话、消息已经填好，员工按 Enter 发出。
+所以分三步上线，每一步都比现在省事：
+
+1. **只列名单** 1–2 星期（W42）：员工照旧手动发，同时对照名单。
+2. **员工按 *Open in WhatsApp* 发**：只要 A1 做好（柜台另一台电脑 + 只读帐号，D52、D53）。不用 5c、不用模板审核、不用钱；还是员工自己发，和现在一样。
+3. **5c 接上后，改成系统按 Send 一次发完**（模板消息）。Coexistence 接不上的话，就一直用第 2 步。
 
 ### 8.2 名词
 
@@ -284,6 +291,12 @@ GPiS（只读）──读「明天」的预约──→ Backend：排除不是�
 
 - 上面：预约日期、「Read from GPiS at 09:02」和 *Refresh*；preview 模式时显示 *Preview only – sending is turned off*，没有 Send 按钮。
 - **Ready**：每个号码一行（勾选框、号码、几位病人和时间、消息预览），默认都勾。
+- **Open in WhatsApp**（每一行，D54）：打开 WhatsApp Desktop 里那位病人的对话，消息已经填好（`whatsapp://send?phone=…&text=…`，或 `https://wa.me/…?text=…`），员工按 Enter 发出。
+  - 那台电脑的 WhatsApp Desktop（或 WhatsApp Web）要连上诊所的 Business App（手机的「已连接的设备」）。
+  - 按了就记成 *Opened in WhatsApp*（谁、几点按的）。系统不知道员工最后有没有按 Enter（没有 webhook），员工可以改回 *Not sent*；同一个号码同一天按过的会标出来，避免发两次。
+  - `wa.me` 的网址会留在浏览器的历史记录（有号码和名字，D31）→ 优先用 `whatsapp://` 直接开 WhatsApp Desktop；实作时测试会不会留下记录。
+  - 消息照诊所的原文（8.5），不受模板的限制，但用一样的文字，以后换成模板时病人看到的一样。
+  - 5c 之前页面只有这个按钮，没有 Send。
 - **Needs staff**：要员工看的，写明原因（上面的表）。
 - **Not appointments**：只显示数量（`00:00` 几条、`OFF DAY` 几条、取消几条），不列名字。
 - **Sent**：送达状态（*Sent* → *Delivered* → *Read* / *Failed* + 原因）和病人的回复（8.5）。
@@ -349,8 +362,12 @@ Footer（建议加，D46）：Reply STOP to stop reminders
 - **送审**：在 WhatsApp Manager → *Message templates* 建（开发时在**测试 portfolio 的测试 WABA**，D34），送出后通常几分钟到一天有结果；被拒绝就看原因改了再送。
   模板属于 WABA：**5c 接上诊所的号码时，要在诊所的 WABA 再建、再送审一次**。模板名字、语言不是密码，可以放在设置里。
 - **品质**：很多病人 block / report，Meta 会降低号码和模板的品质、暂停模板。所以内容要短、只发给真的有预约的人、要有 STOP。
-- **费用**（A6）：2025-07 起 Meta 按**每条送达的模板**收费，价钱看类别和**收件人的国家**（马来西亚、新加坡不同）；病人 24 小时内传过消息的话，utility 模板免费。
-  一天约 30–40 条；上线前看 Meta 的价目表算一个月多少钱。
+- **费用**（A6；第三方资料，Meta 官方网站在云端容器打不开，上线前看 Meta 的价目表）：Meta 按**每条送达的消息**收费，价钱看类别和**收件人的国家**（马来西亚、新加坡不同）。
+  - **模板**（提醒）：每条都收。**2026-10-01 起**，病人 24 小时内传过消息也照收（以前免费）。马来西亚 utility 约 **US$0.014（约 RM0.06）一条**（2026 年的价目）。
+  - **员工在 24 小时内自由回复**（service message）：2026-10-01 起也收，价钱和 utility 一样，但**每个号码每月头 1,000 条免费**；诊所的回复量应该在免费额度内。
+  - 病人传来的消息不收钱；Coexistence 时员工用手机 App 发的也不收（第三方资料）。
+  - 一天 10–30 条提醒（W31）→ 一个月约 300–900 条 → 大约 **RM20–60**。BSP 的月费另外算（第 10 节），通常比消息费贵。
+  - *Open in WhatsApp*（D54）是员工用 Business App 发，不经 API，**不收钱**。
 - **发送量的限制**：新的 Business portfolio 一天（24 小时）最多主动发给 250 个不同号码，诊所够用；Coexistence 每秒最多 20 条（A7），也够。
 
 **病人的回复怎么进 Conversations**（D43、D48）：
@@ -380,6 +397,7 @@ Footer（建议加，D46）：Reply STOP to stop reminders
 | ② 读 `GPiS_Dev` 就不能发 | 预约是从 `GPiS_Dev` 读的（`GPIS_EXPECTED_DATABASE`）→ 程序拒绝 `send`，就算 `REMINDERS_MODE=send`。只有读主机的 `GPiS` 才能发 |
 | ③ 允许名单（D34） | 新的 `send_template` 和 `send_text` 一样，在**最底层**检查 `WHATSAPP_ALLOWED_RECIPIENTS`；`*` 只有上线才用 |
 
+- ***Open in WhatsApp* 也要锁**（D54）：预约从 `GPiS_Dev` 读的时候**没有这个按钮**（允许名单里的号码例外），点了会打开真的病人的对话。
 - **开发时要真的发一次**（测模板、按钮、回复）：用**假的预约来源**（例 `REMINDER_SOURCE=demo`：*Demo Patient A / B*，号码 = 自己的手机），不读 GPiS；
   和 `app.db.demo` 一样只能用在 `_dev` 数据库。消息只会到自己的手机（锁 ③）。
 - **preview `GPiS_Dev`**：名单只显示在自己电脑的 Admin Platform 上（和打开 GPiS 一样）。截图要遮住名字、号码。
@@ -567,3 +585,60 @@ wa_contacts            + reminders_opt_out_at, reminders_opt_out_by (PATIENT / S
 - 网页在局域网也用 https（登录 cookie，D26）。
 
 不选方案 2：要把全部病人的号码放上云端，还要写同步和处理删除。不选方案 4：云端一出事，整个数据库就被看光。
+
+## 10. 5c：接上诊所的号码，和 Plan B（草稿）
+
+> 2026-10-08 草稿。A7（用 BSP 还是自己做 Embedded Signup）还没决定。费用、平台的资料来自第三方网站和厂商自己的说明（Meta 官方网站在云端容器打不开），决定前要再确认。
+
+### 10.1 名词
+
+| 名词 | 意思 |
+|---|---|
+| Business portfolio | 公司在 Meta 的总帐户（以前叫 Business Manager） |
+| **WABA**（WhatsApp Business Account） | portfolio 里的「WhatsApp 文件夹」：放**电话号码**和**消息模板**。开发用的是自己测试 portfolio 里的 *Test WhatsApp Business Account*（D34） |
+| **建模板** | 在 WhatsApp Manager → *Message templates* → *Create*：选类别（utility）、语言，贴上文字（空格写 `{{1}}`…），填假的范例，送 Meta 审核（几分钟到一天）。**模板属于 WABA**：5c 时要在诊所的 WABA 再建、再审核一次（8.5） |
+| **BSP**（Business Solution Provider） | Meta 认可、帮商家接 WhatsApp API 的公司 |
+| Tech Provider | 自己的 Meta App 也能帮商家接 WhatsApp（要做商家验证），不经 BSP |
+| Embedded Signup | 接号码的流程：在 Meta 的画面登录、选 portfolio、用手机 App 扫 QR code |
+| **Coexistence** | 同一个号码**同时**在手机的 Business App 和 Cloud API 用（A7） |
+
+### 10.2 5c 要做什么
+
+诊所的号码现在在柜台手机的 Business App 上。系统要用**同一个号码**发提醒、收回复，所以要用 Coexistence 把号码接上 Cloud API：员工照旧用手机回复，系统用 API 发提醒，两边都看得到消息。
+要经过 Embedded Signup：找一家支持 Coexistence 的 BSP，或自己的 App 成为 Tech Provider。限制见 A7（手机 App 每 14 天至少打开一次、广播列表等功能不能用、每秒最多 20 条）。
+
+### 10.3 第三方平台
+
+| | **只给 API 的 BSP**（例：360dialog、YCloud） | **全套平台**（例：WATI、SleekFlow、respond.io） |
+|---|---|---|
+| 做什么 | 帮忙接号码（Embedded Signup、Coexistence），之后几乎就是 Cloud API | 有自己的对话收件箱、群发、排程、自动回复、chatbot，员工在它们的网页或 App 回复 |
+| 本系统还要做什么 | 全部照现在的设计；发消息的网址、token 换成 BSP 的 | Conversations 的部分可以用它们的；但它们**读不到 GPiS**，提醒名单（`*C`、家人合并、排除占位）还是要本系统做，再经它们的 API 发 |
+| 病人资料 | 经 BSP 和 Meta | 对话、名单都存在那家公司（多一个要在 PDPA 通知里写的公司） |
+| 费用（第三方资料，要问报价） | 每个号码的月费 + Meta 的消息费 | 月费比较高，例：SleekFlow 马来西亚页面写 RM699 起；WATI、respond.io 约 US$59–79 起；有的在 Meta 的消息费上再加价 |
+| Coexistence（厂商自己说的） | 360dialog、YCloud 都说支持；360dialog 列的不支持国家（欧盟、英国、印度、日本、澳洲）没有马来西亚 | WATI、SleekFlow、respond.io 都说支持；Twilio 据竞争对手说不支持（未确认） |
+
+**建议**：保留本系统，5c 找一家**只给 API、支持 Coexistence** 的 BSP（或自己做 Tech Provider，A7）。
+全套平台只有在诊所想要「厂商维护的现成产品」时才考虑（A6）：月费比较高、资料多交给一家公司，而且和 GPiS 的连接还是要自己做。
+
+### 10.4 Coexistence 行不通时的 Plan B
+
+可能的原因：号码或 App 版本不符合条件、找不到合适的 BSP 或太贵、商家验证过不了、员工觉得手机 App 少了的功能太不方便。
+
+| | **B1 号码整个搬到 API** | **B2 另开一个新号码** | **B3 员工按 *Open in WhatsApp* 发**（D54） |
+|---|---|---|---|
+| 做法 | 诊所的号码从手机 App 移走，只在 API 用 | 新号码接 API 专门发提醒；旧号码留在手机 | 系统备好名单和每条消息，员工点一下、按 Enter（8.4） |
+| 病人看到的号码 | ✅ 同一个 | ❌ 陌生号码，可能以为是诈骗 | ✅ 同一个 |
+| 员工的手机还能用吗 | ❌ 只能用 Admin Platform 回复 | ✅ 旧号码可以 | ✅ 和现在一样 |
+| 要 Meta 审核模板吗 | 要 | 要 | 不用 |
+| Meta 的费用 | 每条收 | 每条收 | 不用钱 |
+| 病人同意 | 和 5c 一样的要求（8.8） | 和 5c 一样的要求 | 和现在员工手动发一样 |
+| Phase 6 的 AI 自动回复 | ✅ | ⚠️ 只在新号码 | ❌ AI 要经 API |
+| 主要风险 | 系统停了没有人看得到消息；手机的聊天记录不会搬过去 | 病人的回复分散在两个号码 | 员工还是要按 10–30 次，但不用再找号码、改名字和时间 |
+
+**不要用**非官方的 WhatsApp 自动化工具（例：模拟 WhatsApp Web 自动发的程序库）：违反 WhatsApp 的条款，诊所的号码可能被封。
+
+### 10.5 建议
+
+1. **B3 现在就做**，放进 5b（D54）：A1 做好就能用，不用等 5c。
+2. 之后试 Coexistence（5c），接得上就改成系统按 Send 一次发完。
+3. Coexistence 接不上：提醒继续用 B3。只有到 Phase 6 **要 AI 自动回复**时才考虑 B1（同一个号码、官方允许的方式）。
