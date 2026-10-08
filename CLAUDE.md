@@ -9,7 +9,7 @@
 | 文件 | 内容 |
 |---|---|
 | [`docs/gpis-database.md`](docs/gpis-database.md) | GPiS 数据库：表、字段、跑过的 SQL、结果、待验证的问题 |
-| [`docs/architecture.md`](docs/architecture.md) | 系统架构、技术选型、开发路线、人工介入设计 |
+| [`docs/architecture.md`](docs/architecture.md) | 系统架构、技术选型、开发路线、人工介入设计；第 8 节：Phase 5b 预约提醒的设计（草稿） |
 | [`docs/decisions.md`](docs/decisions.md) | 做过的决定和原因、数据安全规则 |
 | [`docs/clinic-workflow.md`](docs/clinic-workflow.md) | 营业时间、医生排班、staff 如何使用 GPiS 预约、Remarks 治疗代码、待确认问题 |
 | [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
@@ -27,7 +27,7 @@
 5. **不反编译 GPiS、不解密 `sa` 密码、不读取 `Tbl_User`。**
 6. 仓库里不写入任何密码、连接字符串中的密码、access token（用环境变量 / `.env`，并加入 `.gitignore`）。
 
-## 当前进度（2026-10-07）
+## 当前进度（2026-10-08）
 
 - [x] 确认 GPiS 使用 SQL Server 2012 Express，数据库名 `GPiS`
 - [x] 导出表结构，找到预约表 `Tbl_CAH_Appointment` 及相关设置表
@@ -57,16 +57,20 @@
 - [x] Phase 5a 初版：WhatsApp webhook（`backend/app/webhook_main.py`，port 8001）、员工回复、送达状态（migration `0003`）；开发只用 Meta 测试号码 + allowlist（D34–D38）；云端 `pytest` 161 个、Vitest 35 个通过，全部假数据
 - [x] Phase 5a 设定检查：`python -m app.whatsapp_check`（问 Meta + 经 tunnel 打一次 webhook，找出手机消息没送来的原因；也查 token 能不能发消息）；`pytest` 183 个
 - [x] Phase 5a 测试：开发电脑（Meta 测试 App 在自己的测试 portfolio，token 用 System User 的，D39）：`0003 (head)`，`pytest` 183 个、`npm test` 35 个通过，`npm run build` 成功，测试清单 1–7 项全部通过（记录见 `backend/README.md`）
+- [x] Phase 5a 合并进 `main`（PR #10）
+- [x] Phase 5b 设计草稿（只有文档，没有程序）：预约前一天用 WhatsApp 模板消息提醒病人（`docs/architecture.md` 第 8 节、D40–D46）；要问诊所 W31–W43
+- [ ] 诊所回答 W31–W43，确认 5b 设计（特别是病人同意 W40）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. 把 Phase 5a 合并进 `main`。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
-2. Phase 5b：模板消息 + 预约前一天的提醒（和第 3 点一起设计）；5c：上线时用 Coexistence 接上诊所的号码（A7 待决定：BSP 还是自己做 Embedded Signup）。
-3. 设计主机 ↔ 本系统的数据读取方式（`docs/architecture.md` A1）：`GPiS_Dev` 只是 9 月 28 日的快照，正式上线必须读主机的实时数据。
-4. 上线前：用 Admin Platform（*Settings → Clinic closures*）导入公共假期、补上农历新年多休的日子（`clinic_closures` 现在是空的）。
-5. Phase 6（AI 推荐时段）之前要解决 A8：还没录入 GPiS 的预约请求要算进空档。
+1. 和诊所确认 Phase 5b 的设计（`docs/architecture.md` 第 8 节），回答 `docs/clinic-workflow.md` 的 W31–W43；改了的设计照 `decisions.md` 的规则新增一条 D 取代。
+2. 确认之后，下一个 session 写 5b 的程序：先做「只看名单、不发送」（preview：拿 `GPiS_Dev` 的某一天当「明天」）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
+3. 5b 对真的病人发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（读主机的实时预约）、病人同意（W40、D46）。
+4. 设计主机 ↔ 本系统的数据读取方式（`docs/architecture.md` A1）：`GPiS_Dev` 只是 9 月 28 日的快照，正式上线必须读主机的实时数据；提醒要病人名字和号码，A1 的方案要能处理（第 8.7 节）。
+5. 上线前：用 Admin Platform（*Settings → Clinic closures*）导入公共假期、补上农历新年多休的日子（`clinic_closures` 现在是空的；提醒也要靠它决定假期前提早发）。
+6. Phase 6（AI 推荐时段）之前要解决 A8：还没录入 GPiS 的预约请求要算进空档。
 
-改空档规则时，`sql/check_available_slots.sql` 和 `backend/app/availability.py` 要一起改，再用上面的测试日期对照一次。
+改空档规则时，`sql/check_available_slots.sql` 和 `backend/app/availability.py` 要一起改，再用上面的测试日期对照一次；提醒名单沿用同一套判断（D41），也要再看一次。
 改表结构时：改 `backend/app/db/models.py` → 加 Alembic migration → `pytest`（步骤见 `backend/README.md`「改表结构的步骤」）。
 改 API 的回传栏位时：`frontend/src/types.ts` 也要一起改，再 `npm run build`（TypeScript 会指出画面上用到旧栏位的地方）。
