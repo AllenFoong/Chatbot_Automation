@@ -9,7 +9,7 @@
 - **.NET Framework 3.5 WinForms 桌面程序**，使用 DevExpress v10.1（含 `XtraScheduler` 预约日历）和 Crystal Reports。
 - 开发商：GPiS Solutions Sdn Bhd，文件夹内附 `EULA.rtf`。
 - **局域网多终端**：每台电脑的 `GPiS.exe.config` 设有 `Room.Name` / `Counter.Name`，并通过 `System Manager.IP` + 端口 `30001` 连接一个 System Manager 服务。
-  柜台有 **2 台电脑**：诊所叫「A」的那台是**主机**（有 SQL Server 和 GPiS 数据库，权限最大）；**A 先登录 GPiS，另一台才能登录**（2026-10-08）。
+  柜台有 **2 台电脑**：诊所叫「A」的那台是**主机**（有 SQL Server 和 GPiS 数据库，权限最大）；**A 先登录 GPiS，另一台才能登录**；**A 24 小时开着**，其他电脑下班会关（2026-10-08）。
 
 ### `GPiS.exe.config` 数据库设置
 

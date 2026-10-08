@@ -427,8 +427,14 @@ Footer（建议加，D46）：Reply STOP to stop reminders
 
 **建议**（D46）：
 
-1. 诊所的登记表 / PDPA 通知加一段：诊所名字、会用 WhatsApp 发提醒和回复、经 Meta 传送、怎么停止。草稿可以帮忙写，由诊所 / 律师定稿。
-2. 旧病人怎么补同意由诊所决定（下次来诊所时补签等）。
+1. 诊所的登记表 / PDPA 通知加一段：诊所名字、会用 WhatsApp 发提醒和回复、经 Meta 传送、怎么停止。草稿（第二轮问卷 W40 附给诊所看；正式的要写诊所名字，由诊所 / 律师定稿）：
+
+   > 我同意本诊所用我提供的手机号码，通过 WhatsApp 发预约提醒、回复我的询问。我明白这些消息会经过 WhatsApp（Meta 公司）传送。我随时可以回复 STOP 或告诉诊所员工，停止收到提醒。☐ 同意
+   >
+   > I agree that the clinic may use the mobile number I give to send me appointment reminders and reply to my enquiries on WhatsApp. I understand these messages are delivered through WhatsApp (Meta). I can stop the reminders at any time by replying STOP or telling the clinic staff. ☐ I agree
+
+2. 旧病人怎么补同意由诊所决定（W40d）：下次来诊所时补签；或病人自己 WhatsApp 诊所时，员工在对话里问一句。
+   不要由诊所**主动**发消息去问同意：那本身就是没有同意的主动消息。
 3. 本系统一定要做**号码层级的 opt-out**（病人回 `STOP`、员工在 Admin Platform 标记 → 这个号码不再发）；要不要逐个记录 opt-in（日期、方式），看诊所怎么收同意。
 4. **同意没解决之前，不对真的病人发**：5b 只在测试号码 + 假资料上跑。
 
@@ -480,7 +486,7 @@ wa_contacts            + reminders_opt_out_at, reminders_opt_out_by (PATIENT / S
 - **柜台有 2 台电脑**（2026-10-08）：诊所叫「A」的那台就是**主机**（有 SQL Server 和 GPiS 数据库，权限最大）。
   **A 先登录 GPiS，另一台才能登录**：和 `GPiS.exe.config` 对得上，其他电脑经局域网连 A 上的 System Manager（port `30001`，`gpis-database.md` 第 1 节）。
 - 本系统**直接读 SQL Server，不经 GPiS 程序**：不用登录 GPiS、不碰 System Manager；但 A 要开着、SQL Server 服务要在跑。
-  营业时间员工一定会先开 A，所以白天读得到；晚上、假期 A 关不关还不知道（W49）。A 关了 → 读不到：AI 转人工、提醒页面显示读不到。
+  **A 24 小时开着**，其他电脑下班会关（2026-10-08）→ 晚上、假期也读得到。只有停电、A 重开时读不到（W49）：AI 转人工、提醒页面显示读不到。
 - 从另一台电脑连主机的数据库，主机的 SQL Server Express 要接受局域网的连线（TCP/IP），防火墙只让那一台电脑进来。
   柜台另一台的 GPiS 如果是直接连 A 的数据库，A 应该**已经开放给局域网**了，主机要改的就只剩只读帐号（W51：看另一台 `GPiS.exe.config` 的 `Database.Server` 那一行）。
 
@@ -513,7 +519,7 @@ wa_contacts            + reminders_opt_out_at, reminders_opt_out_by (PATIENT / S
 
 - **把 SQL Server 的 port 直接开放到网上**：SQL Server 2012 没有安全更新，开了一定会被扫。
 - **每天把备份传上云端**：资料一天才新一次，而且整个病人数据库都在云端。
-- **把本系统装在主机（A）上**：不用多一台电脑，但会和 GPiS 抢资源，还要在营业用的电脑上装、更新程序（D3 的精神）；A 出问题，柜台两台电脑都不能用 GPiS。
+- **把本系统装在主机（A）上**：A 本来就 24 小时开着、不用多一台电脑，但会和 GPiS 抢资源，还要在营业用的电脑上装、更新程序（D3 的精神）；A 出问题，柜台两台电脑都不能用 GPiS。
 
 ### 9.4 建议（等诊所回答 W48–W53 再定）
 
@@ -529,7 +535,7 @@ wa_contacts            + reminders_opt_out_at, reminders_opt_out_by (PATIENT / S
 | 放在 | 好处 | 问题 |
 |---|---|---|
 | **新的专用小电脑**（建议） | 一直开着；不影响员工、不影响 GPiS | 要买一台（mini PC）+ UPS |
-| 柜台另一台电脑（不是 A） | 不用买；营业时间一定开着 | 员工每天在用，可能会关机、重开、装别的东西；晚上关了 webhook 就停。可以先拿来试跑 W42 的「只列名单 1–2 星期」（不用 webhook） |
+| 柜台另一台电脑（不是 A） | 不用买；营业时间一定开着 | **下班会关**（2026-10-08），关了 webhook 就停；员工每天在用，可能重开、装别的东西。只适合试跑 W42 的「只列名单 1–2 星期」（不用 webhook） |
 | 主机 A | — | 不考虑（9.3） |
 
 要做的：
