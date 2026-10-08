@@ -15,6 +15,7 @@
 | [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
 | [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API；Phase 3：PostgreSQL（安装、建表、改表结构的步骤）；Phase 4a：员工登录、Admin API；Phase 5a：WhatsApp（Meta 测试 App、tunnel、测试清单）；对照步骤 |
 | [`frontend/README.md`](frontend/README.md) | Phase 4b：Admin Platform 网页（React + TypeScript）：安装、启动、测试清单 |
+| [`docs/host-data.md`](docs/host-data.md) | A1：本系统怎么读主机上的 GPiS（候选方案、建议、只读帐号、要问诊所的 H1–H8） |
 
 开始新 session 时先读这四个文件。
 
@@ -57,6 +58,7 @@
 - [x] Phase 5a 初版：WhatsApp webhook（`backend/app/webhook_main.py`，port 8001）、员工回复、送达状态（migration `0003`）；开发只用 Meta 测试号码 + allowlist（D34–D38）；云端 `pytest` 161 个、Vitest 35 个通过，全部假数据
 - [x] Phase 5a 设定检查：`python -m app.whatsapp_check`（问 Meta + 经 tunnel 打一次 webhook，找出手机消息没送来的原因；也查 token 能不能发消息）；`pytest` 183 个
 - [x] Phase 5a 测试：开发电脑（Meta 测试 App 在自己的测试 portfolio，token 用 System User 的，D39）：`0003 (head)`，`pytest` 183 个、`npm test` 35 个通过，`npm run build` 成功，测试清单 1–7 项全部通过（记录见 `backend/README.md`）
+- [x] A1 设计初稿：`docs/host-data.md`（建议方案 1：本系统放诊所里的电脑，局域网只读读 GPiS；待诊所回答 H1–H8 后定案）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
