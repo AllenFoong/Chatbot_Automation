@@ -1,6 +1,6 @@
 # 系统架构与技术选型
 
-> 最后更新：2026-10-07
+> 最后更新：2026-10-08（第 8、9 节按诊所两轮问卷更新）
 
 ## 1. 需求
 
@@ -159,7 +159,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | 2 | FastAPI 封装 `check_available_slots()`：`backend/`（`GET /availability`，用法见 `backend/README.md`）（完成：10 个测试日期和 SQL 结果一致） |
 | 3 | PostgreSQL：customers / conversations / messages / appointment_requests，诊所设置搬进数据库（`backend/app/db/`）（完成：开发电脑 104 个测试通过，10 个测试日期和 Phase 2 结果一致） |
 | 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等）。分两步：**4a** 员工登录 + Admin API（`backend/app/api/`，完成：开发电脑 131 个测试通过）；**4b** React + TypeScript 网页（英文画面，`frontend/`，完成：Vitest 31 个测试通过，开发电脑测试清单全部通过） |
-| 5 | WhatsApp Cloud API。分三步：**5a** 收消息（webhook）、员工在 Admin Platform 回复、送达状态，开发只用 Meta 测试号码（`backend/` 的 `whatsapp.py`、`webhook_main.py`；完成：开发电脑测试清单全部通过，`python -m app.whatsapp_check` 检查 Meta 的设定）；**5b** 模板消息 + 预约前一天自动提醒（要读 GPiS 明天的预约，和 A1 一起设计；员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 更早上线）；**5c** 上线时把诊所的号码接上（Coexistence，A7） |
+| 5 | WhatsApp Cloud API。分三步：**5a** 收消息（webhook）、员工在 Admin Platform 回复、送达状态，开发只用 Meta 测试号码（`backend/` 的 `whatsapp.py`、`webhook_main.py`；完成：开发电脑测试清单全部通过，`python -m app.whatsapp_check` 检查 Meta 的设定）；**5b** 模板消息 + 预约前一天提醒（设计草稿见**第 8 节**，诊所已回答第一轮问卷；员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 更早上线，但对真的病人发要等 5c、A1 和病人同意）；**5c** 上线时把诊所的号码接上（Coexistence，A7） |
 | 6 | AI Agent（Tool Calling）+ 转人工规则 |
 | 7 | Docker 化，部署到云端（假数据） |
 | 8 | 解决主机 ↔ 云端同步，再评估是否写入 GPiS |
@@ -168,7 +168,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 
 | # | 问题 |
 |---|---|
-| A1 | **主机不在公网**：云端 Backend 如何读取主机上的 GPiS？候选：诊所本地放一个同步小程序，定时把空档（不含病人资料）推送到云端 |
+| A1 | **主机不在公网**：Backend 如何读取主机上的 GPiS？方案比较和建议见**第 9 节**：诊所不能放新电脑（W48）→ 5b 先把本系统装在柜台另一台电脑，经局域网只读读主机 A（D53）；诊所同意在 A 开只读帐号（D52）。Phase 6 之前再决定长期放哪里（W54） |
 | A2 | AI 自主程度：只收集需求 / 推荐空档由员工一键批准 / 空档明确时自动确认？ |
 | A3 | 员工在哪里介入：只用网页 Admin Platform，还是也要手机？ |
 | A4 | 各服务的时长？✅ 一般 30 分钟；`RCT`、`IMPLANT`、`SCAN B`、`VENEER` 等可能要 1 hour，由员工看情况在 Remarks 写 `1 hour`（`clinic-workflow.md` 第 2 节） |
@@ -177,3 +177,393 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | A7 | 病人已经习惯用诊所现有的 WhatsApp 号码，诊所用的是 **WhatsApp Business App**（W18）。候选：Meta 的 **Coexistence**，同一个号码同时用 Business App 和 Cloud API，保留聊天记录，员工仍可在手机上回复（第三方资料显示马来西亚已支持）。已知限制：每秒最多 20 条消息；不支持群组、广播列表、语音 / 视频通话、目录（catalog）、限时消息等。2026-10-06 再查（第三方资料：BSP 文件、搜索结果；Meta 官方网站在云端容器打不开）：① 员工在手机 App 发的消息会经 **`smb_message_echoes`** webhook 送来 → 本系统看得到（存成 `STAFF`、`staff_id` 空；Phase 3 的 `record_outgoing_message` 已经支持）；② 连上时同步过去 180 天的聊天（`history` webhook）和联系人（`smb_app_state_sync`）；③ Business App **每 14 天至少要打开一次**，否则连接会失效；④ 连上后 App 的撤回、限时消息、view once、即时位置、广播列表、编辑消息不能用；⑤ 要经 **Embedded Signup** 连接：找 BSP，或自己的 Meta App 成为 Tech Provider（要商家验证）。**待决定（5c，上线前）**：用 BSP 还是自己做 Embedded Signup；180 天的历史要不要导入（是病人资料）；以上各点上线前再对照 Meta 官方文件 |
 | A9 | **病人传的照片、语音、文件**：5a 先不下载，只显示 `[Image]` 等（D38）。要不要存？存在哪里、保留多久、谁能看（可能是伤口照片，比文字更敏感）？Phase 6 的 AI 要不要看照片？ |
 | A8 | **还没录入 GPiS 的预约请求要不要算进空档**：空档现在只看 GPiS。AI 把 10:00 推荐给病人 A（`PENDING`）之后、员工录入 GPiS 之前，病人 B 来问，10:00 仍然显示有空。建议在 Phase 6（AI 推荐时段）之前：`PENDING` 和刚 `CONFIRMED`、GPiS 里还看不到的请求都算占用（宁可少推荐）。难处：要把请求和 GPiS 的预约对上（日期、时段、医生、病人），否则员工录入后会算两次；GPiS 画面不显示 `AppointmentID`，`gpis_appointment_id` 也要靠系统自动对上。改规则时 SQL 和 `availability.py` 要一起改 |
+| A10 | **病人资料在本系统保留多久**（PDPA 的保留原则）：`messages`、5b 的 `reminders` 都有病人名字、号码和预约。建议：提醒的内容 90 天后删掉、只留统计；对话的保留期限和 A9 一起决定。要诊所同意 |
+
+## 8. Phase 5b 设计：预约前一天的 WhatsApp 提醒（草稿）
+
+> 2026-10-08 写的草稿，**还没有程序**。诊所已回答两轮问卷（W31–W53，见 [`clinic-workflow.md`](clinic-workflow.md) 第 7 节）；还差 W40b（登记表的照片）、W54。
+> 决定记在 [`decisions.md`](decisions.md) D40–D53；D48–D53 是按诊所的回答改的。
+
+### 8.1 现况和目标
+
+- **现况**（W11、W18）：预约前一天，员工在 WhatsApp Business App 上一个个手动发提醒。
+- **目标**：系统每天准备好提醒名单 → 员工在 Admin Platform 看一下、按一次 **Send** → 用 WhatsApp **模板消息**发出 →
+  病人打字回复（第一版没有按钮，D48）→ 回复进 *Conversations*，交给员工。
+- 不需要 AI；**不写入 GPiS**（D5）：病人要改期，员工照旧在 GPiS `Edit`。
+- **提醒的文字照诊所现在用的原文**（W32，8.5），变的只是「谁来做」：
+
+| 步骤 | 现在（员工手动） | 5b 之后 |
+|---|---|---|
+| 找明天的预约 | 员工打开 GPiS 看 | 系统读 GPiS |
+| 填 NAME / DATE / TIME / DOCTOR | 员工复制原文，一格一格改 | 系统自动填 |
+| 发给病人 | 在 Business App 找号码、贴上、发送，重复 30–40 次 | 员工在 Admin Platform 看名单、按一次 Send |
+| 病人回复 | 员工在手机上看 | 出现在 *Conversations* |
+| 病人要改期 | 员工在 GPiS 改 | 一样，员工在 GPiS 改 |
+
+- 为什么一定要用模板消息：提醒是诊所**主动**发的，病人通常超过 24 小时没传消息，WhatsApp 只允许发事先送审通过的模板（第 5 节的 24 小时规则）。
+
+```
+GPiS（只读）──读「明天」的预约──→ Backend：排除不是预约的记录、同一个号码合成一条（8.3）
+                                          │
+                                          ▼
+                    Admin Platform「Reminders」：员工看名单、取消勾选例外（8.4）
+                                          │ 按 Send
+                                          ▼
+                    WhatsApp 模板消息（utility，8.5）──→ 病人的手机
+                                          │ 病人打字回复（第一版没有按钮）
+                                          ▼
+                    webhook ──→ reminders（记下回复）+ Conversations（要处理的才转员工）
+```
+
+**对真的病人发之前要先有三件事**：① 5c 把诊所的号码接上 Cloud API（病人只认得诊所的号码，测试号码只能发给自己）；
+② A1：读得到主机的**实时**预约（8.7）；③ 病人的同意（8.8）。在那之前，5b 只用 Meta 测试号码 + 假资料，`GPiS_Dev` 只能「只看名单」。
+
+### 8.2 名词
+
+| 名词 | 意思 |
+|---|---|
+| 预约日期 | 要提醒的那一天的预约（通常是「明天」） |
+| 提醒 | 发给**一个号码**的一条模板消息，可能列出几位家人的预约 |
+| preview（只看名单） | 名单照算、显示在画面上，但**不能发送**；开发时读 `GPiS_Dev` 只能用这个 |
+
+### 8.3 提醒名单怎么来（第 1 点）
+
+**1. 哪一天**：默认是「从明天到下一个营业日（包括）」，营业日看 `clinic_closures`。
+诊所每天营业（W1、W13），所以平常就是明天；明天是公共假期时，假期那天没有人发提醒，所以**今天就发后天的**（W34：诊所现在也是假期前提早 2 天发；周末照常每天发）。
+页面上也可以自己选日期（开发时用这个拿 `GPiS_Dev` 的某一天当「明天」）。
+
+**2. 读 GPiS**：一条只读的 `SELECT`，读那几天**所有医生**的预约，只拿要用的栏位：
+`AppointmentID`、`AppointmentDate`、`TimeSlot`、`DoctorID`、`Status`、`ContactID`、病人名字、手机号码（`HPNo`）、`Remarks`。
+不拿 NRIC、House No。`Remarks` 只在内存里判断 `OFFDAY`，**不存、不显示、不发**（统计 B5：Remarks 里有病人名字）。
+栏位从 `Qry_CAH_Appointment` 读（统计 B10、B11 用过它的 `HPNo`、`ContactID`）；实作时先用 `INFORMATION_SCHEMA` 确认名字栏位叫什么。
+
+**3. 每条记录分成三种**：要提醒、不是预约（不提醒，只显示数量）、要员工看（不自动发，列出原因）。
+**沿用空档的规则**：空档计算里「算病人」的预约（`availability.py` 的 `parse_appointment(...).occupies`），就是要提醒的预约，不另外写一套。
+
+| GPiS 记录 | 怎么处理 | 原因 |
+|---|---|---|
+| `Status` = `Canceled`、`Postpone` | 不是预约 | 和空档规则一样 |
+| `TimeSlot` = `00:00` | 不是预约（是提醒 / 待办，例 `REMIND PT STO`）；留给员工自己处理，页面只显示有几条（W43） | `clinic-workflow.md` 4.1 |
+| `Remarks` 去掉空格后含 `OFFDAY` | 不是预约（占位记录） | 联系人不是病人（统计 C5），发了会发给奇怪的人 |
+| 联系人是诊所自己（`clinic_contact_id`） | **要员工看**：没有病人的号码；多数是占位（`1130 FIRST APPT`、`GO BANK`），少数是真的病人（统计 B7） | 两年只有约 10 条（B6），给员工看就好 |
+| `Status` = `Confirmed`、`Closed` | **要提醒** | 将来的日期只有 `Confirmed`（B13）；开发时选以前的日子会是 `Closed` |
+| `Status` 空、`Waiting`、`Rearrange`、`Calling` 等 | **要员工看** | 状态不明：宁可不发 |
+| 号码空、看不懂（`normalize_phone` = 空） | **要员工看**（打电话） | 统计 B10：434 位病人没有号码 |
+| 号码是固网：马来西亚 `60` 后面不是 `1`（例 `07-…` = Johor 的固网）、新加坡 `65` 后面不是 `8` / `9` | **要员工看** | WhatsApp 只能发手机 |
+| 号码已经 opt-out（病人说不要提醒） | 不发，显示 *Opted out* | D46 |
+| 那天在 `clinic_closures`、医生请假（`doctor_leaves`）、医生那天不上班，或医生已停用（例 CHER） | **要员工看** | 资料互相矛盾：宁可不发 |
+| 时段在午休、下班后（员工破例排的，`clinic-workflow.md` 第 1 节） | 照常提醒 | 是真的预约 |
+| `Remarks` 有要等技工所的代码（`ISSUE C`、`ISSUE CROWN`、`ISSUE B`、`ISSUE BRIDGE`、`ISSUE IMPLANT`、`ISSUE DENTURE`、`MMR`、`TRY-IN`、`VENEER`），后面**没有 `*C`** | **要员工看**：*Lab work not marked as arrived (\*C)* | W39、W47：`*C` = 技工所做的牙已经送到诊所，送来那天加上，**一定写成 `*C`**；没到就提醒，病人来了没有东西可以装（D50、D51）。判断时**不能用 `normalize_remarks`**（它会去掉 `*`） |
+
+原则和空档一样：**不确定的不自动发，交给员工**（宁可员工多处理一条，也不要发错）。
+
+**4. 同一个号码合成一条**（统计 B11：2,243 个号码有多于一位病人）：
+
+- 用**标准化后的号码**（`app/phone.py`）分组：同一个号码、同一个预约日期的所有预约（不同家人、不同医生、同一人几个时段）→ **一条提醒**，按时间排。
+- 写哪些照诊所现在的原文（W32、W33）：名字、日期、时间、医生、分行。**不写疗程**（是健康资料，而且 Remarks 有别人的名字），原文本来也没写。
+- **诊所现在就是合成一条**（W38，D49）：`NAME: DEMO A & DEMO B`。时间或医生不一样时，建议照名字的顺序写 `TIME: 10:00 AM & 10:30 AM`、`DOCTOR: DR PHANG & DR GOH`，全部一样就只写一次（W46：诊所说「拼一起」= 照这样合在一起；试跑时让员工看一次预览确认）。
+- 同一位病人（`ContactID`）同一时段有两条记录 → 合成一行。
+- 同一个号码只要有一个预约「要员工看」，**整个号码**都交给员工（不要只提醒一部分家人，病人会以为另一位没有预约）。
+- 一个号码超过 5 个预约，或文字太长（模板正文最多 1,024 字）→ 要员工看。
+- `WITH`（一起来，W8）不用特别处理：一起来的家人通常同一个号码，自然合成一条；号码不同就各发一条。
+- 用同一个号码的人会看到这个号码下所有人的预约：本来就共用号码，员工现在手动发也一样（W38 确认）。
+
+### 8.4 谁按发送（第 2 点）
+
+**建议先做「员工确认后按 Send」**（D40），全自动定时以后再说：
+
+| | 员工确认后按 Send（先做） | 全自动定时 |
+|---|---|---|
+| 员工每天要做的 | 打开页面看一下、按一次（比现在一条条发快很多） | 不用做 |
+| GPiS 有怪记录（占位、状态不明、病人刚打电话取消还没改 GPiS） | 员工看得到，可以取消勾选 | 照发，发错了收不回 |
+| 出错的代价 | 有人看过才发 | 一次可能发错几十位病人 |
+| 需要的东西 | 现在的 Admin Platform 就够 | 一台一直开着、读得到主机实时预约的机器（A1）、定时器、出错时通知谁 |
+| 什么时候改成全自动 | — | A1 解决、上线几星期员工几乎不用改名单之后。同一套程序，只是由定时器代替员工按 Send；「要员工看」的照样留给员工 |
+
+**Reminders 页面**（英文画面，D24；STAFF 可以看、可以发；几点到几点能发等设定由 ADMIN 改，能不能发送由 `.env` 的 `REMINDERS_MODE` 决定，见 8.6）：
+
+- 上面：预约日期、「Read from GPiS at 09:02」和 *Refresh*；preview 模式时显示 *Preview only – sending is turned off*，没有 Send 按钮。
+- **Ready**：每个号码一行（勾选框、号码、几位病人和时间、消息预览），默认都勾。
+- **Needs staff**：要员工看的，写明原因（上面的表）。
+- **Not appointments**：只显示数量（`00:00` 几条、`OFF DAY` 几条、取消几条），不列名字。
+- **Sent**：送达状态（*Sent* → *Delivered* → *Read* / *Failed* + 原因）和病人的回复（8.5）。
+- 按 *Send 23 reminders* → 再问一次「Send 23 WhatsApp reminders for Fri, 9 Oct?」→ 才发。
+
+**按 Send 之后**（D45）：
+
+1. 后端**重新读一次 GPiS**、重新算名单；和员工看到的不一样（例如员工刚在 GPiS 改了预约）→ 不发，显示 *The list has changed. Please check it again.*
+2. 一条一条发：先在 `reminders` 写一行 `SENDING` → 调用 Cloud API → Meta 收下就记 wamid（`ACCEPTED`）；Meta 不收就记 `FAILED` 和原因（例：号码没有 WhatsApp）。
+3. **同一个号码、同一个预约日期只自动发一次**（数据库 UNIQUE）：按两次 Send、两个员工同时按，都不会发两次。
+4. 程序在「调用 Meta」和「记下 wamid」之间断掉，那一行会停在 `SENDING` → 页面显示 *Unknown*，**不自动重发**（宁可员工确认后补发，也不要病人收到两次）。
+5. 之后的 status webhook 更新送达状态（和 5a 的消息一样只往前走，D36）。
+6. **发出之后才约的预约不补发**（W37）：再打开页面显示在 *Booked after sending*，没有勾选框。
+   诊所也说「今天才约明天的」不用提醒，但 GPiS 没有「什么时候约的」这一栏，分不出来：发送前约的照样在名单上，员工知道的可以取消勾选。
+7. 诊所现在约早上 10 点发、一天 10–30 条、没有规定几点（W31）。系统仍设一个能发的时间（默认 9:00–21:00），避免半夜按错。
+
+### 8.5 模板（第 3 点）
+
+**类别：Utility**（D42）。预约提醒是 Meta 列的 utility 用途（和已经约好的事有关）。**不能夹促销**（例「洗牙八折」）：
+Meta 会把它改成 marketing 类别（比较贵、规定比较多，病人也比较会 block）。Meta 审核时可能自动改类别，要看审核结果。
+
+**草稿：照诊所现在的原文**（W32，2026-10-08）。诊所名、分行名不写进仓库，用 `<诊所名>`、`<诊所英文名>`、`<分行名>` 代替；★ 是改了的地方（W45：诊所同意）：
+
+```
+模板名字：appointment_reminder      类别：UTILITY
+语言：中英两段写在同一条（和诊所现在一样），送审时声明成 zh_CN；被拒绝的话再拆成 zh_CN、en 两个版本
+Body：
+  温馨提醒💕
+
+  你好 这里是<诊所名> 🦷
+  NAME: {{1}}
+  DATE: {{2}}
+  TIME: {{3}}
+  DOCTOR: {{4}}
+  BRANCH：<分行名>
+  想提醒你和我们有个预约 记得赴约哟😊到时见❤️如果有事情耽搁没办法准时到或想取消预约，请通知我们哦😊谢谢你💕
+
+  Gentle Reminder💕
+
+  Hello, we are <诊所英文名> 🦷 Kindly remind you that you have an appointment with us on the date above 😊
+  If there is any problem, pls contact us😊 Thank you 💕 See you!
+Footer（建议加，D46）：Reply STOP to stop reminders
+按钮：第一版没有（W35、W36、W41，D48）
+
+★ 英文原文是 "Hello Miss/Mr , … an appointment with us tomorrow … See you tomorrow"：
+  称呼空着的 Miss/Mr 拿掉；tomorrow 改成 on the date above、See you!（假期前要提早发，写「明天」会错）
+
+变量的格式（照原文）：
+  {{1}} 病人名字，大写      {{2}} DD/MM/YY      {{3}} 12 小时制 + AM / PM      {{4}} DR PHANG / DR GOH（"DR " + doctors.display_name）
+
+送审用的范例（只用假资料）：
+  {{1}} = DEMO PATIENT A      {{2}} = 09/10/26      {{3}} = 10:00 AM      {{4}} = DR PHANG
+```
+
+- **写日期，不写 "tomorrow"**：假期前要提早几天发（8.3），写「明天」会错。原文的中文部分有 `DATE`，英文部分要改（★）。
+- **第一版不加按钮**（D48）：诊所说病人回不回复不重要（W35）；改期、取消都是病人打字讲，员工直接在 GPiS 改（W36）；现在也没有「确认」（W41）。
+  诊所说可以试 *Confirm* 按钮（W41）：以后要试，再送审一个有按钮的新模板。
+- **变量的限制**（第三方资料，送审前再对照 Meta 官方文件）：变量里不能有换行、Tab、连续 4 个以上空格 → 几位家人写在同一个变量里，用 ` & ` 隔开（W38）；
+  变量不能放在正文的最前面或最后面；正文最多 1,024 字、按钮文字最多 25 字、footer 最多 60 字。
+- **语言**：诊所现在中英两段写在同一条、没有马来文（W32）→ 照做，不用知道病人用哪种语言。一个模板名字也可以有几种语言版本（`en`、`zh_CN`、`ms`），每种都要送审。
+- **以后加按钮时**：每个按钮带一个代号（payload），例 `reminder:123:confirm`（只有提醒的编号，没有病人资料）；
+  病人按了，webhook 送回来的是 `button.payload` + `context.id`（= 提醒的 wamid）。程序要检查号码和那条提醒对得上（payload 当作不可信的输入）。
+- **送审**：在 WhatsApp Manager → *Message templates* 建（开发时在**测试 portfolio 的测试 WABA**，D34），送出后通常几分钟到一天有结果；被拒绝就看原因改了再送。
+  模板属于 WABA：**5c 接上诊所的号码时，要在诊所的 WABA 再建、再送审一次**。模板名字、语言不是密码，可以放在设置里。
+- **品质**：很多病人 block / report，Meta 会降低号码和模板的品质、暂停模板。所以内容要短、只发给真的有预约的人、要有 STOP。
+- **费用**（A6）：2025-07 起 Meta 按**每条送达的模板**收费，价钱看类别和**收件人的国家**（马来西亚、新加坡不同）；病人 24 小时内传过消息的话，utility 模板免费。
+  一天约 30–40 条；上线前看 Meta 的价目表算一个月多少钱。
+- **发送量的限制**：新的 Business portfolio 一天（24 小时）最多主动发给 250 个不同号码，诊所够用；Coexistence 每秒最多 20 条（A7），也够。
+
+**病人的回复怎么进 Conversations**（D43、D48）：
+
+提醒本身**不开对话、不放进 `messages`**：不然每天几十段对话，员工分不出哪些要处理。提醒存在 `reminders` 表（8.9）。
+病人回复时，和 5a 一样存进 `messages`、出现在 *Conversations*（`record_incoming_message`），再对上是哪一条提醒：
+① `context.id`（病人引用的那条消息）= 提醒的 wamid；② 同一个号码 48 小时内收过提醒 → 也算回这条提醒。
+
+| 病人做什么 | Reminders 页面 | Conversations |
+|---|---|---|
+| 打字、传照片（例：要改期、要取消） | 💬 *Replied* | 交给员工（和 D37 一样）；员工回复病人、在 GPiS `Edit` / `Canceled`（W36） |
+| 回 `STOP` | *Opted out* | 记下 opt-out（整个号码，D46），交给员工确认（家人共用号码） |
+| 没回复 | — | 没有对话；不用跟进（W35） |
+
+- 对话画面旁边显示**这个号码最近 7 天的提醒**（内容、送达状态、回复），员工看得懂病人在回什么。
+- 病人回复之后 24 小时内，员工可以在 Admin Platform 自由回复（24 小时规则，D23）。
+- 现在的 `parse_webhook` 没有拿 `context.id`，5b 要加上。
+- 5c 用 Coexistence 后，系统发的消息也会出现在诊所手机的 Business App 里（第三方资料：API 发的消息会同步到 App；模板要实测）。
+
+### 8.6 安全（第 4 点）
+
+`GPiS_Dev` 里是**真的病人名字和电话**，所以开发时绝不能发出去。**三道锁**（D44），任何一道挡住就不发：
+
+| 锁 | 做什么 |
+|---|---|
+| ① `REMINDERS_MODE` | `preview`（没设定时的默认：只看名单，没有 Send 按钮）/ `send`。只有明确写 `send` 才能发 |
+| ② 读 `GPiS_Dev` 就不能发 | 预约是从 `GPiS_Dev` 读的（`GPIS_EXPECTED_DATABASE`）→ 程序拒绝 `send`，就算 `REMINDERS_MODE=send`。只有读主机的 `GPiS` 才能发 |
+| ③ 允许名单（D34） | 新的 `send_template` 和 `send_text` 一样，在**最底层**检查 `WHATSAPP_ALLOWED_RECIPIENTS`；`*` 只有上线才用 |
+
+- **开发时要真的发一次**（测模板、按钮、回复）：用**假的预约来源**（例 `REMINDER_SOURCE=demo`：*Demo Patient A / B*，号码 = 自己的手机），不读 GPiS；
+  和 `app.db.demo` 一样只能用在 `_dev` 数据库。消息只会到自己的手机（锁 ③）。
+- **preview `GPiS_Dev`**：名单只显示在自己电脑的 Admin Platform 上（和打开 GPiS 一样）。截图要遮住名字、号码。
+- **要贴给 AI 对照的**：用终端程序（例 `python -m app.reminders_cli 2026-09-02`），只印 AppointmentID、时间、医生、状态、分类原因、
+  号码代号（`#1`、`#2` …：同一个号码同一个代号）和号码种类（`MY` / `SG` / 其他 / 空 / 固网），**不印名字、号码、Remarks**（像 `app.cli` 的 7c 只有 ID）。
+- **日志**：只记数量、提醒编号、wamid；不记名字、号码、消息内容（D38）。Meta 的错误原因存在 `reminders` 给员工看，不写进日志。
+- **送审的模板范例只用假名字**；pytest、Vitest 只用假资料。
+- `reminders` 表有病人名字和号码（和 `messages` 一样）：开发时只在自己电脑的 `chatbot_dev`；保留多久见 A10。
+
+### 8.7 和 A1 的关系（第 5 点）
+
+- **正式上线要读主机的实时预约**：员工今天下午才改、才删的预约（W26）也要读到；按 Send 前还会再读一次（8.4）。
+  只读账号（D7）要能读 `Qry_CAH_Appointment`（或 `Tbl_CAH_Appointment` + `Tbl_CAH_ContactNumbers`）。
+- 提醒比空档简单：一天读一两次、一两个日期、几十条。但**需要病人名字和号码**，A1 原本的候选（只把空档推到云端、不含病人资料）不够。两个方向：
+  各种方案的比较和建议见**第 9 节**。不管哪一种，模板里的名字、时间都会经过 Meta 的服务器（8.8 的同意和跨境问题）。
+- 5b 的程序把「读预约」做成一个接口（像现在的 `AppointmentSource`）：`GPiS_Dev`、假资料、将来主机的来源都接在同一个接口，换来源不用改名单规则。
+- **开发**：`GPiS_Dev` = 2026-09-28 的快照，拿其中一天当「明天」（页面、终端程序都能选日期）。建议的测试日期（和空档的测试日期一样）：
+
+| 日期 | 为什么选它 |
+|---|---|
+| 2026-09-02（星期三，T6） | 忙的一天（PHANG 25 人）；以前的日子，状态多是 `Closed` |
+| 2026-09-18（星期五，T9） | GOH 有 `OFF DAY` 记录 → 那条不提醒，PHANG 的照常 |
+| 2026-09-30（星期三，T10） | 有诊所联系人的记录（`1130 FIRST APPT`）→ *Needs staff* |
+| 2026-10-09（星期五，测试 0） | 快照之后的日子：状态是 `Confirmed`，最像真的「明天」 |
+| 另外找 | 有家人共用号码、号码空 / 固网、`Waiting` / `Rearrange` 的日子：实作时加一个只输出统计的 SQL 来挑（像 `sql/find_test_dates.sql`） |
+
+### 8.8 病人同意（第 6 点）
+
+**WhatsApp 的规定**（Business Messaging Policy；2024-11 改过；Meta 官方网站在云端容器打不开，以下是第三方整理和搜索结果，上线前对照官方文件）：
+
+- 病人给了号码，而且**同意（opt-in）收到这家诊所的消息**；同意时要写明**诊所的名字**、说明是同意收到诊所的消息。
+- 怎么收同意由诊所决定：纸本登记表、当面、网站、WhatsApp 对话都可以，但要**符合当地法律**。
+- 要让病人容易停止（opt-out），病人要求停止就要停。block、report 多了，号码和模板会被限制。
+
+**PDPA**（马来西亚 Personal Data Protection Act 2010；2024 年修正案在 2025 年分阶段生效；以下是律师事务所文章的整理，不是法律意见，要诊所 / 律师确认）：
+
+- 健康资料是**敏感个人资料**（sensitive personal data）。「某人明天几点看牙医」很可能就算 → 一般要**明确同意**；法律有医疗用途的例外，提醒算不算要律师确认。
+- **通知与选择**：要告诉病人资料用来做什么、会交给谁（这里是 Meta / WhatsApp）。
+- **跨境传送**：模板经过 Meta 的服务器（不在马来西亚）。修正案取消了白名单，改成「对方有相似的法律或足够的保护」，病人同意也可以；有 2025 年的跨境传送指引。
+- 2025-06 起：要委任 **DPO**、资料外泄要通报。
+- **直销**：提醒不是直销；模板夹了促销就是了（8.5 不能夹促销）。
+- 和现在不同的地方：Business App 是手机之间端对端加密；Cloud API（Coexistence 也是）由 **Meta 代收代发**，隐私通知要写清楚（上线前对照 WhatsApp 的官方说明）。
+
+**诊所现在有没有病人的同意？还不确定**（W40，2026-10-08）：
+
+- 新病人填**纸本**登记表（名字、IC、电话），上面有类似的条款，但**可能没写 WhatsApp**；诊所会拍一张空白表格来（W40b，待收）。
+- 诊所**愿意**在登记表加 8.8 的例句（W40c）。
+- 旧病人：诊所的想法是告诉病人「以后用 WhatsApp 将会自动提醒你」（W40d）。这是**告知 + 可以拒绝**（opt-out），不是先问同意（opt-in）；WhatsApp 的规定要的是同意。建议员工讲成**问句**（「以后用 WhatsApp 提醒你可以吗？」），病人说不要就在 Admin Platform 标记 opt-out；上线前请律师看这样够不够。
+
+员工现在已经用 WhatsApp 手动发提醒，病人应该知道诊所会用 WhatsApp 联系，但「知道」不等于有记录的同意。
+
+**建议**（D46）：
+
+1. 诊所的登记表 / PDPA 通知加一段：诊所名字、会用 WhatsApp 发提醒和回复、经 Meta 传送、怎么停止。草稿（第二轮问卷 W40 附给诊所看；正式的要写诊所名字，由诊所 / 律师定稿）：
+
+   > 我同意本诊所用我提供的手机号码，通过 WhatsApp 发预约提醒、回复我的询问。我明白这些消息会经过 WhatsApp（Meta 公司）传送。我随时可以回复 STOP 或告诉诊所员工，停止收到提醒。☐ 同意
+   >
+   > I agree that the clinic may use the mobile number I give to send me appointment reminders and reply to my enquiries on WhatsApp. I understand these messages are delivered through WhatsApp (Meta). I can stop the reminders at any time by replying STOP or telling the clinic staff. ☐ I agree
+
+2. 旧病人怎么补同意由诊所决定（W40d）：下次来诊所时补签；或病人自己 WhatsApp 诊所时，员工在对话里问一句。
+   不要由诊所**主动**发消息去问同意：那本身就是没有同意的主动消息。
+3. 本系统一定要做**号码层级的 opt-out**（病人回 `STOP`、员工在 Admin Platform 标记 → 这个号码不再发）；要不要逐个记录 opt-in（日期、方式），看诊所怎么收同意。
+4. **同意没解决之前，不对真的病人发**：5b 只在测试号码 + 假资料上跑。
+
+### 8.9 资料表（草稿，实作时以 `models.py` 为准）
+
+```
+reminders              id, appointment_date, wa_phone, body (发出的完整文字，有病人名字), template_name, template_language,
+                       status (SKIPPED / SENDING / ACCEPTED / SENT / DELIVERED / READ / FAILED), skip_reason,
+                       wa_message_id (unique), wa_error, reply (REPLIED / STOP), replied_at,
+                       conversation_id (nullable：病人回复了才有), sent_by (staff), created_at, sent_at
+                       UNIQUE (appointment_date, wa_phone)：同一个号码同一个预约日期只自动发一次（D45）
+reminder_appointments  reminder_id, gpis_appointment_id, time_slot, doctor_id
+                       这条提醒包括哪几个 GPiS 预约：发出后 GPiS 被改期、删掉，页面可以提醒员工
+wa_contacts            + reminders_opt_out_at, reminders_opt_out_by (PATIENT / STAFF)：整个号码不再收提醒（D46）
+```
+
+`Remarks`、疗程代码不存。`SENDING` 停住 = 页面上的 *Unknown*（8.4）。
+
+### 8.10 下一个 session 的测试（草稿）
+
+- pytest（假资料）：8.3 表里每一种记录的分类（包括 `*C`）、号码种类、合并（`&`）、变量里没有换行、回复和提醒的对应、同一天同一个号码只发一次、
+  三道锁（读 `GPiS_Dev` 拒绝 `send`、不在允许名单的号码不发）、日志里没有名字和号码。
+- 开发电脑：
+  1. preview 8.7 的 4 个测试日期，和 GPiS 的 Appointment 画面对照（要员工看的、不是预约的都对）；终端程序的输出没有病人资料，可以贴回来。
+  2. 在测试 WABA 建模板、送审通过。
+  3. 用假的预约来源发给自己的手机：收到模板；回一句话 → *Needs staff*，对话旁边看得到那条提醒；回 `STOP` → *Opted out*。
+
+## 9. A1 方案比较：怎么读主机上的 GPiS（草稿）
+
+> 2026-10-08。诊所已回答 W48–W53（[`clinic-workflow.md`](clinic-workflow.md) 第 7 节）：第一步定了（D52、D53，9.4），长期放哪里 Phase 6 之前再决定（W54）。
+
+### 9.1 要读什么、要多新
+
+| 谁要读 | 读什么 | 要多新 | 有病人资料吗 |
+|---|---|---|---|
+| 空档（Phase 6 的 AI、员工找空档） | 某天某医生的预约：ID、时段、状态、联系人 ID；`Remarks` 只在内存里判断 OFF DAY、1 hour | 几分钟内：员工随时在 GPiS 约、改、删（W26） | `Remarks` 有名字（B5）；算出来的空档没有 |
+| 提醒（5b） | 明天（假期前是后天）的预约 + 病人名字、手机号码；`Remarks` 判断 OFF DAY、`*C` | 一天一次，按 Send 前再读一次（D45） | **有** |
+| AI 认病人（Phase 6 的 `get_customer_by_phone`、`get_treatment_doctor`） | 用号码找病人、这位病人上一次同类疗程的医生 | 问的时候 | **有**，而且是**所有病人**，不只是有预约的 |
+| A8：对上预约请求 | GPiS 预约的 ID、日期、时段、医生、联系人 | 几分钟内 | 有 |
+
+结论：A1 原本的候选（只把空档推到云端、不含病人资料）只够第一行；提醒和 AI 认病人都要病人资料。
+
+### 9.2 现在的限制
+
+- 主机只在诊所的局域网，**没有公开的网址**。也不能为了本系统把数据库开放到网上：SQL Server 2012 在 2022 年就停止支援，没有安全更新。
+- 主机是营业用的电脑：不在上面测试（规则 1、D3）；装程序、改设定都要诊所同意。
+- **每个方案都要在主机上建一个只读的数据库帐号**（D7：只开放预约相关的表和视图，`Tbl_User` 绝不开放）。
+  这超出了现在「主机只做只读查询和 `COPY_ONLY` 备份」（D3）：要诊所同意（A5、W52），脚本先在 `GPiS_Dev` 上试，再记一条新的 D。
+- **柜台有 2 台电脑**（2026-10-08）：诊所叫「A」的那台就是**主机**（有 SQL Server 和 GPiS 数据库，权限最大）。
+  **A 先登录 GPiS，另一台才能登录**：和 `GPiS.exe.config` 对得上，其他电脑经局域网连 A 上的 System Manager（port `30001`，`gpis-database.md` 第 1 节）。
+- 本系统**直接读 SQL Server，不经 GPiS 程序**：不用登录 GPiS、不碰 System Manager；但 A 要开着、SQL Server 服务要在跑。
+  **A 24 小时开着**，其他电脑下班会关（2026-10-08）→ 晚上、假期也读得到。只有停电、A 重开时读不到（W49）：AI 转人工、提醒页面显示读不到。
+- 从另一台电脑连主机的数据库，主机的 SQL Server Express 要接受局域网的连线（TCP/IP），防火墙只让那一台电脑进来。
+  柜台另一台的 GPiS 如果是直接连 A 的数据库，A 应该**已经开放给局域网**了，主机要改的就只剩只读帐号（W51：诊所同意让我们看另一台 `GPiS.exe.config` 的 `Database.Server` 那一行，下次去诊所看）。
+- **诊所同意在 A 开只读帐号**，条件是不能让 GPiS 出问题（W52，D52）。GPiS 自己用 `sa` 登入，表示 A 的 SQL Server 已经开了 SQL 帐号登入：建帐号**不用改登入方式、不用重开 SQL Server**，GPiS 不会停。
+  只有 A 还没开放给局域网、要改 TCP/IP 时才要重开 SQL Server 服务（GPiS 会断一下）→ 只在下班后、没有人用 GPiS 时做。
+- 诊所不常停电、不常断网；真的停电，A 要员工手动开机（W49、W50）。
+
+### 9.3 四个方案
+
+方案用数字 1–4：「方案 A / B」在第 2 节已经是数据层 / AI 层（D10），诊所又把主机叫「A」，用字母会搞混。
+
+```
+方案 1 本地部署   [诊所] 一台电脑跑本系统全部 ──局域网、只读──→ 主机（A）的 GPiS
+                         └─ Cloudflare Tunnel（只往外连）←── Meta 的 webhook
+方案 2 同步推送   [诊所] 同步小程序 ──每 1–2 分钟把资料推上去──→ [云端] 本系统
+方案 3 查询代理   [云端] 本系统 ──问──→ tunnel ──→ [诊所] 查询小程序（只有几种固定的查询）──→ 主机 GPiS
+方案 4 VPN 直连   [云端] 本系统 ──VPN──→ 主机的 SQL Server
+```
+
+| | 方案 1 本地部署 | 方案 2 同步推送到云端 | 方案 3 云端 + 诊所查询代理 | 方案 4 云端经 VPN 直连 |
+|---|---|---|---|---|
+| 比喻 | 把办公室搬进诊所，直接开档案柜 | 每隔几分钟把档案影印一份寄出去 | 外面打电话进来，诊所里的助理只回答几种固定问题 | 给外面一把档案柜的钥匙 |
+| 资料多新 | ✅ 每次直接读 | ⚠️ 晚 1–2 分钟；删掉的预约要整批比对才知道（W26） | ✅ 每次直接读 | ✅ 每次直接读 |
+| 病人资料在哪里 | ✅ 留在诊所（发出的提醒经 Meta；Phase 6 的对话经 LLM） | ❌ 要推到云端；AI 认病人要推**全部病人的号码** | ⚠️ 每次只有问到的那几笔离开诊所，云端不存 | ❌ 云端读得到所有开放的表 |
+| 主机要改什么 | 只读帐号；局域网连线、防火墙（可能已经开了，W51） | 只读帐号；小程序装在主机或另一台电脑 | 同方案 2 | 只读帐号、局域网连线、主机装 VPN |
+| 往外开的门 | 只有 webhook（tunnel 只往外连，不开 port） | 没有（只往外推） | tunnel 进来一个小 API：要认证、只有固定查询，不能下任意 SQL | VPN：云端被入侵 = 整个数据库被看光 |
+| 诊所电脑关了、断网 | ❌ 整个系统停（Coexistence 的话，员工手机照样收到病人的消息） | ⚠️ 资料停在最后一次，AI 可能推荐过时的空档 | ⚠️ 读不到 GPiS → AI 转人工；其他照常 | ⚠️ 同方案 3 |
+| 员工在诊所外用 Admin Platform | ⚠️ 要另外开（tunnel + 登录，A3；W53：诊所里用就够，在家偶尔用） | ✅ | ✅ | ✅ |
+| 要维护的 | 1 台诊所电脑（开机、更新、备份） | 云端 + 同步小程序 + 同步规则（删除、冲突） | 云端 + 查询小程序 | 云端 + VPN |
+| 每月费用 | 电费；tunnel 的固定网址要一个域名 | 云端主机 + 数据库 | 同方案 2 | 同方案 2 |
+| 和现在的开发方式差多少 | ✅ 几乎一样：开发电脑就是这样跑的 | ❌ 要写同步、上云端 | ⚠️ 要写查询小程序、上云端 | ⚠️ 要设 VPN、上云端 |
+
+不考虑的做法：
+
+- **把 SQL Server 的 port 直接开放到网上**：SQL Server 2012 没有安全更新，开了一定会被扫。
+- **每天把备份传上云端**：资料一天才新一次，而且整个病人数据库都在云端。
+- **把本系统装在主机（A）上**：A 本来就 24 小时开着、不用多一台电脑，但会和 GPiS 抢资源，还要在营业用的电脑上装、更新程序（D3 的精神）；A 出问题，柜台两台电脑都不能用 GPiS。
+
+### 9.4 建议（2026-10-08，按第二轮问卷更新）
+
+**诊所不能放一台新的电脑**，可以先借用柜台另一台（不是 A）（W48）。所以：
+
+**第一步（5b）：方案 1，本系统装在柜台另一台电脑上**（D53），跑开发电脑上现在那一套（Admin API、webhook、PostgreSQL、网页），经局域网只读读主机 A。
+
+1. 病人资料留在诊所，PDPA 最简单：只要处理经 Meta 发出的提醒（8.8）。
+2. 资料是实时的，不用写同步，也不用处理删掉的预约。
+3. 跑法和开发电脑一样，测过的东西直接搬过去。
+4. 提醒是员工早上 10 点左右按 Send（W31），那台电脑营业时间一定开着，够用。
+5. 先做 W42 的「只列名单 1–2 星期」：不用 webhook、不发任何消息，只是让员工对照名单。
+
+那台电脑**下班会关**，所以有两个限制：
+
+- 关机时 webhook 停：病人晚上的回复，本系统要等开机后 Meta 重送才收到（Meta 会重送一段时间，上线前确认多久）；接上 Coexistence（5c）后，诊所手机照样即时收到。
+- Phase 6 的 AI 要 24 小时回复，那台电脑一定要一直开着，或改成下面的方案。
+
+**以后（Phase 6 之前）再决定长期放哪里**（W54）：
+
+| 做法 | 好处 | 问题 |
+|---|---|---|
+| 柜台另一台电脑**不关机** | 不用改程序 | 员工每天在用，可能重开、装别的东西；要诊所同意 |
+| **方案 3**：本系统上云端，A 上只装一个很小的只读查询程序 | 云端 24 小时开着；员工在家也能用（W53）；A 上的东西很少 | 要写查询小程序、付云端的钱；每次查询的那几笔资料会离开诊所 |
+| 本系统整套装在 A 上 | A 24 小时开着 | 不考虑：和 GPiS 抢资源，A 出问题柜台两台都不能用 GPiS（诊所在 W52 特别要求不能让系统瘫痪） |
+
+程序已经把「读预约」做成接口（`AppointmentSource`，8.7），改成方案 3 只是多一个「经查询代理读」的写法。
+到时云端选马来西亚的区域（例：AWS 2024 年开了马来西亚区域，上线前确认），病人资料不出国。
+
+**装上去之前要做的**：
+
+- 去诊所时看柜台另一台电脑：Windows 版本、内存、硬盘空间（装 Python、PostgreSQL 够不够），和 `GPiS.exe.config` 的 `Database.Server` 那一行（W51，**不看密码那一行**）。
+- 主机 A：建只读帐号（D52）。脚本先在开发电脑的 SQL Server 上试（建帐号、只给预约相关的表和视图、确认读不到 `Tbl_User`、确认不能写），诊所同意后才在 A 上执行。
+- 本系统在那台电脑上开机自动启动；PostgreSQL 每天备份，备份要加密（数据安全规则）。
+- 要发消息时（5c 之后）：webhook 用 Cloudflare 的 **named tunnel**（固定网址，要一个域名）；开发用的 quick tunnel 每次重开网址都会变，不能上线用。
+- 网页在局域网也用 https（登录 cookie，D26）。
+
+不选方案 2：要把全部病人的号码放上云端，还要写同步和处理删除。不选方案 4：云端一出事，整个数据库就被看光。
