@@ -58,13 +58,13 @@
 - [x] Phase 5a 设定检查：`python -m app.whatsapp_check`（问 Meta + 经 tunnel 打一次 webhook，找出手机消息没送来的原因；也查 token 能不能发消息）；`pytest` 183 个
 - [x] Phase 5a 测试：开发电脑（Meta 测试 App 在自己的测试 portfolio，token 用 System User 的，D39）：`0003 (head)`，`pytest` 183 个、`npm test` 35 个通过，`npm run build` 成功，测试清单 1–7 项全部通过（记录见 `backend/README.md`）
 - [x] Phase 5a 合并进 `main`（PR #10）
-- [x] Phase 5b 设计草稿（只有文档，没有程序）：预约前一天用 WhatsApp 模板消息提醒病人（`docs/architecture.md` 第 8 节、D40–D46）；要问诊所 W31–W43
-- [ ] 诊所回答 W31–W43，确认 5b 设计（特别是病人同意 W40）
+- [x] Phase 5b 设计草稿（只有文档，没有程序）：预约前一天用 WhatsApp 模板消息提醒病人（`docs/architecture.md` 第 8 节、D40–D47）；要问诊所 W31–W45（给诊所的中英对照问卷在 claude.ai 上，不在仓库）
+- [ ] 诊所回答 W31–W45，确认 5b 设计（特别是病人同意 W40）；W32（提醒原文）、W33、W44（只有一间分行）已经有答案
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. 和诊所确认 Phase 5b 的设计（`docs/architecture.md` 第 8 节），回答 `docs/clinic-workflow.md` 的 W31–W43；改了的设计照 `decisions.md` 的规则新增一条 D 取代。
+1. 和诊所确认 Phase 5b 的设计（`docs/architecture.md` 第 8 节），回答 `docs/clinic-workflow.md` 的 W31–W45；改了的设计照 `decisions.md` 的规则新增一条 D 取代。
 2. 确认之后，下一个 session 写 5b 的程序：先做「只看名单、不发送」（preview：拿 `GPiS_Dev` 的某一天当「明天」）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
 3. 5b 对真的病人发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（读主机的实时预约）、病人同意（W40、D46）。
 4. 设计主机 ↔ 本系统的数据读取方式（`docs/architecture.md` A1）：`GPiS_Dev` 只是 9 月 28 日的快照，正式上线必须读主机的实时数据；提醒要病人名字和号码，A1 的方案要能处理（第 8.7 节）。

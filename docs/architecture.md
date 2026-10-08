@@ -159,7 +159,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | 2 | FastAPI 封装 `check_available_slots()`：`backend/`（`GET /availability`，用法见 `backend/README.md`）（完成：10 个测试日期和 SQL 结果一致） |
 | 3 | PostgreSQL：customers / conversations / messages / appointment_requests，诊所设置搬进数据库（`backend/app/db/`）（完成：开发电脑 104 个测试通过，10 个测试日期和 Phase 2 结果一致） |
 | 4 | React Admin Platform：看对话、接手、确认/拒绝；排班、疗程、**假期管理**模块（公共假期、农历新年多休等）。分两步：**4a** 员工登录 + Admin API（`backend/app/api/`，完成：开发电脑 131 个测试通过）；**4b** React + TypeScript 网页（英文画面，`frontend/`，完成：Vitest 31 个测试通过，开发电脑测试清单全部通过） |
-| 5 | WhatsApp Cloud API。分三步：**5a** 收消息（webhook）、员工在 Admin Platform 回复、送达状态，开发只用 Meta 测试号码（`backend/` 的 `whatsapp.py`、`webhook_main.py`；完成：开发电脑测试清单全部通过，`python -m app.whatsapp_check` 检查 Meta 的设定）；**5b** 模板消息 + 预约前一天提醒（设计草稿见**第 8 节**，等诊所回答 W31–W43；员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 更早上线，但对真的病人发要等 5c、A1 和病人同意）；**5c** 上线时把诊所的号码接上（Coexistence，A7） |
+| 5 | WhatsApp Cloud API。分三步：**5a** 收消息（webhook）、员工在 Admin Platform 回复、送达状态，开发只用 Meta 测试号码（`backend/` 的 `whatsapp.py`、`webhook_main.py`；完成：开发电脑测试清单全部通过，`python -m app.whatsapp_check` 检查 Meta 的设定）；**5b** 模板消息 + 预约前一天提醒（设计草稿见**第 8 节**，等诊所回答 W31–W45；员工现在一个个手动发，提醒又不需要 AI，可以比 Phase 6 更早上线，但对真的病人发要等 5c、A1 和病人同意）；**5c** 上线时把诊所的号码接上（Coexistence，A7） |
 | 6 | AI Agent（Tool Calling）+ 转人工规则 |
 | 7 | Docker 化，部署到云端（假数据） |
 | 8 | 解决主机 ↔ 云端同步，再评估是否写入 GPiS |
@@ -181,8 +181,8 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 
 ## 8. Phase 5b 设计：预约前一天的 WhatsApp 提醒（草稿）
 
-> 2026-10-08 写的草稿，**还没有程序**。和诊所确认（W31–W43，见 [`clinic-workflow.md`](clinic-workflow.md) 第 7 节）之后，下一个 session 再写程序。
-> 决定记在 [`decisions.md`](decisions.md) D40–D46；诊所的回答改了设计，就新增一条 D 取代。
+> 2026-10-08 写的草稿，**还没有程序**。和诊所确认（W31–W45，见 [`clinic-workflow.md`](clinic-workflow.md) 第 7 节）之后，下一个 session 再写程序。
+> 决定记在 [`decisions.md`](decisions.md) D40–D47；诊所的回答改了设计，就新增一条 D 取代。
 
 ### 8.1 现况和目标
 
@@ -190,6 +190,16 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 - **目标**：系统每天准备好提醒名单 → 员工在 Admin Platform 看一下、按一次 **Send** → 用 WhatsApp **模板消息**发出 →
   病人按按钮（*Confirm* / *Reschedule*）或回复 → 回复进 *Conversations*，要处理的才交给员工。
 - 不需要 AI；**不写入 GPiS**（D5）：病人要改期，员工照旧在 GPiS `Edit`。
+- **提醒的文字照诊所现在用的原文**（W32，8.5），变的只是「谁来做」：
+
+| 步骤 | 现在（员工手动） | 5b 之后 |
+|---|---|---|
+| 找明天的预约 | 员工打开 GPiS 看 | 系统读 GPiS |
+| 填 NAME / DATE / TIME / DOCTOR | 员工复制原文，一格一格改 | 系统自动填 |
+| 发给病人 | 在 Business App 找号码、贴上、发送，重复 30–40 次 | 员工在 Admin Platform 看名单、按一次 Send |
+| 病人回复 | 员工在手机上看 | 出现在 *Conversations* |
+| 病人要改期 | 员工在 GPiS 改 | 一样，员工在 GPiS 改 |
+
 - 为什么一定要用模板消息：提醒是诊所**主动**发的，病人通常超过 24 小时没传消息，WhatsApp 只允许发事先送审通过的模板（第 5 节的 24 小时规则）。
 
 ```
@@ -249,7 +259,11 @@ GPiS（只读）──读「明天」的预约──→ Backend：排除不是�
 **4. 同一个号码合成一条**（统计 B11：2,243 个号码有多于一位病人）：
 
 - 用**标准化后的号码**（`app/phone.py`）分组：同一个号码、同一个预约日期的所有预约（不同家人、不同医生、同一人几个时段）→ **一条提醒**，按时间排。
-- 每一行写：时间、病人名字、医生（`doctors.display_name`）。**不写疗程**（是健康资料，而且 Remarks 有别人的名字）。W33 确认要写哪些。
+- 写哪些照诊所现在的原文（W32、W33）：名字、日期、时间、医生、分行。**不写疗程**（是健康资料，而且 Remarks 有别人的名字），原文本来也没写。
+- **原文是一位病人一条**（只有一个 `NAME`、一个 `TIME`），和「合成一条」对不上。两个做法，等 W38：
+  - **甲**：照原文，一个预约一条；同一时段、同一位医生的家人（`WITH`）可以把名字写在同一个 `NAME`。员工最熟悉、模板最简单，但家人不同时段会收到几条。
+  - **乙**：合成一条（D41 原来的建议）：`NAME`、`TIME` 改成一行列出每个人，例 `DEMO PATIENT A (10:00 AM) / DEMO PATIENT B (10:30 AM)`。
+  选甲的话，D45 的「同一个号码同一天只发一次」要改成「同一个预约只发一次」。
 - 同一位病人（`ContactID`）同一时段有两条记录 → 合成一行。
 - 同一个号码只要有一个预约「要员工看」，**整个号码**都交给员工（不要只提醒一部分家人，病人会以为另一位没有预约）。
 - 一个号码超过 5 个预约，或文字太长（模板正文最多 1,024 字）→ 要员工看。
@@ -292,25 +306,44 @@ GPiS（只读）──读「明天」的预约──→ Backend：排除不是�
 **类别：Utility**（D42）。预约提醒是 Meta 列的 utility 用途（和已经约好的事有关）。**不能夹促销**（例「洗牙八折」）：
 Meta 会把它改成 marketing 类别（比较贵、规定比较多，病人也比较会 block）。Meta 审核时可能自动改类别，要看审核结果。
 
-**草稿**（英文；语言和原文等 W32、W33；`<Clinic name>` 上线时换成诊所的名字，仓库里不写）：
+**草稿：照诊所现在的原文**（W32，2026-10-08）。诊所名、分行名不写进仓库，用 `<诊所名>`、`<诊所英文名>`、`<分行名>` 代替；★ 是改了的地方（W45 待诊所确认）：
 
 ```
-模板名字：appointment_reminder      类别：UTILITY      语言：en
+模板名字：appointment_reminder      类别：UTILITY
+语言：中英两段写在同一条（和诊所现在一样），送审时声明成 zh_CN；被拒绝的话再拆成 zh_CN、en 两个版本
 Body：
-  Hello, this is <Clinic name>. This is a reminder of your appointment(s) on {{1}}: {{2}}.
-  If you cannot come, please tap Reschedule and our staff will contact you. Thank you!
-Footer：Reply STOP to stop reminders
-按钮（quick reply）：[Confirm] [Reschedule]
+  温馨提醒💕
+
+  你好 这里是<诊所名> 🦷
+  NAME: {{1}}
+  DATE: {{2}}
+  TIME: {{3}}
+  DOCTOR: {{4}}
+  BRANCH：<分行名>
+  想提醒你和我们有个预约 记得赴约哟😊到时见❤️如果有事情耽搁没办法准时到或想取消预约，请通知我们哦😊谢谢你💕
+
+  Gentle Reminder💕
+
+  Hello, we are <诊所英文名> 🦷 Kindly remind you that you have an appointment with us on the date above 😊
+  If there is any problem, pls contact us😊 Thank you 💕 See you!
+Footer（建议加，D46）：Reply STOP to stop reminders
+按钮（quick reply，要不要等 W35、W36）：[Confirm] [Reschedule]
+
+★ 英文原文是 "Hello Miss/Mr , … an appointment with us tomorrow … See you tomorrow"：
+  称呼空着的 Miss/Mr 拿掉；tomorrow 改成 on the date above、See you!（假期前要提早发，写「明天」会错）
+
+变量的格式（照原文）：
+  {{1}} 病人名字，大写      {{2}} DD/MM/YY      {{3}} 12 小时制 + AM / PM      {{4}} DR PHANG / DR GOH（"DR " + doctors.display_name）
 
 送审用的范例（只用假资料）：
-  {{1}} = Fri, 9 Oct 2026
-  {{2}} = 10:00 am – Demo Patient A (Dr Phang); 10:30 am – Demo Patient B (Dr Phang)
+  {{1}} = DEMO PATIENT A      {{2}} = 09/10/26      {{3}} = 10:00 AM      {{4}} = DR PHANG
 ```
 
-- **写日期，不写 "tomorrow"**：假期前要提早几天发（8.3），写「明天」会错。
-- **变量的限制**（第三方资料，送审前再对照 Meta 官方文件）：变量里不能有换行、Tab、连续 4 个以上空格 → 几位家人的预约用 `; ` 写在同一行；
+- **写日期，不写 "tomorrow"**：假期前要提早几天发（8.3），写「明天」会错。原文的中文部分有 `DATE`，英文部分要改（★）。
+- **原文没有按钮**：病人现在是打字回复。打字的回复照样进 *Conversations*（下面的表）；加不加按钮等 W35、W36。
+- **变量的限制**（第三方资料，送审前再对照 Meta 官方文件）：变量里不能有换行、Tab、连续 4 个以上空格 → 几位家人写在同一个变量时用 ` / ` 隔开（8.3 的乙）；
   变量不能放在正文的最前面或最后面；正文最多 1,024 字、按钮文字最多 25 字、footer 最多 60 字。
-- **语言**：一个模板名字可以有几种语言版本（`en`、`zh_CN`、`ms`），每种都要送审。GPiS 应该没有记病人用哪种语言 → 先用诊所现在用的语言（W32），或一条消息里写两种语言。
+- **语言**：诊所现在中英两段写在同一条、没有马来文（W32）→ 照做，不用知道病人用哪种语言。一个模板名字也可以有几种语言版本（`en`、`zh_CN`、`ms`），每种都要送审。
 - **按钮带 payload**：发的时候每个按钮带一个代号，例 `reminder:123:confirm`（只有提醒的编号，没有病人资料）；
   病人按了，webhook 送回来的是 `button.payload` + `context.id`（= 提醒的 wamid）。程序要检查号码和那条提醒对得上（payload 当作不可信的输入）。
 - **送审**：在 WhatsApp Manager → *Message templates* 建（开发时在**测试 portfolio 的测试 WABA**，D34），送出后通常几分钟到一天有结果；被拒绝就看原因改了再送。
