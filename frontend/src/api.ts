@@ -13,6 +13,7 @@ import type {
   Doctor,
   HolidayImport,
   Leave,
+  ReminderList,
   RequestStatus,
   ScheduleDay,
   Service,
@@ -158,6 +159,13 @@ export const requests = {
     }),
   reject: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/reject`),
   cancel: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/cancel`),
+};
+
+// ---------- 预约提醒（只看名单；每次都重新读 GPiS） ----------
+
+export const reminders = {
+  /** date 不填 = 今天要提醒的日期（明天；假期前连后天） */
+  list: (date?: string) => request<ReminderList>("GET", `/reminders${query({ date })}`),
 };
 
 // ---------- 设置（看：所有员工；改：只有 ADMIN，后端会检查） ----------

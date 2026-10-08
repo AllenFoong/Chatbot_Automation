@@ -141,3 +141,41 @@ export interface ClinicSettings {
   max_per_slot_for_ai: number;
   clinic_contact_id: number;
 }
+
+// ---------- 预约提醒（app/api/reminders.py，Phase 5b） ----------
+
+export type PhoneKind = "MY_MOBILE" | "SG_MOBILE" | "OTHER_COUNTRY" | "LANDLINE" | "MISSING";
+
+export interface ReminderLine {
+  appointment_ids: number[];
+  time: string | null; // "10:00"
+  doctor_id: string;
+  doctor_name: string;
+  patient_name: string;
+  status: string | null;
+  problems: string[];
+}
+
+/** 发给一个号码的一条提醒（同一天）。没有号码的病人各自一组。 */
+export interface ReminderGroup {
+  key: string;
+  date: string;
+  phone: string | null;
+  phone_kind: PhoneKind;
+  lines: ReminderLine[];
+  problems: string[];
+  message: string | null;
+  /** 能不能显示 Open in WhatsApp（D54：只有读主机的 GPiS，或允许名单里的号码） */
+  whatsapp_allowed: boolean;
+}
+
+export interface ReminderList {
+  dates: string[];
+  suggested_dates: string[];
+  source: string;
+  production: boolean;
+  read_at: string;
+  ready: ReminderGroup[];
+  needs_staff: ReminderGroup[];
+  not_appointments: { reason: string; count: number }[];
+}

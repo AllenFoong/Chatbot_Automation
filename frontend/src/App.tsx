@@ -10,6 +10,7 @@ import { useLoad } from "./hooks";
 import AccountPage from "./pages/AccountPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import LoginPage from "./pages/LoginPage";
+import RemindersPage from "./pages/RemindersPage";
 import RequestsPage from "./pages/RequestsPage";
 import SettingsPage from "./pages/SettingsPage";
 import StaffPage from "./pages/StaffPage";
@@ -47,6 +48,7 @@ function Layout() {
           <NavLink to="/requests">
             Requests {counts && counts.pending > 0 && <span className="count">{counts.pending}</span>}
           </NavLink>
+          <NavLink to="/reminders">Reminders</NavLink>
           <NavLink to="/settings">Settings</NavLink>
           {isAdmin && <NavLink to="/staff">Staff accounts</NavLink>}
         </nav>
@@ -65,6 +67,7 @@ function Layout() {
           <Route path="/conversations" element={<ConversationsPage />} />
           <Route path="/conversations/:id" element={<ConversationsPage />} />
           <Route path="/requests" element={<RequestsPage />} />
+          <Route path="/reminders" element={<RemindersPage />} />
           <Route path="/settings" element={<Navigate to="/settings/doctors" replace />} />
           <Route path="/settings/:section" element={<SettingsPage />} />
           <Route path="/staff" element={isAdmin ? <StaffPage /> : <Navigate to="/" replace />} />

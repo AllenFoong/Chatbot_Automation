@@ -181,7 +181,9 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 
 ## 8. Phase 5b 设计：预约前一天的 WhatsApp 提醒（草稿）
 
-> 2026-10-08 写的草稿，**还没有程序**。诊所已回答两轮问卷（W31–W53，见 [`clinic-workflow.md`](clinic-workflow.md) 第 7 节）；还差 W40b（登记表的照片）、W54。
+> **第一步的程序已经写好**（2026-10-08）：Reminders 页面（只看名单）+ *Open in WhatsApp*，用法见 [`backend/README.md`](../backend/README.md)「Phase 5b」。
+> 还没有：`reminders` 表（发送记录、按过 *Open in WhatsApp*）、opt-out、系统自己发（5c）。
+> 2026-10-08 的设计。诊所已回答两轮问卷（W31–W53，见 [`clinic-workflow.md`](clinic-workflow.md) 第 7 节）；还差 W40b（登记表的照片）、W54。
 > 决定记在 [`decisions.md`](decisions.md) D40–D53；D48–D53 是按诊所的回答改的。
 
 ### 8.1 现况和目标
@@ -242,7 +244,8 @@ GPiS（只读）──读「明天」的预约──→ Backend：排除不是�
 **2. 读 GPiS**：一条只读的 `SELECT`，读那几天**所有医生**的预约，只拿要用的栏位：
 `AppointmentID`、`AppointmentDate`、`TimeSlot`、`DoctorID`、`Status`、`ContactID`、病人名字、手机号码（`HPNo`）、`Remarks`。
 不拿 NRIC、House No。`Remarks` 只在内存里判断 `OFFDAY`，**不存、不显示、不发**（统计 B5：Remarks 里有病人名字）。
-栏位从 `Qry_CAH_Appointment` 读（统计 B10、B11 用过它的 `HPNo`、`ContactID`）；实作时先用 `INFORMATION_SCHEMA` 确认名字栏位叫什么。
+实作（`app/gpis.py` 的 `REMINDER_SQL`）：预约和名字（`ContactName`）读 `Tbl_CAH_Appointment`，手机号码用 `AppointmentID` 对上 `Qry_CAH_Appointment` 的 `HPNo`（统计 B10、B11 用过）。
+视图有没有 `AppointmentID` 还没确认：开发电脑先跑 `python -m app.reminders_cli --check-gpis`。
 
 **3. 每条记录分成三种**：要提醒、不是预约（不提醒，只显示数量）、要员工看（不自动发，列出原因）。
 **沿用空档的规则**：空档计算里「算病人」的预约（`availability.py` 的 `parse_appointment(...).occupies`），就是要提醒的预约，不另外写一套。
@@ -259,7 +262,9 @@ GPiS（只读）──读「明天」的预约──→ Backend：排除不是�
 | 号码是固网：马来西亚 `60` 后面不是 `1`（例 `07-…` = Johor 的固网）、新加坡 `65` 后面不是 `8` / `9` | **要员工看** | WhatsApp 只能发手机 |
 | 号码已经 opt-out（病人说不要提醒） | 不发，显示 *Opted out* | D46 |
 | 那天在 `clinic_closures`、医生请假（`doctor_leaves`）、医生那天不上班，或医生已停用（例 CHER） | **要员工看** | 资料互相矛盾：宁可不发 |
-| 时段在午休、下班后（员工破例排的，`clinic-workflow.md` 第 1 节） | 照常提醒 | 是真的预约 |
+| 时段在午休，或最后一格之后的一格（例 PHANG 17:00，员工破例排的，`clinic-workflow.md` 第 1 节） | 照常提醒 | 是真的预约 |
+| 时段比上班早、或比最后一格晚超过一格（例 02:30）；时段看不懂 | **要员工看** | 统计 A：凌晨的时段是打错的 |
+| 没有病人名字 | **要员工看** | 消息的 `NAME` 会是空的 |
 | `Remarks` 有要等技工所的代码（`ISSUE C`、`ISSUE CROWN`、`ISSUE B`、`ISSUE BRIDGE`、`ISSUE IMPLANT`、`ISSUE DENTURE`、`MMR`、`TRY-IN`、`VENEER`），后面**没有 `*C`** | **要员工看**：*Lab work not marked as arrived (\*C)* | W39、W47：`*C` = 技工所做的牙已经送到诊所，送来那天加上，**一定写成 `*C`**；没到就提醒，病人来了没有东西可以装（D50、D51）。判断时**不能用 `normalize_remarks`**（它会去掉 `*`） |
 
 原则和空档一样：**不确定的不自动发，交给员工**（宁可员工多处理一条，也不要发错）。
@@ -294,6 +299,7 @@ GPiS（只读）──读「明天」的预约──→ Backend：排除不是�
 - **Open in WhatsApp**（每一行，D54）：打开 WhatsApp Desktop 里那位病人的对话，消息已经填好（`whatsapp://send?phone=…&text=…`，或 `https://wa.me/…?text=…`），员工按 Enter 发出。
   - 那台电脑的 WhatsApp Desktop（或 WhatsApp Web）要连上诊所的 Business App（手机的「已连接的设备」）。
   - 按了就记成 *Opened in WhatsApp*（谁、几点按的）。系统不知道员工最后有没有按 Enter（没有 webhook），员工可以改回 *Not sent*；同一个号码同一天按过的会标出来，避免发两次。
+    （第一步的程序只在画面上显示 *Opened*，重新整理就没了；记进 `reminders` 表是下一步。）
   - `wa.me` 的网址会留在浏览器的历史记录（有号码和名字，D31）→ 优先用 `whatsapp://` 直接开 WhatsApp Desktop；实作时测试会不会留下记录。
   - 消息照诊所的原文（8.5），不受模板的限制，但用一样的文字，以后换成模板时病人看到的一样。
   - 5c 之前页面只有这个按钮，没有 Send。

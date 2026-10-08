@@ -1,6 +1,6 @@
 # Frontend（Phase 4b：Admin Platform 网页）
 
-员工用的网页：看 WhatsApp 对话、接手 / 交回 AI、确认预约请求、改诊所设置、管理员工账号。
+员工用的网页：看 WhatsApp 对话、接手 / 交回 AI、确认预约请求、预约提醒的名单（Phase 5b）、改诊所设置、管理员工账号。
 **画面是英文**（D24），资料全部来自 Phase 4a 的 `/api`（说明见 [`backend/README.md`](../backend/README.md)「Admin Platform 的 API」）。
 
 React 19 + TypeScript + Vite。只多用了一个套件 React Router（网址 ↔ 画面）；没有 UI 套件（D30）。
@@ -16,7 +16,7 @@ React 19 + TypeScript + Vite。只多用了一个套件 React Router（网址 �
 | `src/hooks.ts` | `useLoad`（读资料、自动更新）、`useAction`（按钮做事情） |
 | `src/format.ts` | 日期时间的显示（一律马来西亚时间） |
 | `src/schedule.ts` | 排班送出前的检查（和数据库的 CHECK 一样，信息比较好懂） |
-| `src/pages/` | 各个画面：登录、对话、预约请求、设置（`settings/`）、员工账号、我的账号 |
+| `src/pages/` | 各个画面：登录、对话、预约请求、预约提醒、设置（`settings/`）、员工账号、我的账号 |
 | `src/**/*.test.ts(x)` | 测试（Vitest），全部用假资料、假后端 |
 | `vite.config.ts` | 开发用的网页服务器：`/api` 转给 FastAPI |
 | `package.json`、`package-lock.json` | 套件和固定的版本（`npm ci` 照 lock 文件装，每台电脑装到的一模一样） |
@@ -28,6 +28,7 @@ React 19 + TypeScript + Vite。只多用了一个套件 React Router（网址 �
 | `/conversations` | 所有员工 | 对话列表（Open / Needs staff / AI replying / Closed），每 15 秒更新 |
 | `/conversations/12` | 所有员工 | 完整对话；**Take over**（AI 停止回复）、**Hand back to AI**、**Close**、经 WhatsApp 回复（Phase 5a） |
 | `/requests` | 所有员工 | 预约请求；**Confirm**（先在 GPiS 录入，可以填 GPiS AppointmentID）、**Reject**、**Patient cancelled** |
+| `/reminders` | 所有员工 | 预约提醒的名单（Phase 5b）：*Ready* / *Needs staff* / *Not appointments*；**Open in WhatsApp**（消息已经填好，员工按 Enter，D54）；*Copy message*。每次 *Refresh* 都重新读 GPiS |
 | `/settings/...` | 看：所有员工；改：**ADMIN** | 医生和排班、疗程、假期（一键导入公共假期）、医生请假、每格上限 |
 | `/staff` | **ADMIN** | 员工账号：新增、改权限、停用、重设密码 |
 | `/account` | 所有员工 | 改自己的密码 |
@@ -76,7 +77,7 @@ npm run dev
 ## 测试
 
 ```powershell
-npm test            # Vitest：35 个测试，假后端、假资料，不需要开 uvicorn
+npm test            # Vitest：41 个测试，假后端、假资料，不需要开 uvicorn
 npm run build       # TypeScript 检查 + 打包到 dist\（不进仓库）
 ```
 

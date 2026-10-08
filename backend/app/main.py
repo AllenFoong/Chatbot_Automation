@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .api import auth as auth_api
-from .api import conversations, requests, settings, staff
+from .api import conversations, reminders, requests, settings, staff
 from .availability import check_available_slots
 from .clinic_rules import ClinicRules
 from .config import get_settings
@@ -23,8 +23,8 @@ from .gpis import AppointmentSource, GpisReader, WrongDatabaseError
 
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="Chatbot_Automation API", version="0.4.0")
-for module in (auth_api, conversations, requests, settings, staff):
+app = FastAPI(title="Chatbot_Automation API", version="0.5.0")
+for module in (auth_api, conversations, reminders, requests, settings, staff):
     app.include_router(module.router)
 
 
