@@ -9,7 +9,7 @@
 | 文件 | 内容 |
 |---|---|
 | [`docs/gpis-database.md`](docs/gpis-database.md) | GPiS 数据库：表、字段、跑过的 SQL、结果、待验证的问题 |
-| [`docs/architecture.md`](docs/architecture.md) | 系统架构、技术选型、开发路线、人工介入设计；第 8 节：Phase 5b 预约提醒的设计（草稿） |
+| [`docs/architecture.md`](docs/architecture.md) | 系统架构、技术选型、开发路线、人工介入设计；第 8 节：Phase 5b 预约提醒的设计（草稿）；第 9 节：A1 怎么读主机的方案比较（草稿） |
 | [`docs/decisions.md`](docs/decisions.md) | 做过的决定和原因、数据安全规则 |
 | [`docs/clinic-workflow.md`](docs/clinic-workflow.md) | 营业时间、医生排班、staff 如何使用 GPiS 预约、Remarks 治疗代码、待确认问题 |
 | [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
@@ -59,15 +59,17 @@
 - [x] Phase 5a 测试：开发电脑（Meta 测试 App 在自己的测试 portfolio，token 用 System User 的，D39）：`0003 (head)`，`pytest` 183 个、`npm test` 35 个通过，`npm run build` 成功，测试清单 1–7 项全部通过（记录见 `backend/README.md`）
 - [x] Phase 5a 合并进 `main`（PR #10）
 - [x] Phase 5b 设计草稿（只有文档，没有程序）：预约前一天用 WhatsApp 模板消息提醒病人（`docs/architecture.md` 第 8 节、D40–D47）；要问诊所 W31–W45（给诊所的中英对照问卷在 claude.ai 上，不在仓库）
-- [ ] 诊所回答 W31–W45，确认 5b 设计（特别是病人同意 W40）；W32（提醒原文）、W33、W44（只有一间分行）已经有答案
+- [x] 诊所回答第一轮问卷（2026-10-08）：W31–W39、W41–W45 已回答，设计照着改（D48 第一版没有按钮、D49 家人合成 `NAME: A & B`、D50 戴牙的预约要有 `*C` 才发）
+- [x] A1 方案比较草稿（`docs/architecture.md` 第 9 节）：建议先在诊所放一台专用小电脑跑本系统，经局域网只读读主机
+- [ ] 第二轮问卷：W40（病人同意，第一轮看不懂，要附例句重新问）、W46–W47（提醒）、W48–W53（A1）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. 和诊所确认 Phase 5b 的设计（`docs/architecture.md` 第 8 节），回答 `docs/clinic-workflow.md` 的 W31–W45；改了的设计照 `decisions.md` 的规则新增一条 D 取代。
-2. 确认之后，下一个 session 写 5b 的程序：先做「只看名单、不发送」（preview：拿 `GPiS_Dev` 的某一天当「明天」）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
+1. 第二轮问卷（`docs/clinic-workflow.md` 第 7 节的 W40、W46–W53）。W40（病人同意）要附一段登记表的例句；A1 等 W48–W53 回答后定案，记成新的 D。主机上建只读帐号、开 TCP/IP 超出现在的规则 1 / D3，要诊所同意、脚本先在 `GPiS_Dev` 上试。
+2. 确认之后，下一个 session 写 5b 的程序：先做「只看名单、不发送」（preview：拿 `GPiS_Dev` 的某一天当「明天」；第一版模板没有按钮，D48）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
 3. 5b 对真的病人发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（读主机的实时预约）、病人同意（W40、D46）。
-4. 设计主机 ↔ 本系统的数据读取方式（`docs/architecture.md` A1）：`GPiS_Dev` 只是 9 月 28 日的快照，正式上线必须读主机的实时数据；提醒要病人名字和号码，A1 的方案要能处理（第 8.7 节）。
+4. A1（读主机的实时预约）：方案比较见 `docs/architecture.md` 第 9 节，等 W48–W53；`GPiS_Dev` 只是 9 月 28 日的快照，正式上线必须读主机的实时数据。
 5. 上线前：用 Admin Platform（*Settings → Clinic closures*）导入公共假期、补上农历新年多休的日子（`clinic_closures` 现在是空的；提醒也要靠它决定假期前提早发）。
 6. Phase 6（AI 推荐时段）之前要解决 A8：还没录入 GPiS 的预约请求要算进空档。
 
