@@ -77,6 +77,7 @@ def test_cancelled_offday_and_todo_records_are_only_counted():
     (appt("08:30"), "Time is outside working hours"),
     (appt("9:00"), "Unreadable time slot"),
     (appt(name="  "), "No patient name in GPiS"),
+    (appt(name="(P)"), "No patient name in GPiS"),
     (appt(remarks="ISSUE CROWN 36 (P)"), "Lab work not marked as arrived (*C)"),
     (appt(phone=None), "No mobile number in GPiS"),
     (appt(phone="07-123 4567"), "Not a mobile number"),
@@ -178,6 +179,17 @@ def test_family_on_one_number_gets_one_message():
 def test_same_time_and_doctor_are_written_once():
     g = only_group(build(appt("13:00", name="Demo A"), appt("13:00", name="Demo B")))
     assert "NAME: DEMO A & DEMO B\nDATE: 09/10/26\nTIME: 1:00 PM\nDOCTOR: DR PHANG\n" in g.message
+
+
+def test_p_and_g_after_the_name_are_not_sent():
+    """GPiS 的名字后面的 (P)、(G) 不是名字的一部分（D56）；名字中间的括号不动。"""
+    g = only_group(build(
+        appt("10:00", name="Demo Patient A(P)"),
+        appt("10:30", doctor="GOH", name="demo patient b ( g )"),
+        appt("11:00", name="Demo (Ah) C (P)(G)"),
+    ))
+    assert [ln.patient_name for ln in g.lines] == ["DEMO PATIENT A", "DEMO PATIENT B", "DEMO (AH) C"]
+    assert "NAME: DEMO PATIENT A & DEMO PATIENT B & DEMO (AH) C\n" in g.message
 
 
 def test_message_uses_the_clinic_names_from_settings():

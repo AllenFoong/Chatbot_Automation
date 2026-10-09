@@ -164,8 +164,12 @@ def _outside_hours(slot: int, schedule: DaySchedule) -> bool:
     return slot < _minutes(schedule.start) or slot > _minutes(schedule.last_slot) + SLOT_MINUTES
 
 
+# GPiS 的名字后面有时带着 (P)、(G)（例 DEMO PATIENT(P)）：不是名字的一部分，名单和消息里都拿掉（D56）
+_NAME_TAG = re.compile(r"(?:\s*\(\s*[PG]\s*\))+$")
+
+
 def _clean_name(name: str | None) -> str:
-    return " ".join((name or "").split()).upper()
+    return _NAME_TAG.sub("", " ".join((name or "").split()).upper()).strip()
 
 
 def _problems(a: ReminderAppointment, slot: int | None, rules: ClinicRules,

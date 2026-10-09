@@ -351,7 +351,7 @@ Footer（建议加，D46）：Reply STOP to stop reminders
   称呼空着的 Miss/Mr 拿掉；tomorrow 改成 on the date above、See you!（假期前要提早发，写「明天」会错）
 
 变量的格式（照原文）：
-  {{1}} 病人名字，大写      {{2}} DD/MM/YY      {{3}} 12 小时制 + AM / PM      {{4}} DR PHANG / DR GOH（"DR " + doctors.display_name）
+  {{1}} 病人名字，大写，拿掉最后的 (P)、(G)（D56）      {{2}} DD/MM/YY      {{3}} 12 小时制 + AM / PM      {{4}} DR PHANG / DR GOH（"DR " + doctors.display_name）
 
 送审用的范例（只用假资料）：
   {{1}} = DEMO PATIENT A      {{2}} = 09/10/26      {{3}} = 10:00 AM      {{4}} = DR PHANG
