@@ -576,7 +576,11 @@ python -m app.reminders_cli 2026-09-02      # 拿 GPiS_Dev 的某一天当「明
 | 5 | ✅ 09-30：Ready 4（`Confirmed`），和 T10 的「4 人」一样；11:00 的诊所联系人在 Needs staff（`No mobile number in GPiS; Booked under the clinic's own contact`） |
 | 6 | ✅ 10-09：2 个，`Confirmed`，和测试 0 的「2 人」一样 |
 | 7 | ✅ 网页 09-02：黄色 *Preview only … GPiS_Dev*、没有 *Open in WhatsApp*；Ready 24 / Needs staff 1 / Not appointments 4，和终端一样 |
+| 8 | ✅ 假资料：`read from Demo data`；A & B 一张卡、有 *Open in WhatsApp* |
+| 9 | ✅ WhatsApp Desktop 打开自己的对话、消息已经填好：`.env` 的诊所名（中文没有乱码）、分行名；`NAME: DEMO PATIENT A & DEMO PATIENT B`、`DATE: 10/10/26`、`TIME: 10:00 AM & 10:30 AM`、`DOCTOR: DR PHANG & DR GOH`；表情符号、换行正常 |
+| 10 | ✅ 浏览器历史记录找不到 `whatsapp://` 和消息内容 |
 
 - 看到 GPiS 有的名字后面带 `(P)` → 名单和消息里拿掉最后的 `(P)`、`(G)`（D56），`pytest` 257 个。
 - 第 8 项第一次试：页面还是 `read from GPiS_Dev`（可能是改了 `.env` 没重开 uvicorn，或那行前面有 `#`）→ 上面「使用」加了步骤和检查方法。
-- 还没做：第 1、8–10 项。
+- 第一次 `reminders_cli` 还是 `GPiS_Dev`：`REMINDER_SOURCE=demo` 要写在 `backend\.env`（不是 `.env.example`），存档、重开视窗。
+- 还没做：第 1 项。
