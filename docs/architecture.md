@@ -447,9 +447,9 @@ Footer（建议加，D46）：Reply STOP to stop reminders
 - **直销**：提醒不是直销；模板夹了促销就是了（8.5 不能夹促销）。
 - 和现在不同的地方：Business App 是手机之间端对端加密；Cloud API（Coexistence 也是）由 **Meta 代收代发**，隐私通知要写清楚（上线前对照 WhatsApp 的官方说明）。
 
-**诊所现在有没有病人的同意？还不确定**（W40，2026-10-08）：
+**诊所现在没有 WhatsApp 的同意**（W40，2026-10-08、10-09）：
 
-- 新病人填**纸本**登记表（名字、IC、电话），上面有类似的条款，但**可能没写 WhatsApp**；诊所会拍一张空白表格来（W40b，待收）。
+- 纸本表格（W40b，看过照片）**不是每人一张的登记表**，是**每天一张、当天来的病人一起签的签名表**：栏位是病人名字、NRIC / 护照、H/P NO、Remark，上面只有一句马来文 + 英文的声明「同意接受治疗、了解治疗和费用」。**没有写 WhatsApp，也没有写个人资料怎么用。**
 - 诊所**愿意**在登记表加 8.8 的例句（W40c）。
 - 旧病人：诊所的想法是告诉病人「以后用 WhatsApp 将会自动提醒你」（W40d）。这是**告知 + 可以拒绝**（opt-out），不是先问同意（opt-in）；WhatsApp 的规定要的是同意。建议员工讲成**问句**（「以后用 WhatsApp 提醒你可以吗？」），病人说不要就在 Admin Platform 标记 opt-out；上线前请律师看这样够不够。
 
@@ -457,16 +457,27 @@ Footer（建议加，D46）：Reply STOP to stop reminders
 
 **建议**（D46）：
 
-1. 诊所的登记表 / PDPA 通知加一段：诊所名字、会用 WhatsApp 发提醒和回复、经 Meta 传送、怎么停止。草稿（第二轮问卷 W40 附给诊所看；正式的要写诊所名字，由诊所 / 律师定稿）：
+1. **在每天的签名表上加一句**（D55，W55 待确认）。病人每次来都要签这张表，所以**新病人、旧病人下次来的时候都签到了**，不用另外一个个去问旧病人（W40d），也有纸本记录。
+   和表上现在的声明一样用马来文 + 英文（正式的要写诊所名字，由诊所 / 律师定稿）：
+
+   > SAYA BERSETUJU KLINIK MENGHANTAR PERINGATAN TEMUJANJI DAN BALASAN MELALUI WHATSAPP KE NOMBOR H/P SAYA (MESEJ DIHANTAR MELALUI META). TULIS "NO WA" DI RUANGAN REMARK JIKA TIDAK BERSETUJU.
+   >
+   > I AGREE THAT THE CLINIC MAY SEND APPOINTMENT REMINDERS AND REPLIES TO MY H/P NO BY WHATSAPP (MESSAGES PASS THROUGH META). WRITE "NO WA" IN THE REMARK COLUMN IF YOU DO NOT AGREE.
+
+   写了 `NO WA` 的，员工在 Admin Platform 把那个号码标记 opt-out（第 4 点）。
+2. 诊所的 PDPA 通知（贴在柜台，或病人要看的时候给他看）写得完整一点：诊所名字、会用 WhatsApp 发提醒和回复、经 Meta 传送、怎么停止。草稿（第二轮问卷附给诊所看过）：
 
    > 我同意本诊所用我提供的手机号码，通过 WhatsApp 发预约提醒、回复我的询问。我明白这些消息会经过 WhatsApp（Meta 公司）传送。我随时可以回复 STOP 或告诉诊所员工，停止收到提醒。☐ 同意
    >
    > I agree that the clinic may use the mobile number I give to send me appointment reminders and reply to my enquiries on WhatsApp. I understand these messages are delivered through WhatsApp (Meta). I can stop the reminders at any time by replying STOP or telling the clinic staff. ☐ I agree
 
-2. 旧病人怎么补同意由诊所决定（W40d）：下次来诊所时补签；或病人自己 WhatsApp 诊所时，员工在对话里问一句。
+3. 旧病人：签名表加了那一句之后，下次来诊所签名就同意了。诊所原本想用「告知」的方式（W40d），签名表比较好：有签名、有纸本记录。
    不要由诊所**主动**发消息去问同意：那本身就是没有同意的主动消息。
-3. 本系统一定要做**号码层级的 opt-out**（病人回 `STOP`、员工在 Admin Platform 标记 → 这个号码不再发）；要不要逐个记录 opt-in（日期、方式），看诊所怎么收同意。
-4. **同意没解决之前，不对真的病人发**：5b 只在测试号码 + 假资料上跑。
+4. 本系统一定要做**号码层级的 opt-out**（病人回 `STOP`、在签名表写 `NO WA`、员工在 Admin Platform 标记 → 这个号码不再发）。
+5. **同意没解决之前，不对真的病人发**：5b 只在测试号码 + 假资料上跑。
+
+**签名表本身的一个问题**（不是本系统的事，但和 PDPA 有关，可以顺便请律师看）：同一张表上，后来签的病人看得到前面病人的 NRIC 和电话。
+可以考虑每人一张小表，或签名时把上面几行盖住。
 
 ### 8.9 资料表（草稿，实作时以 `models.py` 为准）
 
