@@ -28,7 +28,7 @@ React 19 + TypeScript + Vite。只多用了一个套件 React Router（网址 �
 | `/conversations` | 所有员工 | 对话列表（Open / Needs staff / AI replying / Closed），每 15 秒更新 |
 | `/conversations/12` | 所有员工 | 完整对话；**Take over**（AI 停止回复）、**Hand back to AI**、**Close**、经 WhatsApp 回复（Phase 5a） |
 | `/requests` | 所有员工 | 预约请求；**Confirm**（先在 GPiS 录入，可以填 GPiS AppointmentID）、**Reject**、**Patient cancelled** |
-| `/reminders` | 所有员工 | 预约提醒的名单（Phase 5b）：*Ready* / *Needs staff* / *Not appointments*；**Open in WhatsApp**（消息已经填好，员工按 Enter，D54）；*Copy message*。每次 *Refresh* 都重新读 GPiS |
+| `/reminders` | 所有员工 | 预约提醒的名单（Phase 5b）：*Ready* / *Needs staff* / *Not appointments*；**Open in WhatsApp**（消息已经填好，员工按 Enter，D54；按过会记下来，别的员工也看得到，D58）；*Mark as not sent*；*Copy message*；**NO WA**（这个号码不要提醒，D55）。每次 *Refresh* 都重新读 GPiS |
 | `/settings/...` | 看：所有员工；改：**ADMIN** | 医生和排班、疗程、假期（一键导入公共假期）、医生请假、每格上限 |
 | `/staff` | **ADMIN** | 员工账号：新增、改权限、停用、重设密码 |
 | `/account` | 所有员工 | 改自己的密码 |
@@ -77,7 +77,7 @@ npm run dev
 ## 测试
 
 ```powershell
-npm test            # Vitest：41 个测试，假后端、假资料，不需要开 uvicorn
+npm test            # Vitest：44 个测试，假后端、假资料，不需要开 uvicorn
 npm run build       # TypeScript 检查 + 打包到 dist\（不进仓库）
 ```
 

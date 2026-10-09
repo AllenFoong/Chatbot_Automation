@@ -113,6 +113,8 @@ export function fakeReminderList(overrides: Partial<ReminderList> = {}): Reminde
         problems: [],
         message: "NAME: DEMO PATIENT A & DEMO PATIENT B\nTIME: 10:00 AM & 10:30 AM",
         whatsapp_allowed: true,
+        opted_out: false,
+        record: null,
       },
     ],
     needs_staff: [
@@ -127,6 +129,8 @@ export function fakeReminderList(overrides: Partial<ReminderList> = {}): Reminde
         problems: ["Lab work not marked as arrived (*C)"],
         message: "NAME: DEMO PATIENT C",
         whatsapp_allowed: false,
+        opted_out: false,
+        record: null,
       },
     ],
     not_appointments: [

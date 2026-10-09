@@ -14,6 +14,7 @@ import type {
   HolidayImport,
   Leave,
   ReminderList,
+  ReminderRecord,
   RequestStatus,
   ScheduleDay,
   Service,
@@ -161,11 +162,18 @@ export const requests = {
   cancel: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/cancel`),
 };
 
-// ---------- 预约提醒（只看名单；每次都重新读 GPiS） ----------
+// ---------- 预约提醒（名单每次都重新读 GPiS；员工做过的事记在本系统） ----------
 
 export const reminders = {
   /** date 不填 = 今天要提醒的日期（明天；假期前连后天） */
   list: (date?: string) => request<ReminderList>("GET", `/reminders${query({ date })}`),
+  /** 员工按了 Open in WhatsApp */
+  opened: (date: string, phone: string) => request<ReminderRecord>("POST", "/reminders/opened", { date, phone }),
+  /** 员工说没有发出去 */
+  notSent: (date: string, phone: string) => request<ReminderRecord>("POST", "/reminders/not-sent", { date, phone }),
+  /** 这个号码不要提醒（NO WA）/ 改回照常提醒 */
+  optOut: (phone: string, opted_out: boolean) =>
+    request<{ phone: string; opted_out: boolean }>("PUT", "/reminders/opt-out", { phone, opted_out }),
 };
 
 // ---------- 设置（看：所有员工；改：只有 ADMIN，后端会检查） ----------

@@ -299,7 +299,7 @@ GPiS（只读）──读「明天」的预约──→ Backend：排除不是�
 - **Open in WhatsApp**（每一行，D54）：打开 WhatsApp Desktop 里那位病人的对话，消息已经填好（`whatsapp://send?phone=…&text=…`，或 `https://wa.me/…?text=…`），员工按 Enter 发出。
   - 那台电脑的 WhatsApp Desktop（或 WhatsApp Web）要连上诊所的 Business App（手机的「已连接的设备」）。
   - 按了就记成 *Opened in WhatsApp*（谁、几点按的）。系统不知道员工最后有没有按 Enter（没有 webhook），员工可以改回 *Not sent*；同一个号码同一天按过的会标出来，避免发两次。
-    （第一步的程序只在画面上显示 *Opened*，重新整理就没了；记进 `reminders` 表是下一步。）
+    （第一步只在画面上显示 *Opened*；第二步记进 `reminders` 表，D58：别的员工、重新整理都看得到，按错了可以按 *Mark as not sent*。）
   - `wa.me` 的网址会留在浏览器的历史记录（有号码和名字，D31）→ 优先用 `whatsapp://` 直接开 WhatsApp Desktop；实作时测试会不会留下记录。
   - 消息照诊所的原文（8.5），不受模板的限制，但用一样的文字，以后换成模板时病人看到的一样。
   - 5c 之前页面只有这个按钮，没有 Send。
@@ -493,6 +493,16 @@ wa_contacts            + reminders_opt_out_at, reminders_opt_out_by (PATIENT / S
 ```
 
 `Remarks`、疗程代码不存。`SENDING` 停住 = 页面上的 *Unknown*（8.4）。
+
+**已经实作的（第二步，D58，migration `0004`）**：比上面的草稿简单，5c 时再加栏位。
+
+```
+reminders    id, appointment_date, wa_phone, status (OPENED / NOT_SENT), body, gpis_appointment_ids (int[]),
+             staff_id（最后改的员工）, created_at, updated_at
+             UNIQUE (appointment_date, wa_phone)
+             reminder_appointments 表没有做：GPiS 预约 ID 直接存成一个 int[]，用来看「按过之后 GPiS 改了」
+wa_contacts  + reminders_opt_out_at, reminders_opt_out_by (PATIENT / STAFF), reminders_opt_out_staff_id
+```
 
 ### 8.10 下一个 session 的测试（草稿）
 

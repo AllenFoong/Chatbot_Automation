@@ -120,3 +120,91 @@ def test_gpis_error_hides_details(amy):
     use(FakeSource(error=RuntimeError("Server=secret;PWD=hunter2")))
     r = amy.get("/api/reminders", params={"date": "2026-10-09"})
     assert r.status_code == 503 and "hunter2" not in r.text
+
+
+# ---------- 员工做过的事：Open in WhatsApp、没有发出去、不要提醒（reminders 表、D55） ----------
+
+KEY = {"date": "2026-10-09", "phone": "60120000001"}
+OWN = frozenset({"60120000001"})
+
+
+def ready_family(client):
+    body = client.get("/api/reminders", params={"date": "2026-10-09"}).json()
+    return next(g for g in body["ready"] + body["needs_staff"] if g["phone"] == "60120000001"), body
+
+
+def test_open_in_whatsapp_is_recorded(amy, session):
+    from app.db.models import Reminder
+    use(FakeSource(ROWS), allowed=OWN)
+    family, _ = ready_family(amy)
+    assert family["record"] is None and family["opted_out"] is False
+
+    r = amy.post("/api/reminders/opened", json={"date": "2026-10-09", "phone": "+60 12-000 0001"})
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "OPENED" and r.json()["staff_name"] == "amy (test)"
+
+    family, _ = ready_family(amy)
+    assert family["record"]["status"] == "OPENED" and family["record"]["changed"] is False
+    [row] = session.query(Reminder).all()
+    assert row.gpis_appointment_ids == [1, 2] and "NAME: DEMO PATIENT A & DEMO PATIENT B" in row.body
+
+
+def test_second_open_updates_the_same_row(amy, session, client_for):
+    from app.db.models import Reminder
+    use(FakeSource(ROWS), allowed=OWN)
+    add_staff(session, "ben", password=PASSWORD)
+    ben = client_for("ben")
+    assert amy.post("/api/reminders/opened", json=KEY).status_code == 200
+    assert ben.post("/api/reminders/opened", json=KEY).json()["staff_name"] == "ben (test)"
+    assert session.query(Reminder).count() == 1       # 同一个号码、同一天只有一条（D45）
+    family, _ = ready_family(amy)
+    assert family["record"]["staff_name"] == "ben (test)"
+
+
+def test_list_changed_after_opening(amy):
+    use(FakeSource(ROWS), allowed=OWN)
+    amy.post("/api/reminders/opened", json=KEY)
+    use(FakeSource(ROWS + [row(5, "11:30", name="Demo Patient E")]), allowed=OWN)   # 同一个号码多了一个预约
+    family, _ = ready_family(amy)
+    assert family["record"]["changed"] is True
+
+
+def test_open_is_refused_when_not_ready_or_locked(amy):
+    use(FakeSource(ROWS), allowed=OWN | {"60120000003"})
+    lab = {"date": "2026-10-09", "phone": "60120000003"}          # 没有 *C → Needs staff
+    assert amy.post("/api/reminders/opened", json=lab).status_code == 409
+    use(FakeSource(ROWS))                                          # 不在允许名单（D54）
+    assert amy.post("/api/reminders/opened", json=KEY).status_code == 403
+    use(FakeSource(ROWS, production=True))
+    assert amy.post("/api/reminders/opened", json=KEY).status_code == 200
+    assert amy.post("/api/reminders/opened", json={"date": "2026-10-09", "phone": "abc"}).status_code == 422
+
+
+def test_mark_not_sent(amy):
+    use(FakeSource(ROWS), allowed=OWN)
+    assert amy.post("/api/reminders/not-sent", json=KEY).status_code == 404     # 还没按过
+    amy.post("/api/reminders/opened", json=KEY)
+    assert amy.post("/api/reminders/not-sent", json=KEY).json()["status"] == "NOT_SENT"
+    family, _ = ready_family(amy)
+    assert family["record"]["status"] == "NOT_SENT"
+
+
+def test_no_wa_moves_the_number_to_needs_staff(amy):
+    use(FakeSource(ROWS), allowed=OWN)
+    r = amy.put("/api/reminders/opt-out", json={"phone": "012-000 0001", "opted_out": True})
+    assert r.json() == {"phone": "60120000001", "opted_out": True}
+    family, body = ready_family(amy)
+    assert family in body["needs_staff"] and family["opted_out"] is True
+    assert family["problems"] == ["Opted out of reminders"] and family["whatsapp_allowed"] is False
+    assert amy.post("/api/reminders/opened", json=KEY).status_code == 409
+
+    amy.put("/api/reminders/opt-out", json={"phone": "60120000001", "opted_out": False})
+    family, body = ready_family(amy)
+    assert family in body["ready"] and family["opted_out"] is False
+
+
+def test_actions_need_login(session, client_for):
+    anon = client_for()
+    assert anon.post("/api/reminders/opened", json=KEY).status_code == 401
+    assert anon.post("/api/reminders/not-sent", json=KEY).status_code == 401
+    assert anon.put("/api/reminders/opt-out", json={"phone": "60120000001", "opted_out": True}).status_code == 401
