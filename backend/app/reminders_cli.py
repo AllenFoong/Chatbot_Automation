@@ -19,6 +19,7 @@ from sqlalchemy import select
 
 from .api.reminders import get_reminder_source
 from .db.models import Doctor
+from .db.reminders import opted_out_phones
 from .db.rules import load_clinic_rules
 from .db.session import new_session
 from .gpis import GpisReader
@@ -91,10 +92,11 @@ def _run(argv: list[str]) -> int:
     with new_session() as session:
         rules = load_clinic_rules(session)
         doctor_names = {d.id: d.display_name for d in session.scalars(select(Doctor))}
+        opted_out = opted_out_phones(session)
     dates = [date.fromisoformat(argv[0])] if argv else reminder_dates(clinic_today(), rules.closures)
     source = get_reminder_source()
     rows = source.reminder_appointments(min(dates), max(dates))
-    print("\n".join(summary(build_reminder_list(dates, rows, rules, doctor_names), source.label)))
+    print("\n".join(summary(build_reminder_list(dates, rows, rules, doctor_names, opted_out=opted_out), source.label)))
     return 0
 
 

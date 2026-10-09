@@ -19,7 +19,8 @@
 | `app/whatsapp.py` | WhatsApp Cloud API：检查 webhook 签名、看懂 webhook、发文字消息（只发给允许的号码） |
 | `app/whatsapp_check.py` | 检查 WhatsApp 的设定：手机传的消息为什么没送到 webhook（`python -m app.whatsapp_check`） |
 | `app/reminders.py` | 提醒名单（Phase 5b）：哪几天、哪些要提醒 / 要员工看 / 不是预约、家人合成一条、消息的文字。不连接数据库 |
-| `app/api/reminders.py` | `GET /api/reminders`：给 Reminders 页面的名单；*Open in WhatsApp* 的锁（D54） |
+| `app/api/reminders.py` | `GET /api/reminders`：给 Reminders 页面的名单；*Open in WhatsApp* 的锁（D54）；记录按过 *Open in WhatsApp*、*NO WA*（D58） |
+| `app/db/reminders.py` | `reminders` 表、号码的 opt-out：员工对提醒做过的事（名单本身不存） |
 | `app/reminders_cli.py` | 在终端印出名单的摘要（没有名字、号码）；`--check-gpis` 检查 GPiS 的栏位 |
 | `app/reminder_demo.py` | 提醒的假资料（`REMINDER_SOURCE=demo`），不连 GPiS 也能试画面 |
 | `app/webhook.py`、`app/webhook_main.py` | 收 WhatsApp webhook 的小程序（port 8001），开发时只有它经 tunnel 放上网 |
@@ -27,7 +28,7 @@
 | `app/db/demo.py` | 放假资料到 `chatbot_dev`，方便看画面（只能用在 `_dev` 数据库） |
 | `app/cli.py` | 在终端印出和 SQL 7a / 7b / 7c 一样格式的结果，方便对照 |
 | `app/phone.py` | 手机号转成国际格式（例 `60123456789`），WhatsApp 的号码和员工输入的号码才能比对 |
-| `app/db/models.py` | 本系统的 13 张表（表结构以这里为准；Phase 4 加了 `staff_sessions`，Phase 5 加了消息的送达状态） |
+| `app/db/models.py` | 本系统的 14 张表（表结构以这里为准；Phase 4 加了 `staff_sessions`，Phase 5 加了消息的送达状态、`reminders`） |
 | `app/db/seed.py` | 设置的初始值（= SQL 第 2 节 + 疗程代码）；`python -m app.db.seed` 写入 |
 | `app/db/rules.py` | 从 PostgreSQL 读设置 → `ClinicRules` |
 | `app/db/conversations.py` | 收 / 发 WhatsApp 消息、转人工、WhatsApp 24 小时规则 |
@@ -158,6 +159,8 @@ python -m app.db.demo                    # 放假资料（4 段对话、4 个预
 | `POST /api/conversations/{id}/reply` | STAFF | 经 WhatsApp 回复病人（Phase 5a）；病人最后一条消息 24 小时内才能回 |
 | `GET /api/requests`（`?status=`）、`POST /{id}/confirm`、`reject`、`cancel` | STAFF | 预约请求（默认 PENDING，先来的在前）；确认时可以填 GPiS 的 AppointmentID |
 | `GET /api/reminders`（`?date=`） | STAFF | 预约提醒的名单（Phase 5b，见下面）；不填日期 = 今天要提醒的日期 |
+| `POST /api/reminders/opened`、`not-sent`（`{date, phone}`） | STAFF | 按了 *Open in WhatsApp*（重新读 GPiS 确认还在 Ready）/ 没有发出去 |
+| `PUT /api/reminders/opt-out`（`{phone, opted_out}`） | STAFF | 这个号码不要提醒（签名表写 NO WA，D55）/ 改回照常提醒 |
 | `GET /api/doctors`、`services`、`closures`、`leaves`、`settings` | STAFF | 看设置 |
 | 上面这些设置的 `POST` / `PUT` / `PATCH` / `DELETE` | **ADMIN** | 改医生、排班（一次 7 天）、疗程、休息日、请假、每格上限 |
 | `POST /api/closures/import-holidays` | **ADMIN** | 预填一年的全国 + Johor 公共假期；农历新年多休的日子要自己加，回教节日是预估日期要核对 |
@@ -490,8 +493,8 @@ npm run dev
   - **Not appointments**：取消、OFF DAY、`00:00` 的待办，只显示数量。
 - **Open in WhatsApp**（D54）：打开 WhatsApp Desktop 里那位病人的对话，消息已经填好，员工按 Enter 发出。
   读 `GPiS_Dev` 或假资料时，**只有 `WHATSAPP_ALLOWED_RECIPIENTS` 里写出来的号码**才有这个按钮（写 `*` 也不算）。
-- 还没有做：系统自己发（要 5c）、发送记录（`reminders` 表）、opt-out。按过 *Open in WhatsApp* 只记在画面上，重新整理就没了。
-- 没有改数据库：不用 `alembic upgrade`。
+- 还没有做：系统自己发（要 5c）。按过 *Open in WhatsApp* 第一步只记在画面上；**第二步**记进 `reminders` 表、加了 *NO WA*（见下面「Phase 5b 第二步」）。
+- 第一步没有改数据库。
 
 ### 更新（Phase 5a 已经装好的电脑）
 
@@ -586,3 +589,56 @@ python -m app.reminders_cli 2026-09-02      # 拿 GPiS_Dev 的某一天当「明
 - 第一次 `reminders_cli` 还是 `GPiS_Dev`：`REMINDER_SOURCE=demo` 要写在 `backend\.env`（不是 `.env.example`），存档、重开视窗。
 - 129387 → 戴牙代码前面是 `AFTER` 的不算（D57），`pytest` 261 个。
 - **第 1–10 项全部通过。**
+
+## Phase 5b 第二步：`reminders` 表、NO WA
+
+设计见 `docs/architecture.md` 8.4、8.9，D58。
+
+- 按 **Open in WhatsApp** 会记在本系统的数据库（`reminders` 表）：谁、几点按的、填好的消息、包括哪几个 GPiS 预约。
+  换页、重新整理、另一位员工打开，卡片都显示 *Opened*，*Ready* 上方写 `Opened in WhatsApp: 3 of 24`。
+  - 按的时候后端会**重新读一次 GPiS**：那个号码已经不在 *Ready*（例：员工刚改了 GPiS）→ 显示错误，请员工 *Refresh*。
+  - 系统不知道员工最后有没有按 Enter：按错了按 **Mark as not sent**，卡片变成 *Not sent*，可以再按。
+  - 按过之后 GPiS 多了 / 少了预约（例：家人刚约了同一天）→ 卡片显示黄色提醒，请员工再看一次。
+  - 同一个号码、同一个预约日期只有一条记录（UNIQUE）：再按一次是更新同一条。
+- **NO WA: stop reminders**（*Ready*、*Needs staff* 的卡片都有）：病人在签名表的 Remark 写 `NO WA`（D55）→ 员工按一次、确认，
+  这个号码（**整个号码，家人也一起**）以后都在 *Needs staff*：`Opted out of reminders`。按 **Allow reminders again** 改回来。
+  终端的 `reminders_cli` 也会照这个设定。
+- 新的数据库栏位（migration `0004`）：`reminders` 表；`wa_contacts.reminders_opt_out_at`、`_by`（`STAFF` / 以后 5c 的 `PATIENT`）、`_staff_id`。
+- `reminders.body` 有病人名字（和 `messages` 一样）：开发时只在自己电脑的 `chatbot_dev`；保留多久见 `architecture.md` A10。
+- 日志只记员工 ID 和日期，没有名字、号码。
+
+### 更新（第一步已经装好的电脑）
+
+在 `backend` 里（先启用 venv）：
+
+```powershell
+git pull
+alembic upgrade head          # 0003 -> 0004：reminders 表、号码的 opt-out
+alembic current               # 应该是 0004 (head)
+pytest                        # 应该 272 passed，没有 skipped
+```
+
+在 `frontend` 里：`npm test` → **44 passed**；`npm run build` 成功。
+
+### Phase 5b 第二步完成的条件（在开发电脑上测试）
+
+用假资料（`.env`：`REMINDER_SOURCE=demo`、`WHATSAPP_ALLOWED_RECIPIENTS` = 自己的手机；改完 `Ctrl + C` 重开视窗 1）。
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的「更新」 | `0004 (head)`；272 passed、没有 skipped；44 passed；`✓ built` |
+| 2 | Reminders → 按 A & B 的 *Open in WhatsApp*（WhatsApp 打开后不用按 Enter） | 卡片 *Opened*，下面写 `Opened in WhatsApp by <你的名字> at …`；上方 `Opened in WhatsApp: 1 of 2` |
+| 3 | 按 `F5` 重新整理；再用另一个员工帐号（或另一个浏览器）登录看 | 还是 *Opened*、同一个名字和时间 |
+| 4 | 按 *Mark as not sent* | 卡片变成 *Not sent*，`Marked as not sent by …`；*Open in WhatsApp* 可以再按 |
+| 5 | 按 A & B 的 *NO WA: stop reminders* → 确认 | *Ready (1)*；A & B 在 *Needs staff*：`Opted out of reminders` |
+| 6 | `python -m app.reminders_cli` | A & B 那个号码在 NEEDS_STAFF：`Opted out of reminders` |
+| 7 | *Needs staff* 里按 *Allow reminders again* → 确认 | 回到 *Ready (2)* |
+| 8 | 视窗 1 的 uvicorn 日志 | 没有病人名字、号码 |
+
+测完把 `REMINDER_SOURCE` 删掉，`Ctrl + C` 重开视窗 1。读 `GPiS_Dev` 时没有 *Open in WhatsApp*，但 *NO WA* 可以试（会记在 `chatbot_dev`；试完按 *Allow reminders again* 改回来）。
+
+### 云端容器的测试记录（2026-10-09，PostgreSQL 16、只用假资料、没有 GPiS）
+
+- `pytest` → 272 passed（新增 11 个：`reminders` 的 UNIQUE、opt-out 的约束、按两次只有一条、按过后 GPiS 改了、不在 *Ready* / 不在允许名单拒绝、*Not sent*、*NO WA* 和改回来）。
+- `npm test` → 44 passed；`npm run build` 成功。
+- 用 headless Chromium 连 `npm run dev` + `uvicorn`（`REMINDER_SOURCE=demo`、migration 0004）：第 2–5、7 项都对；重新整理后还是 *Opened*；uvicorn 日志没有名字和号码。

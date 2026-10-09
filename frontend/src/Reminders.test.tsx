@@ -1,9 +1,17 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { whatsappLink } from "./pages/RemindersPage";
 import { STAFF, err, fakeApi, fakeReminderList, ok } from "./test/fakeApi";
+import type { ReminderRecord } from "./types";
 import { renderApp } from "./test/render";
+
+const OPENED: ReminderRecord = {
+  status: "OPENED",
+  updated_at: "2026-10-08T02:05:00Z",
+  staff_name: "Amy Tan",
+  changed: false,
+};
 
 const base = {
   "GET /api/auth/me": ok(STAFF),
@@ -16,11 +24,18 @@ function blockWhatsAppLinks(e: MouseEvent) {
   if ((e.target as Element | null)?.closest?.('a[href^="whatsapp:"]')) e.preventDefault();
 }
 beforeEach(() => document.addEventListener("click", blockWhatsAppLinks));
-afterEach(() => document.removeEventListener("click", blockWhatsAppLinks));
+afterEach(() => {
+  document.removeEventListener("click", blockWhatsAppLinks);
+  vi.restoreAllMocks();
+});
 
 describe("reminders", () => {
   it("shows the family as one message with Open in WhatsApp", async () => {
-    fakeApi({ ...base, "GET /api/reminders": ok(fakeReminderList()) });
+    const { calls } = fakeApi({
+      ...base,
+      "GET /api/reminders": ok(fakeReminderList()),
+      "POST /api/reminders/opened": ok(OPENED),
+    });
     renderApp("/reminders");
     expect(await screen.findByRole("heading", { name: "Reminders" })).toBeInTheDocument();
     expect(await screen.findByText(/Preview only: this list is read from GPiS_Dev/)).toBeInTheDocument();
@@ -35,8 +50,81 @@ describe("reminders", () => {
     );
 
     await userEvent.setup().click(open);
-    expect(within(card).getByText("Opened")).toBeInTheDocument();
+    expect(await within(card).findByText("Opened")).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "Open in WhatsApp again" })).toBeInTheDocument();
+    expect(within(card).getByText(/Opened in WhatsApp by Amy Tan/)).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "POST")).toEqual({
+      method: "POST",
+      path: "/api/reminders/opened",
+      body: { date: "2026-10-09", phone: "60120000001" },
+    });
+  });
+
+  it("shows what another staff did and can mark it as not sent", async () => {
+    const list = fakeReminderList();
+    list.ready = list.ready.map((g) => ({ ...g, record: { ...OPENED, changed: true } }));
+    fakeApi({
+      ...base,
+      "GET /api/reminders": ok(list),
+      "POST /api/reminders/not-sent": ok({ ...OPENED, status: "NOT_SENT" }),
+    });
+    renderApp("/reminders");
+    const card = (await screen.findByText("DEMO PATIENT A & DEMO PATIENT B")).closest("li")!;
+    expect(within(card).getByText("Opened")).toBeInTheDocument();
+    expect(screen.getByText("Opened in WhatsApp: 1 of 1")).toBeInTheDocument();
+    expect(within(card).getByText(/GPiS changed after this was opened/)).toBeInTheDocument();
+
+    await userEvent.setup().click(within(card).getByRole("button", { name: "Mark as not sent" }));
+    expect(await within(card).findByText("Not sent")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Open in WhatsApp" })).toBeInTheDocument();
+    expect(within(card).getByText(/Marked as not sent by Amy Tan/)).toBeInTheDocument();
+  });
+
+  it("shows the error when opening cannot be recorded", async () => {
+    fakeApi({
+      ...base,
+      "GET /api/reminders": ok(fakeReminderList()),
+      "POST /api/reminders/opened": err(409, "This reminder is not ready any more. Refresh the list."),
+    });
+    renderApp("/reminders");
+    const card = (await screen.findByText("DEMO PATIENT A & DEMO PATIENT B")).closest("li")!;
+    await userEvent.setup().click(within(card).getByRole("link", { name: "Open in WhatsApp" }));
+    expect(await within(card).findByRole("alert")).toHaveTextContent("not ready any more");
+    expect(within(card).queryByText("Opened")).not.toBeInTheDocument();
+  });
+
+  it("stops reminders for a number after NO WA and can allow them again", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    let optedOut = false;
+    const listNow = () => {
+      const list = fakeReminderList();
+      if (!optedOut) return list;
+      const family = { ...list.ready[0], opted_out: true, whatsapp_allowed: false, problems: ["Opted out of reminders"] };
+      return { ...list, ready: [], needs_staff: [family, ...list.needs_staff] };
+    };
+    const { calls } = fakeApi({
+      ...base,
+      "GET /api/reminders": () => ok(listNow()),
+      "PUT /api/reminders/opt-out": (body) => {
+        optedOut = (body as { opted_out: boolean }).opted_out;
+        return ok(body);
+      },
+    });
+    renderApp("/reminders");
+    const user = userEvent.setup();
+    const card = (await screen.findByText("DEMO PATIENT A & DEMO PATIENT B")).closest("li")!;
+    await user.click(within(card).getByRole("button", { name: "NO WA: stop reminders" }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Stop reminders for +60120000001?"));
+    expect(await screen.findByRole("tab", { name: "Ready (0)" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Needs staff (2)" }));
+    expect(screen.getByText("Opted out of reminders")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Allow reminders again" }));
+    expect(await screen.findByRole("tab", { name: "Ready (1)" })).toBeInTheDocument();
+    expect(calls.filter((c) => c.method === "PUT").map((c) => c.body)).toEqual([
+      { phone: "60120000001", opted_out: true },
+      { phone: "60120000001", opted_out: false },
+    ]);
   });
 
   it("hides Open in WhatsApp when the server does not allow it", async () => {

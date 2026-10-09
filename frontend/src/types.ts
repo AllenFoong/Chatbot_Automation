@@ -156,6 +156,17 @@ export interface ReminderLine {
   problems: string[];
 }
 
+export type ReminderStatus = "OPENED" | "NOT_SENT";
+
+/** 员工对这条提醒做过什么（后端的 reminders 表） */
+export interface ReminderRecord {
+  status: ReminderStatus;
+  updated_at: string;
+  staff_name: string | null;
+  /** 按过之后 GPiS 多了 / 少了预约：要再看一次 */
+  changed: boolean;
+}
+
 /** 发给一个号码的一条提醒（同一天）。没有号码的病人各自一组。 */
 export interface ReminderGroup {
   key: string;
@@ -167,6 +178,9 @@ export interface ReminderGroup {
   message: string | null;
   /** 能不能显示 Open in WhatsApp（D54：只有读主机的 GPiS，或允许名单里的号码） */
   whatsapp_allowed: boolean;
+  /** 这个号码不要提醒（签名表写 NO WA，D55） */
+  opted_out: boolean;
+  record: ReminderRecord | null;
 }
 
 export interface ReminderList {

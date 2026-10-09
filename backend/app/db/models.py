@@ -6,8 +6,10 @@
    wa_contacts（一个 WhatsApp 号码）→ conversations（一段对话）→ messages（每条消息）
    customers（一位病人）← appointment_requests（预约请求，员工确认后手动录入 GPiS，D6）
    staff（员工账号）
+3. 预约提醒（Phase 5b）
+   reminders（一个号码、一个预约日期的提醒）；wa_contacts 上记这个号码要不要提醒（opt-out）
 
-第 2 部分会存病人资料（名字、电话、消息内容）：开发和测试只用假数据（CLAUDE.md 规则 4）。
+第 2、3 部分会存病人资料（名字、电话、消息内容）：开发和测试只用假数据（CLAUDE.md 规则 4）。
 """
 
 from __future__ import annotations
@@ -16,7 +18,11 @@ import enum
 import uuid
 from datetime import date, datetime, time
 
-from sqlalchemy import CheckConstraint, Enum, ForeignKey, Index, SmallInteger, String, Text, false, func, text, true
+from sqlalchemy import (
+    CheckConstraint, Enum, ForeignKey, Index, Integer, SmallInteger, String, Text, UniqueConstraint, false, func, text,
+    true,
+)
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -48,6 +54,17 @@ class RequestStatus(enum.StrEnum):
     CONFIRMED = "CONFIRMED"    # 员工确认，录入 GPiS
     REJECTED = "REJECTED"      # 员工拒绝
     CANCELLED = "CANCELLED"    # 病人取消
+
+
+class ReminderStatus(enum.StrEnum):
+    """一条提醒走到哪一步。现在只有员工按 Open in WhatsApp（D54）；系统自己发要等 5c，到时再加 SENDING、ACCEPTED 等。"""
+    OPENED = "OPENED"          # 员工按了 Open in WhatsApp（系统不知道最后有没有按 Enter）
+    NOT_SENT = "NOT_SENT"      # 员工说没有发出去（按错、病人刚打电话来等）
+
+
+class OptOutBy(enum.StrEnum):
+    PATIENT = "PATIENT"        # 病人自己说不要（5c 之后：回 STOP）
+    STAFF = "STAFF"            # 员工标记（例：签名表的 Remark 写 NO WA，D55）
 
 
 class StaffRole(enum.StrEnum):
@@ -225,11 +242,20 @@ class WaContact(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     wa_phone: Mapped[str] = mapped_column(String(20), unique=True)     # 国际格式、只有数字，例 60123456789
     profile_name: Mapped[str | None] = mapped_column(String(100))      # 病人在 WhatsApp 上自己设的名字
+    # 这个号码不要预约提醒（整个号码，家人也一起，D46）；NULL = 照常提醒
+    reminders_opt_out_at: Mapped[datetime | None]
+    reminders_opt_out_by: Mapped[OptOutBy | None] = mapped_column(_enum(OptOutBy, "opt_out_by"))
+    reminders_opt_out_staff_id: Mapped[int | None] = mapped_column(ForeignKey("staff.id"))   # 哪位员工标记的
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     conversations: Mapped[list[Conversation]] = relationship(back_populates="wa_contact")
 
-    __table_args__ = (CheckConstraint("wa_phone ~ '^[0-9]{8,15}$'", name="wa_phone_digits"),)
+    __table_args__ = (
+        CheckConstraint("wa_phone ~ '^[0-9]{8,15}$'", name="wa_phone_digits"),
+        CheckConstraint("(reminders_opt_out_at IS NULL) = (reminders_opt_out_by IS NULL)", name="opt_out_together"),
+        CheckConstraint("reminders_opt_out_staff_id IS NULL OR reminders_opt_out_by = 'STAFF'",
+                        name="opt_out_staff_only_for_staff"),
+    )
 
 
 class Customer(Base):
@@ -335,4 +361,37 @@ class AppointmentRequest(Base):
         _on_grid("preferred_slot"),
         CheckConstraint("duration_minutes > 0 AND mod(duration_minutes, 30) = 0", name="duration"),
         CheckConstraint("(status = 'PENDING') = (handled_at IS NULL)", name="handled_at"),
+    )
+
+
+# ====================================================================
+# 3. 预约提醒（Phase 5b，docs/architecture.md 第 8 节）
+# ====================================================================
+
+class Reminder(Base):
+    """一个号码、一个预约日期的提醒（家人合成一条，D49）。
+
+    名单本身每次都从 GPiS 重新算，不存；这里只记员工做过什么（按过 Open in WhatsApp、没有发出去），
+    换页、重新整理、两位员工同时看，都看得到，避免同一个号码发两次。
+    """
+
+    __tablename__ = "reminders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    appointment_date: Mapped[date]
+    wa_phone: Mapped[str] = mapped_column(String(20))                  # 国际格式、只有数字
+    status: Mapped[ReminderStatus] = mapped_column(_enum(ReminderStatus, "reminder_status"))
+    body: Mapped[str] = mapped_column(Text)                            # 打开时填好的消息（有病人名字）
+    # 这条提醒包括哪几个 GPiS 预约：之后 GPiS 多了、少了预约，页面会提醒员工再看一次
+    gpis_appointment_ids: Mapped[list[int]] = mapped_column(ARRAY(Integer))
+    staff_id: Mapped[int | None] = mapped_column(ForeignKey("staff.id"))   # 最后改状态的员工
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    staff: Mapped[Staff | None] = relationship()
+
+    __table_args__ = (
+        # 同一个号码、同一个预约日期只有一条（D45）：再按一次是更新这一条
+        UniqueConstraint("appointment_date", "wa_phone"),
+        CheckConstraint("wa_phone ~ '^[0-9]{8,15}$'", name="wa_phone_digits"),
     )
