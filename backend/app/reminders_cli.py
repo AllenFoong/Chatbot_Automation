@@ -3,7 +3,7 @@
 用法（在 backend/ 里）：
     python -m app.reminders_cli                 今天要提醒的日期（明天；假期前连后天）
     python -m app.reminders_cli 2026-09-02      指定预约日期（开发时拿 GPiS_Dev 的某一天当「明天」）
-    python -m app.reminders_cli --check-gpis    检查 GPiS 有没有名单要用的栏位（只印栏位名字）
+    python -m app.reminders_cli --check-gpis    检查 GPiS 有没有名单要用的栏位（只印栏位名字）、帐号是不是只读的
 
 预约读 GPiS（或 REMINDER_SOURCE=demo 的假资料），诊所设置读本系统的 PostgreSQL。
 输出**没有病人名字、电话号码、Remarks**（D44）：号码只印代号（#1、#2 … 同一个号码同一个代号）和种类。
@@ -22,7 +22,7 @@ from .db.models import Doctor
 from .db.reminders import opted_out_phones
 from .db.rules import load_clinic_rules
 from .db.session import new_session
-from .gpis import GpisReader
+from .gpis import GpisReader, NotReadOnlyError, permission_problems
 from .reminders import ReminderList, build_reminder_list, clinic_today, reminder_dates
 
 
@@ -65,13 +65,30 @@ def check_gpis() -> int:
     if not isinstance(source, GpisReader):
         print("REMINDER_SOURCE=demo：不连 GPiS，没有东西要检查。")
         return 0
-    missing = source.missing_columns()
+    try:
+        missing = source.missing_columns()
+        perms = source.permissions()
+    except NotReadOnlyError as e:
+        print(f"[!!] {e}")
+        print("     GPIS_CONNECTION_STRING 要用只读帐号（UID=chatbot_reader），见 sql/README.md「只读帐号」。")
+        return 1
     if missing:
         print("[!!] GPiS 少了这些栏位（把这几行贴回来，程序要改）：")
         for m in missing:
             print(f"     {m}")
         return 1
     print(f"[OK] {source.label} 有提醒名单要用的全部栏位。")
+
+    problems, warnings = permission_problems(perms)
+    if problems:
+        print(f"[!!] 帐号 {perms.LoginName} 不是只读的：")
+        for p in problems:
+            print(f"     {p}")
+        print("     读主机的 GPiS 时系统会拒绝。开发电脑用 Windows 帐号（Trusted_Connection）连 GPiS_Dev 时，看到这个是正常的。")
+        return 1 if source.is_production else 0
+    print(f"[OK] 帐号 {perms.LoginName} 是只读的：读得到预约，读不到 Tbl_User，不能写。")
+    for w in warnings:
+        print(f"[提醒] {w}")
     return 0
 
 

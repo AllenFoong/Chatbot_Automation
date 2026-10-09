@@ -73,14 +73,17 @@
 - [x] Phase 5b 第二步程序：`reminders` 表（按过 Open in WhatsApp 记下来、*Mark as not sent*、按过之后 GPiS 改了会提醒）+ *NO WA*（号码 opt-out，D55）；migration `0004`（D58）；云端 `pytest` 272 个、Vitest 44 个通过，headless Chromium 用假资料点过
 - [x] Phase 5b 第二步：开发电脑测试 8 项全部通过（`0004 (head)`、`pytest` 272 个、`npm test` 44 个，2026-10-09；记录见 `backend/README.md`）
 - [x] Phase 5b 第二步合并进 `main`（PR #14）
+- [x] W51：柜台另一台的 GPiS 用 `sa` 经局域网连 `<主机A的IP>\SQLEXPRESS` → A 不用改设定，只要加只读帐号
+- [x] 只读帐号脚本：`sql/create_readonly_login.sql`、`drop_readonly_login.sql`；读主机的 `GPiS` 时帐号不是只读就拒绝（D59）；`--check-gpis` 检查帐号；云端 `pytest` 289 个（SQL 脚本在云端没有 SQL Server 可以跑）
+- [ ] 只读帐号：开发电脑测试（`sql/README.md`「只读帐号」第一步）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. 下次去诊所：看柜台另一台电脑的 Windows 版本、内存、硬盘，和 `GPiS.exe.config` 的 `Database.Server` 那一行（W51，不看密码那一行）；问 W54、W55。拍表格、画面时只拍空白的，或先遮住手写的部分（规则 4）。
-2. 5b：下一步是 D52 只读帐号的脚本（先在开发电脑试），再装到柜台另一台电脑试跑（D53），员工照旧手动发、同时对照名单 1–2 星期（W42）。第一版模板没有按钮（D48）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
+1. 下次去诊所：看柜台另一台电脑的 Windows 版本、内存、硬盘（`Database.Server` 已经看了）；问 W54、W55。拍表格、画面时只拍空白的，或先遮住手写的部分（规则 4）。
+2. 5b：开发电脑照 `sql/README.md`「只读帐号」第一步测试（D59）；之后装到柜台另一台电脑试跑（D53），那时才在主机 A 建帐号（第二步），员工照旧手动发、同时对照名单 1–2 星期（W42）。第一版模板没有按钮（D48）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
 3. 员工按「Open in WhatsApp」发，只要 A1 做好（第 4 点）。系统用模板自动发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（读主机的实时预约）、病人同意（W40、D46）。
 4. A1：5b 先把本系统装在柜台另一台电脑（D53），主机 A 的只读帐号照 D52 做（脚本先在开发电脑试）。Phase 6 之前决定长期放哪里（W54、`docs/architecture.md` 9.4）。
 5. 上线前：用 Admin Platform（*Settings → Clinic closures*）导入公共假期、补上农历新年多休的日子（`clinic_closures` 现在是空的；提醒也要靠它决定假期前提早发）。

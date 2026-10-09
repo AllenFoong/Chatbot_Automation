@@ -539,7 +539,7 @@ wa_contacts  + reminders_opt_out_at, reminders_opt_out_by (PATIENT / STAFF), rem
 - 本系统**直接读 SQL Server，不经 GPiS 程序**：不用登录 GPiS、不碰 System Manager；但 A 要开着、SQL Server 服务要在跑。
   **A 24 小时开着**，其他电脑下班会关（2026-10-08）→ 晚上、假期也读得到。只有停电、A 重开时读不到（W49）：AI 转人工、提醒页面显示读不到。
 - 从另一台电脑连主机的数据库，主机的 SQL Server Express 要接受局域网的连线（TCP/IP），防火墙只让那一台电脑进来。
-  柜台另一台的 GPiS 如果是直接连 A 的数据库，A 应该**已经开放给局域网**了，主机要改的就只剩只读帐号（W51：诊所同意让我们看另一台 `GPiS.exe.config` 的 `Database.Server` 那一行，下次去诊所看）。
+  柜台另一台的 GPiS 如果是直接连 A 的数据库，A 应该**已经开放给局域网**了，主机要改的就只剩只读帐号（W51，2026-10-09 确认：另一台的 `Database.Server` 是 `<主机A的IP>\SQLEXPRESS`，用 `sa` 连，D59）。
 - **诊所同意在 A 开只读帐号**，条件是不能让 GPiS 出问题（W52，D52）。GPiS 自己用 `sa` 登入，表示 A 的 SQL Server 已经开了 SQL 帐号登入：建帐号**不用改登入方式、不用重开 SQL Server**，GPiS 不会停。
   只有 A 还没开放给局域网、要改 TCP/IP 时才要重开 SQL Server 服务（GPiS 会断一下）→ 只在下班后、没有人用 GPiS 时做。
 - 诊所不常停电、不常断网；真的停电，A 要员工手动开机（W49、W50）。
@@ -605,8 +605,9 @@ wa_contacts  + reminders_opt_out_at, reminders_opt_out_by (PATIENT / STAFF), rem
 
 **装上去之前要做的**：
 
-- 去诊所时看柜台另一台电脑：Windows 版本、内存、硬盘空间（装 Python、PostgreSQL 够不够），和 `GPiS.exe.config` 的 `Database.Server` 那一行（W51，**不看密码那一行**）。
+- 去诊所时看柜台另一台电脑：Windows 版本、内存、硬盘空间（装 Python、PostgreSQL 够不够），（`GPiS.exe.config` 的 `Database.Server` 已经看了，W51）。
 - 主机 A：建只读帐号（D52）。脚本先在开发电脑的 SQL Server 上试（建帐号、只给预约相关的表和视图、确认读不到 `Tbl_User`、确认不能写），诊所同意后才在 A 上执行。
+  已经写好：`sql/create_readonly_login.sql`，步骤见 `sql/README.md`「只读帐号」（D59）。W51：另一台的 GPiS 已经经局域网连 A（`<主机A的IP>\SQLEXPRESS`），A 不用改设定。
 - 本系统在那台电脑上开机自动启动；PostgreSQL 每天备份，备份要加密（数据安全规则）。
 - 要发消息时（5c 之后）：webhook 用 Cloudflare 的 **named tunnel**（固定网址，要一个域名）；开发用的 quick tunnel 每次重开网址都会变，不能上线用。
 - 网页在局域网也用 https（登录 cookie，D26）。
