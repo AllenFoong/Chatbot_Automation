@@ -642,3 +642,7 @@ pytest                        # 应该 272 passed，没有 skipped
 - `pytest` → 272 passed（新增 11 个：`reminders` 的 UNIQUE、opt-out 的约束、按两次只有一条、按过后 GPiS 改了、不在 *Ready* / 不在允许名单拒绝、*Not sent*、*NO WA* 和改回来）。
 - `npm test` → 44 passed；`npm run build` 成功。
 - 用 headless Chromium 连 `npm run dev` + `uvicorn`（`REMINDER_SOURCE=demo`、migration 0004）：第 2–5、7 项都对；重新整理后还是 *Opened*；uvicorn 日志没有名字和号码。
+
+### 开发电脑的测试记录（2026-10-09）
+
+- 第 1–8 项全部通过：`0004 (head)`、`pytest` 272 passed、`npm test` 44 passed、`npm run build` 成功；假资料的 *Opened*、重新整理和另一个帐号、*Mark as not sent*、*NO WA*、`reminders_cli`、*Allow reminders again* 都正常；日志没有名字和号码。
