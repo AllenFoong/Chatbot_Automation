@@ -23,7 +23,7 @@
 柜台另一台电脑 **B**（不是主机 A；`Counter.Name` = `Counter 1`）的 `GPiS.exe.config`（W51，2026-10-09）：`Database.Server` = `<主机A的IP>\SQLEXPRESS`、
 `Database.Name` = `GPiS`、`Database.User` = `sa`、`System Manager.IP` = 主机 A、端口 `30001`。
 → B 的 GPiS 经局域网连 A 的数据库：A 的 SQL Server 已经开放给局域网（具名实例）、已经开了 SQL 帐号登入；本系统用只读帐号 `chatbot_reader` 连同一个地方（D52、D59，`sql/README.md`「只读帐号」）。
-「A 先登录 GPiS，另一台才能登录」应该是因为 System Manager 服务在 A 上。
+已确认 `Database.Server` 的 IP 就是主机 A（2026-10-09）。「A 先登录 GPiS，另一台才能登录」应该是因为 System Manager 服务在 A 上。
 
 ## 2. 主机上的数据库
 
