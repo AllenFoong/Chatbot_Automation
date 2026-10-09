@@ -1,7 +1,7 @@
 // 测试用的假后端：把 fetch 换掉，按 "方法 网址" 回传假资料。全部是假名字、假号码。
 
 import { vi } from "vitest";
-import type { AppointmentRequest, Conversation, ConversationDetail, StaffMember } from "../types";
+import type { AppointmentRequest, Conversation, ConversationDetail, ReminderList, StaffMember } from "../types";
 
 type Reply = { status: number; body?: unknown };
 type Handler = (body: unknown) => Reply;
@@ -88,6 +88,51 @@ export function fakeConversation(overrides: Partial<ConversationDetail> = {}): C
     ],
     // 24 小时规则：默认还能回复（20 小时后才截止）
     reply_window_ends_at: new Date(Date.now() + 20 * 3600_000).toISOString(),
+    ...overrides,
+  };
+}
+
+/** 提醒名单：一组可以发（两位家人合成一条）、一组要员工看（没有 *C）。 */
+export function fakeReminderList(overrides: Partial<ReminderList> = {}): ReminderList {
+  return {
+    dates: ["2026-10-09"],
+    suggested_dates: ["2026-10-09"],
+    source: "GPiS_Dev",
+    production: false,
+    read_at: "2026-10-08T02:00:00Z",
+    ready: [
+      {
+        key: "2026-10-09:1",
+        date: "2026-10-09",
+        phone: "60120000001",
+        phone_kind: "MY_MOBILE",
+        lines: [
+          { appointment_ids: [1], time: "10:00", doctor_id: "PHANG", doctor_name: "PHANG", patient_name: "DEMO PATIENT A", status: "Confirmed", problems: [] },
+          { appointment_ids: [2], time: "10:30", doctor_id: "GOH", doctor_name: "GOH", patient_name: "DEMO PATIENT B", status: "Confirmed", problems: [] },
+        ],
+        problems: [],
+        message: "NAME: DEMO PATIENT A & DEMO PATIENT B\nTIME: 10:00 AM & 10:30 AM",
+        whatsapp_allowed: true,
+      },
+    ],
+    needs_staff: [
+      {
+        key: "2026-10-09:3",
+        date: "2026-10-09",
+        phone: "6591234567",
+        phone_kind: "SG_MOBILE",
+        lines: [
+          { appointment_ids: [3], time: "11:00", doctor_id: "PHANG", doctor_name: "PHANG", patient_name: "DEMO PATIENT C", status: "Confirmed", problems: ["Lab work not marked as arrived (*C)"] },
+        ],
+        problems: ["Lab work not marked as arrived (*C)"],
+        message: "NAME: DEMO PATIENT C",
+        whatsapp_allowed: false,
+      },
+    ],
+    not_appointments: [
+      { reason: "Cancelled or postponed", count: 2 },
+      { reason: "To-do at 00:00", count: 1 },
+    ],
     ...overrides,
   };
 }

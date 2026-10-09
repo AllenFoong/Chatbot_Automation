@@ -52,7 +52,7 @@
 | `AppointmentDate` | datetime | NO | 是否带时间待确认 |
 | `TimeSlot` | nvarchar(10) | YES | 文字，如 `"10:30"` |
 | `ContactID` | int | YES | → `Tbl_CAH_Contact.ContactID` |
-| `ContactName` | nvarchar(100) | YES | 病人名字（冗余存储） |
+| `ContactName` | nvarchar(100) | YES | 病人名字（冗余存储）；有的名字后面带着 `(P)`（开发电脑测试 5b 时看到，2026-10-09）；最后的 `(P)`、`(G)` 提醒里拿掉（D56） |
 | `DoctorID` | nvarchar(20) | YES | → `Qry_CAH_Resource_Sch.Id` |
 | `DoctorName` | nvarchar(100) | YES | |
 | `AssignedBy` | nvarchar(100) | YES | 登记的员工 |

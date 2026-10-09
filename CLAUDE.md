@@ -13,7 +13,7 @@
 | [`docs/decisions.md`](docs/decisions.md) | 做过的决定和原因、数据安全规则 |
 | [`docs/clinic-workflow.md`](docs/clinic-workflow.md) | 营业时间、医生排班、staff 如何使用 GPiS 预约、Remarks 治疗代码、待确认问题 |
 | [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
-| [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API；Phase 3：PostgreSQL（安装、建表、改表结构的步骤）；Phase 4a：员工登录、Admin API；Phase 5a：WhatsApp（Meta 测试 App、tunnel、测试清单）；对照步骤 |
+| [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API；Phase 3：PostgreSQL（安装、建表、改表结构的步骤）；Phase 4a：员工登录、Admin API；Phase 5a：WhatsApp（Meta 测试 App、tunnel、测试清单）；Phase 5b：预约提醒（名单、Open in WhatsApp、测试清单）；对照步骤 |
 | [`frontend/README.md`](frontend/README.md) | Phase 4b：Admin Platform 网页（React + TypeScript）：安装、启动、测试清单 |
 
 开始新 session 时先读这四个文件。
@@ -63,15 +63,20 @@
 - [x] A1 方案比较草稿（`docs/architecture.md` 第 9 节）：建议先在诊所放一台专用小电脑跑本系统，经局域网只读读主机
 - [x] 第二轮问卷整理好（中英对照，在 claude.ai 上）：W40a–d（病人同意，附登记表例句）、W46–W47（提醒）、W48–W53（A1）；已知柜台 2 台电脑，主机 A 24 小时开着
 - [x] 诊所回答第二轮问卷（2026-10-08）：诊所不能放新电脑 → 5b 先装在柜台另一台电脑（D53）；同意在主机 A 开只读帐号（D52）；`VENEER` 也要 `*C`（D51）；旧病人的同意是「告知」不是「问同意」，要请律师看（`architecture.md` 8.8）
-- [ ] 等诊所：W40b（空白登记表的照片）、W54（柜台另一台可不可以一直装着、不关机）
+- [x] W40b：纸本是每天一张、所有病人一起签的签名表，没有写 WhatsApp → 在签名表加一句 WhatsApp 的同意，不同意的写 `NO WA`（D55）
+- [ ] 等诊所：W54（柜台另一台可不可以一直装着、不关机）、W55（签名表加那一句）
+- [x] Phase 5b 第一步程序：Reminders 页面（只看名单）+ Open in WhatsApp（`backend/app/reminders.py`、`api/reminders.py`、`reminders_cli.py`，`frontend/src/pages/RemindersPage.tsx`）；没有改数据库；云端 `pytest` 255 个、Vitest 41 个通过，headless Chromium 用假资料点过，全部假数据
+- [x] Phase 5b 第一步：开发电脑测试第 1–10 项全部通过（`--check-gpis` OK、4 个测试日期和以前的结果一致、假资料的 Open in WhatsApp 正常，2026-10-09；记录见 `backend/README.md`）
+- [x] 测试时找到 `C/UP AFTER ISSUE DENTURE`（装好之后的检查）被当成要等技工所 → `AFTER` 后面的戴牙代码不算（D57）；`pytest` 261 个
+- [x] GPiS 的名字后面有的带 `(P)`：名单和消息里拿掉最后的 `(P)`、`(G)`（D56）；`pytest` 257 个
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
 
 ## 下一步
 
-1. 下次去诊所：看柜台另一台电脑的 Windows 版本、内存、硬盘，和 `GPiS.exe.config` 的 `Database.Server` 那一行（W51，不看密码那一行）；收 W40b 的空白登记表照片（确认上面没有病人资料）。
-2. 写 5b 的程序：先做「只看名单、不发送」（preview：拿 `GPiS_Dev` 的某一天当「明天」），再加「Open in WhatsApp」（D54：读 `GPiS_Dev` 时不显示）；第一版模板没有按钮（D48）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
+1. 下次去诊所：看柜台另一台电脑的 Windows 版本、内存、硬盘，和 `GPiS.exe.config` 的 `Database.Server` 那一行（W51，不看密码那一行）；问 W54、W55。拍表格、画面时只拍空白的，或先遮住手写的部分（规则 4）。
+2. 5b：开发电脑 `git pull` 后 `pytest` 应该 261 个，然后合并 PR #13。之后：`reminders` 表（记录按过 Open in WhatsApp、opt-out），再装到柜台另一台电脑试跑（D52 只读帐号、D53）。第一版模板没有按钮（D48）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
 3. 员工按「Open in WhatsApp」发，只要 A1 做好（第 4 点）。系统用模板自动发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（读主机的实时预约）、病人同意（W40、D46）。
 4. A1：5b 先把本系统装在柜台另一台电脑（D53），主机 A 的只读帐号照 D52 做（脚本先在开发电脑试）。Phase 6 之前决定长期放哪里（W54、`docs/architecture.md` 9.4）。
 5. 上线前：用 Admin Platform（*Settings → Clinic closures*）导入公共假期、补上农历新年多休的日子（`clinic_closures` 现在是空的；提醒也要靠它决定假期前提早发）。

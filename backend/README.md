@@ -1,4 +1,4 @@
-# Backend（Phase 2：空档 API；Phase 3：本系统的 PostgreSQL；Phase 4a：Admin Platform 的 API；Phase 5a：WhatsApp）
+# Backend（Phase 2：空档 API；Phase 3：本系统的 PostgreSQL；Phase 4a：Admin Platform 的 API；Phase 5a：WhatsApp；Phase 5b：预约提醒）
 
 - **Phase 2**：把 `sql/check_available_slots.sql` 的计算搬到 Python（FastAPI），让之后的 WhatsApp 和 AI Agent 可以调用。
   **只读** GPiS，计算规则和 SQL 完全一样；改规则时两边要一起改。
@@ -6,6 +6,7 @@
   每张表的说明见 [`docs/architecture.md`](../docs/architecture.md) 第 4 节。
 - **Phase 4a**：员工登录 + Admin Platform 要用的 API（`/api/...`）。网页（4b）在 [`frontend/`](../frontend/README.md)。
 - **Phase 5a**：接上 WhatsApp Cloud API：收病人的消息（webhook）、员工在 Admin Platform 回复、显示送达状态。开发时只用 Meta 的测试号码。
+- **Phase 5b**（第一步）：预约提醒的名单（只看名单）+ *Open in WhatsApp*，见下面「Phase 5b」。
 
 | 文件 | 内容 |
 |---|---|
@@ -17,6 +18,10 @@
 | `app/api/` | Admin API：登录、对话、预约请求、设置（医生、排班、疗程、假期、请假）、员工账号 |
 | `app/whatsapp.py` | WhatsApp Cloud API：检查 webhook 签名、看懂 webhook、发文字消息（只发给允许的号码） |
 | `app/whatsapp_check.py` | 检查 WhatsApp 的设定：手机传的消息为什么没送到 webhook（`python -m app.whatsapp_check`） |
+| `app/reminders.py` | 提醒名单（Phase 5b）：哪几天、哪些要提醒 / 要员工看 / 不是预约、家人合成一条、消息的文字。不连接数据库 |
+| `app/api/reminders.py` | `GET /api/reminders`：给 Reminders 页面的名单；*Open in WhatsApp* 的锁（D54） |
+| `app/reminders_cli.py` | 在终端印出名单的摘要（没有名字、号码）；`--check-gpis` 检查 GPiS 的栏位 |
+| `app/reminder_demo.py` | 提醒的假资料（`REMINDER_SOURCE=demo`），不连 GPiS 也能试画面 |
 | `app/webhook.py`、`app/webhook_main.py` | 收 WhatsApp webhook 的小程序（port 8001），开发时只有它经 tunnel 放上网 |
 | `app/db/create_staff.py` | 建员工账号（第一个 ADMIN 用这个建） |
 | `app/db/demo.py` | 放假资料到 `chatbot_dev`，方便看画面（只能用在 `_dev` 数据库） |
@@ -152,6 +157,7 @@ python -m app.db.demo                    # 放假资料（4 段对话、4 个预
 | `POST /api/conversations/{id}/take-over`、`hand-back`、`close` | STAFF | 接手（AI 停止回复）、交回 AI、结束 |
 | `POST /api/conversations/{id}/reply` | STAFF | 经 WhatsApp 回复病人（Phase 5a）；病人最后一条消息 24 小时内才能回 |
 | `GET /api/requests`（`?status=`）、`POST /{id}/confirm`、`reject`、`cancel` | STAFF | 预约请求（默认 PENDING，先来的在前）；确认时可以填 GPiS 的 AppointmentID |
+| `GET /api/reminders`（`?date=`） | STAFF | 预约提醒的名单（Phase 5b，见下面）；不填日期 = 今天要提醒的日期 |
 | `GET /api/doctors`、`services`、`closures`、`leaves`、`settings` | STAFF | 看设置 |
 | 上面这些设置的 `POST` / `PUT` / `PATCH` / `DELETE` | **ADMIN** | 改医生、排班（一次 7 天）、疗程、休息日、请假、每格上限 |
 | `POST /api/closures/import-holidays` | **ADMIN** | 预填一年的全国 + Johor 公共假期；农历新年多休的日子要自己加，回教节日是预估日期要核对 |
@@ -473,3 +479,110 @@ npm run dev
 - 设定检查：System User 的 token 不能自己问 `debug_token`，改用 App 的身份再问；失效时间超过 2 天显示天数；找不到 WABA 时印出 token 看得到哪些 WABA；token 没列出 WABA（System User 的 token 常常这样）时跳过订阅那一项，不算 `[!!]`。云端 `pytest` → 183 passed。
 
 结论：Phase 5a 完成。
+
+## Phase 5b：预约提醒（第一步：只看名单、Open in WhatsApp）
+
+设计见 [`docs/architecture.md`](../docs/architecture.md) 第 8 节、D40–D54。这一步做的是上线三步里的第 1、2 步（8.1）：
+
+- Admin Platform 多了 **Reminders** 页面：系统从 GPiS 读「明天」的预约（明天放假就连后天，W34），排好名单。
+  - **Ready**：可以发的。每个号码一张卡，家人合成一条（`NAME: A & B`，D49），消息照诊所现在的原文（8.5）。
+  - **Needs staff**：不确定的，写明原因：没有 `*C`、没有手机号码、固网、状态不明、诊所联系人、那天休息、医生请假、时间在半夜（打错）等（8.3）。
+  - **Not appointments**：取消、OFF DAY、`00:00` 的待办，只显示数量。
+- **Open in WhatsApp**（D54）：打开 WhatsApp Desktop 里那位病人的对话，消息已经填好，员工按 Enter 发出。
+  读 `GPiS_Dev` 或假资料时，**只有 `WHATSAPP_ALLOWED_RECIPIENTS` 里写出来的号码**才有这个按钮（写 `*` 也不算）。
+- 还没有做：系统自己发（要 5c）、发送记录（`reminders` 表）、opt-out。按过 *Open in WhatsApp* 只记在画面上，重新整理就没了。
+- 没有改数据库：不用 `alembic upgrade`。
+
+### 更新（Phase 5a 已经装好的电脑）
+
+在 `backend` 里（先启用 venv）：
+
+1. `pytest` → **261 passed**（新增 78 个），没有 skipped。
+2. 打开 `.env`，照 `.env.example` 加上 `REMINDER_CLINIC_NAME`、`REMINDER_CLINIC_NAME_EN`、`REMINDER_BRANCH`（诊所现在原文里的名字、分行）。
+   **只写在 `.env`**，不写进仓库。没有填的话，消息里显示 `<诊所名>` 等。
+3. 在 `frontend` 里 `npm test` → **41 passed**；`npm run build` 成功。
+
+### 先检查 GPiS 的栏位（只做一次）
+
+手机号码是从 `Qry_CAH_Appointment` 用 `AppointmentID` 对上的（统计 B10、B11 用过它的 `HPNo`），但还没确认这个视图有没有 `AppointmentID`：
+
+```powershell
+python -m app.reminders_cli --check-gpis
+```
+
+- `[OK] GPiS_Dev 有提醒名单要用的全部栏位。` → 继续。
+- `[!!] GPiS 少了这些栏位` → 把那几行贴回来（只有栏位名字，没有病人资料），程序要改。
+
+### 使用
+
+**终端**（输出没有名字、号码、Remarks：号码只印代号 `#1`、`#2`，可以直接贴回来）：
+
+```powershell
+python -m app.reminders_cli                 # 今天要提醒的日期
+python -m app.reminders_cli 2026-09-02      # 拿 GPiS_Dev 的某一天当「明天」
+```
+
+**网页**：开视窗 1（`uvicorn app.main:app --reload`）和网页（`npm run dev`），选单 **Reminders** → *Appointment date* 选日期 → **Show**。
+
+**假资料**（试 *Open in WhatsApp* 用）：
+
+1. `backend/.env` 加一行 `REMINDER_SOURCE=demo`（前面**不要有 `#`**；`.env.example` 里那行是注释掉的）；
+   `WHATSAPP_ALLOWED_RECIPIENTS` 填自己的手机（`60` 开头，只写数字）。
+2. 视窗 1 按 `Ctrl + C` 停掉，再执行一次 `uvicorn app.main:app --reload`。**`--reload` 只看 `.py`，改 `.env` 不会自己重开。**
+3. 检查：`python -m app.reminders_cli` 第一行是 `Source: Demo data`；网页上方写 `read from Demo data`（还是 `GPiS_Dev` = 第 1、2 步没生效）。
+
+每一天都是 Demo Patient A–H：A、B（你的手机）合成一条、C 没有 `*C`、D 有 `*C`、E 固网、F 没有号码、G 取消、H `00:00`。
+试完把 `REMINDER_SOURCE` 删掉，同样 `Ctrl + C` 再开视窗 1。
+
+### 注意（病人资料）
+
+- 读 `GPiS_Dev` 时，**页面上是真的病人名字和号码**（只在自己电脑上，和打开 GPiS 一样）。截图要遮住；消息预览里也有名字，不要贴给 AI。终端的摘要可以贴。
+- 读 `GPiS_Dev` 时没有 *Open in WhatsApp*（允许名单只填自己的手机，不要填病人的号码）。
+- 日志只记数量（`提醒名单：1 天，可以发 2 个号码，要员工看 3 个`），没有名字、号码。
+
+### Phase 5b 第一步完成的条件（在开发电脑上测试）
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | `pytest`；`frontend` 里 `npm test`、`npm run build` | 261 passed、没有 skipped；41 passed；`✓ built` |
+| 2 | `python -m app.reminders_cli --check-gpis` | `[OK]`（不是的话贴回 `[!!]` 那几行） |
+| 3 | `python -m app.reminders_cli 2026-09-02`（T6，忙的一天），和 GPiS 那天的 Appointment 画面对照 | READY + NEEDS_STAFF 的预约数 = 那天的病人数（不算取消、`00:00`、OFF DAY）；抽 3 个看时间、医生对不对；同一个号码的家人是同一个 `#` |
+| 4 | `python -m app.reminders_cli 2026-09-18`（T9） | *Not appointments* 有 `OFF DAY record`；PHANG 的照常在 READY。GOH 那天整天被 OFF DAY 挡住，**没有病人**（和 Phase 2 的 T9 一样）；有的话会在 NEEDS_STAFF：`GPiS has an OFF DAY record for Dr GOH`（单元测试有测） |
+| 5 | `python -m app.reminders_cli 2026-09-30`（T10） | 诊所联系人那条（`1130 FIRST APPT`）在 NEEDS_STAFF：`Booked under the clinic's own contact` |
+| 6 | `python -m app.reminders_cli 2026-10-09`（快照之后） | 状态是 `Confirmed` |
+| 7 | 网页 Reminders → 选 2026-09-02 → Show | 黄色 *Preview only … read from GPiS_Dev*；**没有** *Open in WhatsApp*；*Needs staff* 写明原因 |
+| 8 | 假资料（上面「使用」）：Reminders | 上方写 `read from Demo data`；Demo Patient A & B 一张卡、有 *Open in WhatsApp*；D 有 `*C` 在 Ready 但没有按钮（不在允许名单）；C、E、F 在 *Needs staff*；*Not appointments* 2 |
+| 9 | 按 A & B 的 *Open in WhatsApp* | WhatsApp Desktop 打开你自己的对话，消息已经填好（不想发就不要按 Enter）；卡片显示 *Opened* |
+| 10 | 浏览器的历史记录（`Ctrl + H`） | 找不到 `whatsapp://` 和消息内容（D31） |
+
+把第 3–6 项的终端输出贴回来（没有病人资料），截图要遮住名字和号码。
+
+### 云端容器的测试记录（2026-10-08，PostgreSQL 16、只用假资料、没有 GPiS）
+
+- `pytest` → 255 passed（新增：名单的分类、`*C`、号码种类、家人合并、假期前的日期、*Open in WhatsApp* 的锁、终端摘要没有名字和号码、`GET /api/reminders`）。
+- `npm test` → 41 passed；`npm run build` 成功。
+- 用 headless Chromium 连 `npm run dev` + `uvicorn` + `chatbot_dev`（`REMINDER_SOURCE=demo`）：Demo Patient A & B 合成一条，消息照原文、英文那段写 *on the date above*；
+  只有允许名单的号码有 *Open in WhatsApp*（`whatsapp://send?phone=…&text=…`）；*Needs staff* 显示 `*C`、固网、没有号码；选星期二（PHANG 休息）也正确。
+- uvicorn 的日志里没有名字和号码。
+- **还没有**连真的 GPiS：`--check-gpis` 和第 3–6 项要在开发电脑上做。
+
+### 开发电脑的测试记录（2026-10-09，`GPiS_Dev` = 9 月 28 日的快照）
+
+| # | 结果 |
+|---|---|
+| 1 | ✅ `pytest` 257 passed（D56 之后）；`npm test` 41 passed；`npm run build` 成功 |
+| 2 | ✅ `[OK] GPiS_Dev 有提醒名单要用的全部栏位`：`Qry_CAH_Appointment` 有 `AppointmentID` |
+| 3 | ✅ 09-02：Ready 24 + Needs staff 1 = 25 个预约，和 T6 的「PHANG 25 人」一样；09:00、11:30、15:30 各 3 个；只有 PHANG（星期三）；*Not appointments*：取消 3、`00:00` 1；5 个新加坡号码在 Ready。没有家人共用号码。Needs staff 那 1 条是 `*C`（AppointmentID 129387）：Remarks 是 `C/UP AFTER ISSUE DENTURE`（装好之后的检查）→ 规则改了（D57），以后在 Ready |
+| 4 | ✅ 09-18：PHANG 17 人在 Ready；`OFF DAY record` 1、`00:00` 2；GOH 没有病人 |
+| 5 | ✅ 09-30：Ready 4（`Confirmed`），和 T10 的「4 人」一样；11:00 的诊所联系人在 Needs staff（`No mobile number in GPiS; Booked under the clinic's own contact`） |
+| 6 | ✅ 10-09：2 个，`Confirmed`，和测试 0 的「2 人」一样 |
+| 7 | ✅ 网页 09-02：黄色 *Preview only … GPiS_Dev*、没有 *Open in WhatsApp*；Ready 24 / Needs staff 1 / Not appointments 4，和终端一样 |
+| 8 | ✅ 假资料：`read from Demo data`；A & B 一张卡、有 *Open in WhatsApp* |
+| 9 | ✅ WhatsApp Desktop 打开自己的对话、消息已经填好：`.env` 的诊所名（中文没有乱码）、分行名；`NAME: DEMO PATIENT A & DEMO PATIENT B`、`DATE: 10/10/26`、`TIME: 10:00 AM & 10:30 AM`、`DOCTOR: DR PHANG & DR GOH`；表情符号、换行正常 |
+| 10 | ✅ 浏览器历史记录找不到 `whatsapp://` 和消息内容 |
+
+- 看到 GPiS 有的名字后面带 `(P)` → 名单和消息里拿掉最后的 `(P)`、`(G)`（D56），`pytest` 257 个。
+- 第 8 项第一次试：页面还是 `read from GPiS_Dev`（可能是改了 `.env` 没重开 uvicorn，或那行前面有 `#`）→ 上面「使用」加了步骤和检查方法。
+- 第一次 `reminders_cli` 还是 `GPiS_Dev`：`REMINDER_SOURCE=demo` 要写在 `backend\.env`（不是 `.env.example`），存档、重开视窗。
+- 129387 → 戴牙代码前面是 `AFTER` 的不算（D57），`pytest` 261 个。
+- **第 1–10 项全部通过。**

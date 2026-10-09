@@ -79,3 +79,20 @@ def get_whatsapp_settings() -> WhatsAppSettings:
 def ai_replies_enabled() -> bool:
     """AI 回复（Phase 6）。还没有 AI 时是 false：病人的新对话直接交给员工（D37）。"""
     return os.environ.get("AI_REPLIES_ENABLED", "false").strip().lower() == "true"
+
+
+def get_reminder_text():
+    """提醒里诊所、分行的名字（Phase 5b）。只写在 .env，仓库里不写（D47）；没设定就显示 <诊所名> 等。"""
+    from .reminders import ReminderText
+
+    default = ReminderText()
+    return ReminderText(
+        clinic_name=os.environ.get("REMINDER_CLINIC_NAME", "").strip() or default.clinic_name,
+        clinic_name_en=os.environ.get("REMINDER_CLINIC_NAME_EN", "").strip() or default.clinic_name_en,
+        branch=os.environ.get("REMINDER_BRANCH", "").strip() or default.branch,
+    )
+
+
+def reminder_source_name() -> str:
+    """提醒名单的资料从哪里来：gpis（GPIS_CONNECTION_STRING）或 demo（假资料，不连 GPiS）。"""
+    return os.environ.get("REMINDER_SOURCE", "gpis").strip().lower() or "gpis"
