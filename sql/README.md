@@ -98,7 +98,9 @@ T5、T11 的规则已在 T4、T8、T3 里覆盖。测试后修正了两处显示
 - 脚本**不改 GPiS 的资料、不改 `sa`、不改 SQL Server 设定、不用重开 SQL Server**。
 - 密码不写在任何档案里（规则 6）：执行时传进去，再写进那台电脑的 `backend/.env`。
 
-### 主机 A 的情况（W51，柜台另一台电脑的 `GPiS.exe.config`，2026-10-09）
+### 从电脑 B 的 config 看到的（W51，2026-10-09）
+
+柜台有两台电脑：**A**（主机，有 SQL Server 和 GPiS 数据库）、**B**（另一台，本系统要装的地方）。下面是 **B** 的 `GPiS.exe.config`：
 
 - `Database.Server` = `<主机A的IP>\SQLEXPRESS`：另一台的 GPiS 已经经局域网连 A 的 SQL Server（具名实例），
   所以 A 的网络、防火墙、SQL Server 的「SQL 帐号登入」**都已经开着**，只要加帐号，不用改设定、不用重开。
