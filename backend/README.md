@@ -507,6 +507,8 @@ npm run dev
 
 ### 先检查 GPiS 的栏位（只做一次）
 
+（`--check-gpis` 也会检查连线的帐号是不是只读的，见 `sql/README.md`「只读帐号」、D59。）
+
 手机号码是从 `Qry_CAH_Appointment` 用 `AppointmentID` 对上的（统计 B10、B11 用过它的 `HPNo`），但还没确认这个视图有没有 `AppointmentID`：
 
 ```powershell

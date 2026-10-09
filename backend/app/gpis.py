@@ -2,6 +2,7 @@
 
 只执行 SELECT（空档、提醒、检查栏位），不写入任何数据。连接前检查数据库名字，
 防止不小心连到主机的正式数据库（CLAUDE.md 规则 1、2）。
+读主机的 GPiS 时还要确认用的是只读帐号（D52，sql/create_readonly_login.sql）：不是的话拒绝读取。
 """
 
 from __future__ import annotations
@@ -46,6 +47,52 @@ WHERE TABLE_NAME IN ('Tbl_CAH_Appointment', 'Qry_CAH_Appointment')
 """
 
 
+# 连接用的帐号能做什么（D52）。只看权限，不读任何资料（也不读 Tbl_User，规则 5）。
+_OBJECT = "QUOTENAME(SCHEMA_NAME(o.schema_id)) + '.' + QUOTENAME(o.name)"
+PERMISSIONS_SQL = f"""
+SELECT SUSER_SNAME() AS LoginName,
+       IS_SRVROLEMEMBER('sysadmin') AS IsSysadmin,
+       HAS_PERMS_BY_NAME('dbo.Tbl_CAH_Appointment', 'OBJECT', 'SELECT') AS ReadAppointments,
+       HAS_PERMS_BY_NAME('dbo.Qry_CAH_Appointment', 'OBJECT', 'SELECT') AS ReadView,
+       HAS_PERMS_BY_NAME('dbo.Tbl_User', 'OBJECT', 'SELECT') AS ReadUsers,
+       HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'ALTER') + HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CREATE TABLE')
+           AS ChangeDatabase,
+       (SELECT COUNT(*) FROM sys.objects o WHERE o.type IN ('U', 'V') AND o.is_ms_shipped = 0
+          AND (HAS_PERMS_BY_NAME({_OBJECT}, 'OBJECT', 'INSERT') = 1
+            OR HAS_PERMS_BY_NAME({_OBJECT}, 'OBJECT', 'UPDATE') = 1
+            OR HAS_PERMS_BY_NAME({_OBJECT}, 'OBJECT', 'DELETE') = 1)) AS WritableObjects,
+       (SELECT COUNT(*) FROM sys.objects o WHERE o.type IN ('P', 'PC', 'X') AND o.is_ms_shipped = 0
+          AND HAS_PERMS_BY_NAME({_OBJECT}, 'OBJECT', 'EXECUTE') = 1) AS ExecutableProcedures,
+       (SELECT COUNT(*) FROM sys.objects o WHERE o.type IN ('U', 'V') AND o.is_ms_shipped = 0
+          AND HAS_PERMS_BY_NAME({_OBJECT}, 'OBJECT', 'SELECT') = 1) AS ReadableObjects
+"""
+
+READONLY_LOGIN_TABLES = 2      # 只读帐号只给 Tbl_CAH_Appointment、Qry_CAH_Appointment（sql/create_readonly_login.sql）
+
+
+def permission_problems(r) -> tuple[list[str], list[str]]:
+    """(问题, 提醒)。有「问题」的帐号不能拿来读主机的 GPiS；「提醒」= 权限比需要的多，但不能写。"""
+    problems: list[str] = []
+    if r.IsSysadmin:
+        problems.append(f"{r.LoginName} 是 sysadmin，什么都能改")
+    if r.ChangeDatabase:
+        problems.append("可以改数据库的结构")
+    if r.WritableObjects:
+        problems.append(f"可以写入 {r.WritableObjects} 个表或视图")
+    if r.ExecutableProcedures:
+        problems.append(f"可以执行 {r.ExecutableProcedures} 个 stored procedure（可能会写入）")
+    if r.ReadUsers:
+        problems.append("读得到 Tbl_User（D52：不能给）")
+    if not r.ReadAppointments:
+        problems.append("读不到 Tbl_CAH_Appointment")
+    if not r.ReadView:
+        problems.append("读不到 Qry_CAH_Appointment")
+    warnings: list[str] = []
+    if (r.ReadableObjects or 0) > READONLY_LOGIN_TABLES:
+        warnings.append(f"读得到 {r.ReadableObjects} 个表或视图（只需要 {READONLY_LOGIN_TABLES} 个）")
+    return problems, warnings
+
+
 def missing_columns(found: set[tuple[str, str]]) -> list[str]:
     """found = {(表, 栏位)}；比较时不分大小写（SQL Server 也不分）。"""
     have = {(t.lower(), c.lower()) for t, c in found}
@@ -58,6 +105,10 @@ class AppointmentSource(Protocol):
 
 class WrongDatabaseError(RuntimeError):
     pass
+
+
+class NotReadOnlyError(WrongDatabaseError):
+    """读主机的 GPiS，但帐号不是只读的（例：用了 sa）。"""
 
 
 def ensure_expected_database(actual: str | None, expected: str) -> None:
@@ -87,6 +138,12 @@ class GpisReader:
         try:
             cur = conn.cursor()
             ensure_expected_database(cur.execute("SELECT DB_NAME()").fetchval(), self._expected_database)
+            if self.is_production:
+                problems, _ = permission_problems(cur.execute(PERMISSIONS_SQL).fetchone())
+                if problems:
+                    raise NotReadOnlyError(
+                        "读主机的 GPiS 要用只读帐号（D52）。现在的帐号：" + "；".join(problems) + "。为了安全，拒绝读取。"
+                    )
             return cur.execute(sql, *params).fetchall()
         finally:
             conn.close()
@@ -129,3 +186,7 @@ class GpisReader:
 
     def missing_columns(self) -> list[str]:
         return missing_columns({(r.TABLE_NAME, r.COLUMN_NAME) for r in self._query(COLUMNS_SQL)})
+
+    def permissions(self):
+        """连接用的帐号能做什么（给 --check-gpis 用）。回传一行：LoginName、IsSysadmin 等。"""
+        return self._query(PERMISSIONS_SQL)[0]
