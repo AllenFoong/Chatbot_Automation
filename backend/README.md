@@ -497,7 +497,7 @@ npm run dev
 
 在 `backend` 里（先启用 venv）：
 
-1. `pytest` → **257 passed**（新增 74 个），没有 skipped。
+1. `pytest` → **261 passed**（新增 78 个），没有 skipped。
 2. 打开 `.env`，照 `.env.example` 加上 `REMINDER_CLINIC_NAME`、`REMINDER_CLINIC_NAME_EN`、`REMINDER_BRANCH`（诊所现在原文里的名字、分行）。
    **只写在 `.env`**，不写进仓库。没有填的话，消息里显示 `<诊所名>` 等。
 3. 在 `frontend` 里 `npm test` → **41 passed**；`npm run build` 成功。
@@ -544,7 +544,7 @@ python -m app.reminders_cli 2026-09-02      # 拿 GPiS_Dev 的某一天当「明
 
 | # | 做什么 | 应该看到 |
 |---|---|---|
-| 1 | `pytest`；`frontend` 里 `npm test`、`npm run build` | 257 passed、没有 skipped；41 passed；`✓ built` |
+| 1 | `pytest`；`frontend` 里 `npm test`、`npm run build` | 261 passed、没有 skipped；41 passed；`✓ built` |
 | 2 | `python -m app.reminders_cli --check-gpis` | `[OK]`（不是的话贴回 `[!!]` 那几行） |
 | 3 | `python -m app.reminders_cli 2026-09-02`（T6，忙的一天），和 GPiS 那天的 Appointment 画面对照 | READY + NEEDS_STAFF 的预约数 = 那天的病人数（不算取消、`00:00`、OFF DAY）；抽 3 个看时间、医生对不对；同一个号码的家人是同一个 `#` |
 | 4 | `python -m app.reminders_cli 2026-09-18`（T9） | *Not appointments* 有 `OFF DAY record`；PHANG 的照常在 READY。GOH 那天整天被 OFF DAY 挡住，**没有病人**（和 Phase 2 的 T9 一样）；有的话会在 NEEDS_STAFF：`GPiS has an OFF DAY record for Dr GOH`（单元测试有测） |
@@ -570,8 +570,9 @@ python -m app.reminders_cli 2026-09-02      # 拿 GPiS_Dev 的某一天当「明
 
 | # | 结果 |
 |---|---|
+| 1 | ✅ `pytest` 257 passed（D56 之后）；`npm test` 41 passed；`npm run build` 成功 |
 | 2 | ✅ `[OK] GPiS_Dev 有提醒名单要用的全部栏位`：`Qry_CAH_Appointment` 有 `AppointmentID` |
-| 3 | ✅ 09-02：Ready 24 + Needs staff 1 = 25 个预约，和 T6 的「PHANG 25 人」一样；09:00、11:30、15:30 各 3 个；只有 PHANG（星期三）；*Not appointments*：取消 3、`00:00` 1；5 个新加坡号码在 Ready。没有家人共用号码。Needs staff 那 1 条是 `*C`（AppointmentID 129387，待查 Remarks 的写法） |
+| 3 | ✅ 09-02：Ready 24 + Needs staff 1 = 25 个预约，和 T6 的「PHANG 25 人」一样；09:00、11:30、15:30 各 3 个；只有 PHANG（星期三）；*Not appointments*：取消 3、`00:00` 1；5 个新加坡号码在 Ready。没有家人共用号码。Needs staff 那 1 条是 `*C`（AppointmentID 129387）：Remarks 是 `C/UP AFTER ISSUE DENTURE`（装好之后的检查）→ 规则改了（D57），以后在 Ready |
 | 4 | ✅ 09-18：PHANG 17 人在 Ready；`OFF DAY record` 1、`00:00` 2；GOH 没有病人 |
 | 5 | ✅ 09-30：Ready 4（`Confirmed`），和 T10 的「4 人」一样；11:00 的诊所联系人在 Needs staff（`No mobile number in GPiS; Booked under the clinic's own contact`） |
 | 6 | ✅ 10-09：2 个，`Confirmed`，和测试 0 的「2 人」一样 |
@@ -583,4 +584,5 @@ python -m app.reminders_cli 2026-09-02      # 拿 GPiS_Dev 的某一天当「明
 - 看到 GPiS 有的名字后面带 `(P)` → 名单和消息里拿掉最后的 `(P)`、`(G)`（D56），`pytest` 257 个。
 - 第 8 项第一次试：页面还是 `read from GPiS_Dev`（可能是改了 `.env` 没重开 uvicorn，或那行前面有 `#`）→ 上面「使用」加了步骤和检查方法。
 - 第一次 `reminders_cli` 还是 `GPiS_Dev`：`REMINDER_SOURCE=demo` 要写在 `backend\.env`（不是 `.env.example`），存档、重开视窗。
-- 还没做：第 1 项。
+- 129387 → 戴牙代码前面是 `AFTER` 的不算（D57），`pytest` 261 个。
+- **第 1–10 项全部通过。**

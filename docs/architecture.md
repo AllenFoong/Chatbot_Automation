@@ -265,7 +265,7 @@ GPiS（只读）──读「明天」的预约──→ Backend：排除不是�
 | 时段在午休，或最后一格之后的一格（例 PHANG 17:00，员工破例排的，`clinic-workflow.md` 第 1 节） | 照常提醒 | 是真的预约 |
 | 时段比上班早、或比最后一格晚超过一格（例 02:30）；时段看不懂 | **要员工看** | 统计 A：凌晨的时段是打错的 |
 | 没有病人名字 | **要员工看** | 消息的 `NAME` 会是空的 |
-| `Remarks` 有要等技工所的代码（`ISSUE C`、`ISSUE CROWN`、`ISSUE B`、`ISSUE BRIDGE`、`ISSUE IMPLANT`、`ISSUE DENTURE`、`MMR`、`TRY-IN`、`VENEER`），后面**没有 `*C`** | **要员工看**：*Lab work not marked as arrived (\*C)* | W39、W47：`*C` = 技工所做的牙已经送到诊所，送来那天加上，**一定写成 `*C`**；没到就提醒，病人来了没有东西可以装（D50、D51）。判断时**不能用 `normalize_remarks`**（它会去掉 `*`） |
+| `Remarks` 有要等技工所的代码（`ISSUE C`、`ISSUE CROWN`、`ISSUE B`、`ISSUE BRIDGE`、`ISSUE IMPLANT`、`ISSUE DENTURE`、`MMR`、`TRY-IN`、`VENEER`），后面**没有 `*C`** | **要员工看**：*Lab work not marked as arrived (\*C)* | W39、W47：`*C` = 技工所做的牙已经送到诊所，送来那天加上，**一定写成 `*C`**；没到就提醒，病人来了没有东西可以装（D50、D51）。代码前面是 `AFTER`（`C/UP AFTER ISSUE DENTURE` = 装好之后的检查）不算（D57）。判断时**不能用 `normalize_remarks`**（它会去掉 `*`） |
 
 原则和空档一样：**不确定的不自动发，交给员工**（宁可员工多处理一条，也不要发错）。
 

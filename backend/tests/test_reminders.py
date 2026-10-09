@@ -135,6 +135,10 @@ def test_closed_status_is_reminded():
     ("SOFT TISSUE CHECK", False),    # TISSUE 不是 ISSUE
     ("RCT (C) 36,SC 36 (P)", False), # (C) 是以前的医生，不是 *C
     ("S+P", False),
+    ("C/UP AFTER ISSUE DENTURE (P)", False),     # 装好之后的复诊（D57）
+    ("c/up after  issue crown 36", False),
+    ("C/UP AFTER ISSUE CROWN 36, ISSUE BRIDGE 44 (P)", True),   # 后面还有一个真的要戴的
+    ("ISSUE DENTURE AFTER XLA", True),           # AFTER 在代码后面不算
     (None, False),
 ])
 def test_lab_work_needs_star_c(remarks, not_arrived):

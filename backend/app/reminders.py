@@ -37,6 +37,8 @@ _LAB_WORK = re.compile(
 )
 # 一定写成 *C（D51）：大写 C 紧跟在 * 后面，后面不能再接字母
 _ARRIVED = re.compile(r"\*C(?![A-Za-z])")
+# 代码前面是 AFTER = 已经装好之后的复诊（例 C/UP AFTER ISSUE DENTURE），不用等技工所（D57）
+_AFTER = re.compile(r"AFTER\s*$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -84,9 +86,9 @@ def phone_kind(phone: str | None) -> PhoneKind:
 
 
 def lab_work_not_arrived(remarks: str | None) -> bool:
-    """有要等技工所的代码，但后面没有 *C（D50、D51）。只认 *C 在代码后面。"""
+    """有要等技工所的代码，但后面没有 *C（D50、D51）。只认 *C 在代码后面；AFTER 后面的代码不算（D57）。"""
     r = remarks or ""
-    m = _LAB_WORK.search(r)
+    m = next((m for m in _LAB_WORK.finditer(r) if not _AFTER.search(r, 0, m.start())), None)
     return m is not None and _ARRIVED.search(r, m.end()) is None
 
 
