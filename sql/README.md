@@ -166,6 +166,27 @@ GPIS_EXPECTED_DATABASE=GPiS_Dev
 
 **不要**为了测试去 `SELECT` `Tbl_User`（规则 5）：读不到的检查用第 1 项（只看权限，不读资料）。
 
+### 第一步的测试记录（2026-10-11，开发电脑，`GPiS_Dev`）
+
+SQL Server 2025 Express；`IsIntegratedSecurityOnly = 0`；`sqlcmd` 用 `-C -f 65001`。
+
+| # | 结果 |
+|---|---|
+| 建帐号 | ✅ `GRANT` 3（`CONNECT`、两个 `SELECT`）；`DENY` 数据库层 14 个 + `SELECT Tbl_User`；`DeniedTablesAndViews = 201`（GPiS 一共 203 个表和视图）；`ReadableTablesAndViews = 2`、`OtherDatabasePermissions = 0`；sqlcmd 用 `chatbot_reader` 登入得到 `GPiS_Dev` |
+| 1 | ✅ 两个 `[OK]`（「不能写、不能备份」） |
+| 2 | ✅ 09-02：Ready 25 个号码 / 25 个预约、Needs staff 0；取消 3、`00:00` 1；5 个新加坡号码，和 10-09 一样。底下的表都 `DENY` 了，视图还是读得到号码（同一个 owner） |
+| 3 | ✅ `OK  Patients=25`，和 T6 一样 |
+| 4 | ✅ `Msg 229`：*The UPDATE permission was denied on the object 'Tbl_CAH_Appointment'* |
+| 5 | ✅ Windows 帐号：`[!!]` sysadmin、改结构、备份、写入 203 个、读得到 `Tbl_User`；`[提醒] 读得到 203 个`；改回来两个 `[OK]` |
+| 6 | ✅ 拿掉后 *Login failed for user 'chatbot_reader'*；用新密码建回来，两个 `[OK]` |
+
+测试时找到、已经改好的：
+
+- **第一次跑第 1 项是 `[!!] 可以改数据库的结构`**：GPiS 的数据库把 `CREATE TABLE`、`CREATE VIEW`、`CREATE PROCEDURE`、`CREATE FUNCTION`、`CREATE RULE`、`CREATE DEFAULT`、`BACKUP DATABASE`、`BACKUP LOG` 给了 `public`。
+  `BACKUP DATABASE` = 能把整个数据库备份成档案。脚本改成数据库层 `DENY`、其他表和视图全部 `DENY SELECT`、最后自己检查；`--check-gpis` 也检查 `BACKUP` 和其他 `CREATE`（D60）。主机 A 一样会有这些 `GRANT`。
+- `sqlcmd` 连不上（*The certificate chain was issued by an authority that is not trusted*）→ 加 `-C`；中文乱码 → 加 `-f 65001`。
+- 第一次 *Login failed*：sqlcmd 用 `$pw` 登入得了，所以是 `.env` 的密码贴错 → 改用 `$pw | Set-Clipboard`。
+
 ### 第二步：在主机 A 执行（装到柜台另一台电脑时，诊所同意后）
 
 1. 在**柜台另一台电脑**（本系统要装的地方）照上面第 2 步的第一行产生密码，写进那台的 `backend/.env`：
