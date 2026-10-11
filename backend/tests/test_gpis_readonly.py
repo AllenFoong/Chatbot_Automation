@@ -10,9 +10,11 @@ from app import reminders_cli
 from app.gpis import PERMISSIONS_SQL, GpisReader, NotReadOnlyError, permission_problems
 
 Perms = namedtuple("Perms", "LoginName IsSysadmin ReadAppointments ReadView ReadUsers ChangeDatabase "
-                            "WritableObjects ExecutableProcedures ReadableObjects")
-READER = Perms("chatbot_reader", 0, 1, 1, None, 0, 0, 0, 2)
-SA = Perms("sa", 1, 1, 1, 1, 2, 120, 40, 120)
+                            "BackupDatabase WritableObjects ExecutableProcedures ReadableObjects")
+READER = Perms("chatbot_reader", 0, 1, 1, None, 0, 0, 0, 0, 2)
+SA = Perms("sa", 1, 1, 1, 1, 9, 2, 120, 40, 120)
+# 2026-10-11 开发电脑：GPiS 把 CREATE TABLE、BACKUP DATABASE 等给了 public，旧版的脚本建出来的帐号就是这样（D60）
+READER_WITH_PUBLIC_GRANTS = READER._replace(ChangeDatabase=6, BackupDatabase=2)
 
 
 def test_readonly_login_has_no_problems():
@@ -22,19 +24,31 @@ def test_readonly_login_has_no_problems():
 def test_sa_is_not_readonly():
     problems, _ = permission_problems(SA)
     assert problems[0] == "sa 是 sysadmin，什么都能改"
-    assert "读得到 Tbl_User（D52：不能给）" in problems and len(problems) == 5
+    assert "读得到 Tbl_User（D52：不能给）" in problems and len(problems) == 6
 
 
 @pytest.mark.parametrize("change, problem", [
     (dict(WritableObjects=1), "可以写入 1 个表或视图"),
     (dict(ExecutableProcedures=3), "可以执行 3 个 stored procedure（可能会写入）"),
     (dict(ChangeDatabase=1), "可以改数据库的结构"),
+    (dict(BackupDatabase=1), "可以备份整个数据库（包括所有病人资料和 Tbl_User）"),
     (dict(ReadUsers=1), "读得到 Tbl_User（D52：不能给）"),
     (dict(ReadView=None), "读不到 Qry_CAH_Appointment"),
     (dict(ReadAppointments=0), "读不到 Tbl_CAH_Appointment"),
 ])
 def test_each_problem(change, problem):
     assert permission_problems(READER._replace(**change))[0] == [problem]
+
+
+def test_permissions_from_public_are_refused():
+    assert permission_problems(READER_WITH_PUBLIC_GRANTS)[0] == [
+        "可以改数据库的结构", "可以备份整个数据库（包括所有病人资料和 Tbl_User）"]
+
+
+def test_permissions_sql_checks_backup_and_create_permissions():
+    for name in ("ALTER", "CREATE TABLE", "CREATE VIEW", "CREATE PROCEDURE", "CREATE FUNCTION",
+                 "BACKUP DATABASE", "BACKUP LOG"):
+        assert f"ISNULL(HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', '{name}'), 1)" in PERMISSIONS_SQL
 
 
 def test_extra_tables_are_only_a_warning():
@@ -113,6 +127,8 @@ class FakeReader(GpisReader):
     (FakeReader("GPiS"), 0, "[OK] 帐号 chatbot_reader 是只读的"),
     (FakeReader("GPiS", perms=SA), 1, "UID=chatbot_reader"),
     (FakeReader("GPiS_Dev", perms=SA), 0, "开发电脑用 Windows 帐号"),
+    (FakeReader("GPiS_Dev", perms=READER_WITH_PUBLIC_GRANTS), 0, "可以备份整个数据库"),
+    (FakeReader("GPiS_Dev", perms=SA), 0, "[提醒] 读得到 120 个表或视图"),
     (FakeReader("GPiS_Dev", perms=READER._replace(ReadableObjects=4)), 0, "[提醒] 读得到 4 个表或视图"),
     (FakeReader("GPiS_Dev", missing=["Qry_CAH_Appointment.HPNo"]), 1, "Qry_CAH_Appointment.HPNo"),
 ])
