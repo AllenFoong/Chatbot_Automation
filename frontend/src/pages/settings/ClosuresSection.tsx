@@ -30,7 +30,7 @@ function AddClosureForm({ year, onAdded }: { year: number; onAdded: () => void }
     <form className="card inline-form" onSubmit={submit}>
       <h3>Add a closure day</h3>
       <p className="muted small">
-        For example the extra Chinese New Year days, or a clinic holiday. No new bookings on that day; appointments
+        For example a day the clinic decides to close. No new bookings on that day; appointments
         already there show under <em>Needs staff</em> on the Reminders page, so you can tell the patients.
       </p>
       <div className="fields">
@@ -70,7 +70,7 @@ export default function ClosuresSection({ canEdit }: { canEdit: boolean }) {
       const result = await api.settings.importHolidays(year);
       setImported(
         `Added ${result.added.length} day(s); ${result.already_there} were already there. ` +
-          "Please check the Islamic holidays (their dates are estimates) and add the extra Chinese New Year days.",
+          "Please check the Hari Raya dates (they are estimates) and add any other day the clinic closes.",
       );
       closures.reload();
     });

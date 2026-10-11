@@ -20,7 +20,7 @@
   | Labour Day | 5 月 1 日 | 5 月 1 日 |
   | Merdeka Day | 8 月 31 日 | 8 月 31 日 |
   | Malaysia Day | 9 月 16 日 | 9 月 16 日 |
-  | Deepavali | 11 月 8 日 | **诊所的名单没有**（套件：10 月 28 日，W59） |
+  | Deepavali | 11 月 8 日 | 10 月 28 日（诊所的名单漏写了，W59） |
   | Christmas Day | 12 月 25 日 | 12 月 25 日 |
 
   - **替代假不休**（W56）：例 2026 年 Deepavali 是星期日，政府放 11 月 9 日，诊所照常营业。
@@ -318,7 +318,8 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 | W53 | 员工需要在诊所外面用系统的网页吗？ | 在诊所里用电脑**就够**；也可以做一个在家打开的网页，**不常用**（2026-10-08） |
 | W44 | 诊所有几间分行？ | **现在只有一间**（原文的 `BRANCH`，仓库里写 `<分行名>`）；以前有其他分行，已经关了（2026-10-08）→ 系统先按一间分行设计（D47） |
 | W56 | 公共假期遇到星期日，政府放的替代假诊所休吗？ | **不休**。之后诊所决定哪一天休息、那天已经有预约的话，员工手动通知病人休息、改期；系统只要把那天当作假期，**不能再约**（2026-10-12）→ D61 |
-| W57 | 2027 年的假期？农历新年会多休吗？ | 名单：New Year's Day、Chinese New Year 2 天（2 月 6、7 日）、Hari Raya Aidilfitri 2 天（3 月 10、11 日）、Sultan of Johor's Birthday、Labour Day、Merdeka Day、Malaysia Day、Christmas Day（2026-10-12）。农历新年**不多休**；没有 Deepavali（W59） |
+| W57 | 2027 年的假期？农历新年会多休吗？ | 名单：New Year's Day、Chinese New Year 2 天（2 月 6、7 日）、Hari Raya Aidilfitri 2 天（3 月 10、11 日）、Sultan of Johor's Birthday、Labour Day、Merdeka Day、Malaysia Day、Christmas Day（2026-10-12）。农历新年**不多休** |
+| W59 | 2027 年的名单没有 Deepavali（10 月 28 日）：照常营业还是漏写了？ | **漏写了**，照样休（2026-10-12） |
 
 ### 待确认：预约提醒（Phase 5b）和 A1
 
@@ -326,7 +327,6 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 
 | # | 问题 | 为什么要问 |
 |---|---|---|
-| W59 | 2027 年的名单没有 Deepavali（10 月 28 日）：那天照常营业吗？还是漏写了？ | 2026 年有休 Deepavali。系统导入 2027 年时会加上 10 月 28 日；照常营业的话，员工导入后把那一天删掉 |
 | W58 | 电脑 B 有没有装 WhatsApp Desktop、登入的是诊所的号码吗？员工现在用哪台电脑 / 手机发提醒？ | *Open in WhatsApp* 会打开**按的那台电脑**上的 WhatsApp Desktop（D54、D62）；B 上没有的话要装、用诊所的号码连结（linked device） |
 | W55 | 签名表的声明下面加一句 WhatsApp 的同意（马来文 + 英文，例句见 `architecture.md` 8.8），不同意的病人在 Remark 写 `NO WA`：可以吗？签名表是谁印的、多久印一次？ | 病人每次来都签这张表，新、旧病人都会签到（D55） |
 | W54 | 柜台另一台电脑：试跑之后可以一直装着本系统吗？下班可以不关机吗？ | 那台下班会关：关机时收不到病人的回复，Phase 6 的 AI 晚上也不能回（`architecture.md` 9.4） |

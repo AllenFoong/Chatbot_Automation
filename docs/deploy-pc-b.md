@@ -147,7 +147,7 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 |---|---|---|
 | 1 | 重新开机，登入 Windows，打开 <http://localhost:8000> | 登入画面（不用开任何视窗） |
 | 2 | `start.log` | `备份：…dump`、`uvicorn 启动` |
-| 3 | 用 ADMIN 登入 → *Settings → Clinic closures* → *Import public holidays for 2026*，再换 2027 | 各 *Added 11 day(s)*；和 `clinic-workflow.md` 第 1 节的表对照；核对 Hari Raya 的日期；2027 年的 Deepavali 照 W59 留或删 |
+| 3 | 用 ADMIN 登入 → *Settings → Clinic closures* → *Import public holidays for 2026*，再换 2027 | 各 *Added 11 day(s)*；和 `clinic-workflow.md` 第 1 节的表对照；核对 Hari Raya 的日期 |
 | 4 | *Reminders* → 明天 | 名单的人数和 GPiS 一样；家人合并、`*C` 的规则对 |
 | 5 | 挑一行按 *Open in WhatsApp* | WhatsApp Desktop 打开**那位病人**的对话、消息已经填好。**不要按 Enter**（试跑期间员工照旧手动发）→ 关掉 |
 | 6 | 另一台电脑（例如 A）的浏览器打 `http://<B的IP>:8000` | **打不开**（只听 `127.0.0.1`，D62） |

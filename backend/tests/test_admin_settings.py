@@ -90,7 +90,7 @@ def test_import_only_the_holidays_the_clinic_closes(boss, session):
     assert r["already_there"] == 0
 
 
-# 诊所给的 2027 年名单（2026-10-12，W57）。没有 Deepavali：套件有（10 月 28 日），要诊所确认（W59）
+# 诊所给的 2027 年名单（2026-10-12，W57）。Deepavali（10 月 28 日）是诊所漏写的，照样休（W59）
 CLINIC_2027 = {
     date(2027, 1, 1): "New Year's Day", date(2027, 2, 6): "Chinese New Year",
     date(2027, 2, 7): "Chinese New Year Holiday", date(2027, 3, 10): "Hari Raya Aidilfitri",
@@ -104,7 +104,7 @@ def test_clinic_holidays_2027_matches_the_clinic_list():
     from app.api.settings import clinic_holidays
     found = clinic_holidays(2027)
     assert {d: n for d, n in found.items() if d in CLINIC_2027} == CLINIC_2027    # 诊所名单上的每一天都有
-    assert set(found) - set(CLINIC_2027) == {date(2027, 10, 28)}                 # 只多了 Deepavali（W59）
+    assert set(found) - set(CLINIC_2027) == {date(2027, 10, 28)}                 # 加上漏写的 Deepavali（W59）
     assert date(2027, 2, 9) not in found        # 农历新年在星期日的替代假：不休（W56）
 
 
