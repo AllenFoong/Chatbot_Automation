@@ -77,6 +77,7 @@
 - [x] 只读帐号脚本：`sql/create_readonly_login.sql`、`drop_readonly_login.sql`；读主机的 `GPiS` 时帐号不是只读就拒绝（D59）；`--check-gpis` 检查帐号；云端 `pytest` 289 个（SQL 脚本在云端没有 SQL Server 可以跑）
 - [x] 只读帐号：开发电脑测试 6 项全部通过（2026-10-11，记录见 `sql/README.md`）
 - [x] 测试时找到 GPiS 把 `CREATE TABLE`、`CREATE PROCEDURE`、`BACKUP DATABASE` 等给了 `public`（每个帐号都有，主机 A 也一样）→ 脚本数据库层 `DENY`、其他 201 个表和视图 `DENY SELECT`、最后自己检查；`--check-gpis` 也查 `BACKUP`（D60）；`sqlcmd` 要加 `-C -f 65001`；云端 `pytest` 294 个
+- [x] 只读帐号（D59、D60）和测试记录合并进 `main`（PR #15、#16）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
