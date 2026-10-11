@@ -24,8 +24,8 @@ admin = [Depends(require_admin)]
 # 公共假期：马来西亚全国 + Johor 州（W1、W14）
 HOLIDAY_COUNTRY, HOLIDAY_STATE = "MY", "JHR"
 
-# 诊所只休这 10 种（D61）：holidays 套件的英文名字 → 名单上显示的名字（诊所的写法）。
-# 其他假期（Wesak、Hari Raya Haji …）照常营业；替代假（"(observed)"、"(additional holiday)"）也不休
+# 诊所只休这几种（D61）：holidays 套件的英文名字 → 名单上显示的名字（诊所的写法）。
+# 其他假期（Wesak、Hari Raya Haji …）照常营业；替代假（"(observed)"、"(additional holiday)"）也不休（W56）
 CLINIC_HOLIDAYS = {
     "Chinese New Year": "Chinese New Year",
     "Chinese New Year (Second Day)": "Chinese New Year Holiday",
@@ -38,12 +38,16 @@ CLINIC_HOLIDAYS = {
     "Diwali": "Deepavali",
     "Christmas Day": "Christmas Day",
 }
+# Johor 没有放、诊所自己休的固定日子（W57：2027 年的名单有 New Year's Day）
+CLINIC_FIXED_DAYS = {(1, 1): "New Year's Day"}
 
 
 def clinic_holidays(year: int) -> dict[date, str]:
     """那一年诊所休的公共假期。回教节日的日期是套件预估的，要员工核对。"""
     found = holidays.country_holidays(HOLIDAY_COUNTRY, subdiv=HOLIDAY_STATE, years=year, language="en_US")
-    return {day: CLINIC_HOLIDAYS[name] for day, name in sorted(found.items()) if name in CLINIC_HOLIDAYS}
+    days = {day: CLINIC_HOLIDAYS[name] for day, name in found.items() if name in CLINIC_HOLIDAYS}
+    days.update({date(year, m, d): name for (m, d), name in CLINIC_FIXED_DAYS.items()})
+    return dict(sorted(days.items()))
 
 
 class _Orm(BaseModel):

@@ -70,8 +70,9 @@ def test_services(boss, session):
     assert boss.patch("/api/services/NOPE", json={"active": False}).status_code == 404
 
 
-# 诊所给的 2026 年休息的假期（2026-10-11，D61）
+# 诊所给的 2026 年休息的假期（2026-10-11，D61）；New Year's Day 是 2027 年的名单才有的（W57），每年都加
 CLINIC_2026 = {
+    "2026-01-01": "New Year's Day",
     "2026-02-17": "Chinese New Year", "2026-02-18": "Chinese New Year Holiday",
     "2026-03-21": "Hari Raya Aidilfitri", "2026-03-22": "Hari Raya Aidilfitri Holiday",
     "2026-03-23": "Sultan of Johor's Birthday", "2026-05-01": "Labour Day", "2026-08-31": "Merdeka Day",
@@ -89,11 +90,22 @@ def test_import_only_the_holidays_the_clinic_closes(boss, session):
     assert r["already_there"] == 0
 
 
-def test_clinic_holidays_2027_has_the_same_ten():
+# 诊所给的 2027 年名单（2026-10-12，W57）。没有 Deepavali：套件有（10 月 28 日），要诊所确认（W59）
+CLINIC_2027 = {
+    date(2027, 1, 1): "New Year's Day", date(2027, 2, 6): "Chinese New Year",
+    date(2027, 2, 7): "Chinese New Year Holiday", date(2027, 3, 10): "Hari Raya Aidilfitri",
+    date(2027, 3, 11): "Hari Raya Aidilfitri Holiday", date(2027, 3, 23): "Sultan of Johor's Birthday",
+    date(2027, 5, 1): "Labour Day", date(2027, 8, 31): "Merdeka Day", date(2027, 9, 16): "Malaysia Day",
+    date(2027, 12, 25): "Christmas Day",
+}
+
+
+def test_clinic_holidays_2027_matches_the_clinic_list():
     from app.api.settings import clinic_holidays
     found = clinic_holidays(2027)
-    assert sorted(found.values()) == sorted(CLINIC_2026.values())    # 每一种都找得到（套件改名字的话这里会失败）
-    assert date(2027, 2, 6) in found and date(2027, 2, 9) not in found    # 农历新年在星期六；替代假不休
+    assert {d: n for d, n in found.items() if d in CLINIC_2027} == CLINIC_2027    # 诊所名单上的每一天都有
+    assert set(found) - set(CLINIC_2027) == {date(2027, 10, 28)}                 # 只多了 Deepavali（W59）
+    assert date(2027, 2, 9) not in found        # 农历新年在星期日的替代假：不休（W56）
 
 
 def test_import_holidays_then_add_own_closure(boss, session):

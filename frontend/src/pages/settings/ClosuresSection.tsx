@@ -29,7 +29,10 @@ function AddClosureForm({ year, onAdded }: { year: number; onAdded: () => void }
   return (
     <form className="card inline-form" onSubmit={submit}>
       <h3>Add a closure day</h3>
-      <p className="muted small">For example the extra Chinese New Year days, or a clinic holiday.</p>
+      <p className="muted small">
+        For example the extra Chinese New Year days, or a clinic holiday. No new bookings on that day; appointments
+        already there show under <em>Needs staff</em> on the Reminders page, so you can tell the patients.
+      </p>
       <div className="fields">
         <label>
           Date
@@ -57,7 +60,7 @@ export default function ClosuresSection({ canEdit }: { canEdit: boolean }) {
     if (
       !window.confirm(
         `Add the public holidays the clinic closes on in ${year}? ` +
-          "(Chinese New Year 2 days, Hari Raya Aidilfitri 2 days, Sultan of Johor's Birthday, Labour Day, " +
+          "(New Year's Day, Chinese New Year 2 days, Hari Raya Aidilfitri 2 days, Sultan of Johor's Birthday, Labour Day, " +
           "Merdeka Day, Malaysia Day, Deepavali, Christmas Day. Replacement days are not added.) " +
           "Days already in the list are kept.",
       )
