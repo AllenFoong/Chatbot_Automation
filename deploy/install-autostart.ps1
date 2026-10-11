@@ -2,17 +2,20 @@
 #
 # 用法（用平常登入电脑 B 的 Windows 帐号，普通的 PowerShell，不用系统管理员）：
 #     .\deploy\install-autostart.ps1          设定
-#     .\deploy\install-autostart.ps1 -Remove  拿掉
+#     .\deploy\install-autostart.ps1 -Remove  先停下本系统（stop-chatbot.ps1），再拿掉
 #
-# 工作排程器里的名字：Chatbot_Automation。登入后在背景跑 start-chatbot.ps1（看不到视窗）；
-# 停了 1 分钟后自动重开（最多 3 次）；不会因为跑太久被停掉。
+# 工作排程器里的名字：Chatbot_Automation。登入后在背景跑 start-chatbot.ps1（看不到视窗；uvicorn 停了它自己会重开）；
+# 不会因为跑太久被停掉；工作排程器启动不了它的话，1 分钟后再试（最多 3 次）。
 
 param([switch]$Remove)
 $ErrorActionPreference = "Stop"
 $name = "Chatbot_Automation"
 
 if ($Remove) {
-    Unregister-ScheduledTask -TaskName $name -Confirm:$false
+    & (Join-Path $PSScriptRoot "stop-chatbot.ps1")
+    if (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName $name -Confirm:$false
+    }
     Write-Host "已经拿掉 $name。本系统下次登入不会自己启动。"
     exit 0
 }

@@ -11,7 +11,7 @@
 |---|---|
 | ✅ 员工在 **B 的浏览器**打开 `http://localhost:8000` | Admin Platform：Reminders 名单（读 A 的实时预约）、*Open in WhatsApp*、*NO WA*、Settings |
 | ✅ 按 *Open in WhatsApp* → **B 上的 WhatsApp Desktop** 打开那位病人的对话，消息已经填好，员工按 Enter | 和现在员工一条条发一样，只是名单、`*C`、家人合并由系统做（D54） |
-| ✅ 登入 Windows 就自动启动；每次开机备份本系统的数据库 | `deploy/install-autostart.ps1`、`deploy/start-chatbot.ps1` |
+| ✅ 登入 Windows 就自动启动、停了自己重开；每次开机备份本系统的数据库 | `deploy/install-autostart.ps1`、`deploy/start-chatbot.ps1`（停下用 `deploy/stop-chatbot.ps1`） |
 | ❌ **只有 B 自己打得开**（`127.0.0.1`），A 或别的电脑、手机都打不开 | 网页里有病人名字和号码；不开放给局域网，就不用 https（D62） |
 | ❌ 不收 WhatsApp 消息（5a 的 webhook、cloudflared 不装） | 要等 5c 接上诊所的号码 |
 | ❌ 不装 Node.js、git、SQL Server | 网页在开发电脑 build 好，用 USB 带过去 |
@@ -136,10 +136,13 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 
 等 10 秒，浏览器打开 <http://localhost:8000> → 登入画面。把这个网址加进书签 / 桌面捷径。
 
-- 日志：`%LOCALAPPDATA%\Chatbot\logs\`（`start.log` 每次启动、备份的记录；`uvicorn.log` 这次开机的程序日志）。
+- 日志：`%LOCALAPPDATA%\Chatbot\logs\`（`start.log` 每次启动、备份、重开的记录；`uvicorn-日期-时间.log` 每次启动的程序日志，留最新 14 个）。
 - 备份：`%LOCALAPPDATA%\Chatbot\backup\chatbot-日期.dump`，每次开机一份，留最新 14 份。
   **里面有病人名字和号码**：只留在 B，不复制到 USB、网盘（规则 4）。
-- 拿掉自动启动：`.\deploy\install-autostart.ps1 -Remove`。
+- uvicorn 停了（当掉、被关掉）：`start-chatbot.ps1` 等 1 分钟自己重开，最多 3 次。
+- 停下本系统（改了 `.env` 要重开、更新之前）：`.\deploy\stop-chatbot.ps1` → `已经停了`；再启动：`Start-ScheduledTask -TaskName Chatbot_Automation`。
+  只用 `Stop-ScheduledTask` 不够：uvicorn 可能还在跑。
+- 拿掉自动启动：`.\deploy\install-autostart.ps1 -Remove`（会先停下本系统）。
 
 ## 7. 装好之后的检查（在 B 上）
 
@@ -164,12 +167,13 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 4. `.env`：`GPIS_CONNECTION_STRING` 用开发电脑的 `chatbot_reader`（`SERVER=localhost\SQLEXPRESS;DATABASE=GPiS_Dev`）、`GPIS_EXPECTED_DATABASE=GPiS_Dev`、`DATABASE_URL` 指到 `chatbot_rehearsal`。
 5. 第 5、6 步（不用接主机 A；`2026-09-02` 当「明天」）。
 6. 第 7 节的检查：第 4 项用 `2026-09-02` → Ready 25；第 5 项读 `GPiS_Dev` 时**没有** *Open in WhatsApp*（D44），用 `REMINDER_SOURCE=demo` 和自己的号码试；第 6 项用手机连同一个 Wi-Fi 打 `http://<开发电脑的IP>:8000` → 打不开。
-7. 演练完：`.\deploy\install-autostart.ps1 -Remove`、删掉 `D:\ChatbotRehearsal`、`%LOCALAPPDATA%\Chatbot`（里面的备份有 `GPiS_Dev` 的病人名字）、`DROP DATABASE chatbot_rehearsal;`，`pgpass.conf` 那一行也删掉。
+7. 演练完：`.\deploy\install-autostart.ps1 -Remove`（会先停下本系统）、删掉 `D:\ChatbotRehearsal`、`%LOCALAPPDATA%\Chatbot`（里面的备份有 `GPiS_Dev` 的病人名字）、`DROP DATABASE chatbot_rehearsal;`，`pgpass.conf` 那一行也删掉。
 
 ## 9. 以后更新
 
 1. 开发电脑：新的 `chatbot-<commit>.zip`（第 2 节）。
-2. B：`Stop-ScheduledTask -TaskName Chatbot_Automation`；把 `C:\Chatbot_Automation` 改名成 `C:\Chatbot_Automation.old`（要退回时用）。
+2. B：`C:\Chatbot_Automation\deploy\stop-chatbot.ps1` → `已经停了`；`cd C:\`（PowerShell 在那个文件夹里就改不了名），
+   把 `C:\Chatbot_Automation` 改名成 `C:\Chatbot_Automation.old`（要退回时用）。
 3. 解压新的到 `C:\Chatbot_Automation`；把旧的 `backend\.env` 复制过来；重新建 venv、`pip install -r requirements.txt`。
 4. `alembic upgrade head`（开机时的备份就是改表之前的那一份）。
 5. `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。没问题再删 `.old`。
