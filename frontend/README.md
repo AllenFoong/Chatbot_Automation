@@ -101,7 +101,7 @@ npm run build       # TypeScript 检查 + 打包到 dist\（不进仓库）
 | 5 | **Hand back to AI** | 回到 *The AI is replying …* |
 | 6 | *Settings → Doctors & schedules*：星期六 *Last slot* 选比 *Start* 早的时间 | 红字说明哪里错，*Save schedule* 不能按；改回来 → *Saved.* |
 | 7 | *Treatments* → `C/UP` → Edit → 改名字 → Save；`SC` → Edit → *Group* 选 `CROWN` → Save；`SCAN B` → *Group* 选 `BRIDGE` | 名字更新（代码里有 `/` 也没问题）；`SC`、`ISSUE CROWN` 都是 `CROWN`，`SCAN B`、`ISSUE BRIDGE` 都是 `BRIDGE` |
-| 8 | *Clinic closures* → **Import public holidays for 2026** | *Added 23 day(s)*（已经在 4a 导入过的话：*Added 0 day(s); 23 were already there*） |
+| 8 | *Clinic closures* → **Import public holidays for 2026** | *Added 10 day(s)*（诊所休的 10 种，D61；已经导入过的话：*Added 0 day(s); 10 were already there*） |
 | 9 | 加一个已经有的日子（例 2026-02-17） | *This date is already a closure day.* |
 | 10 | *Staff accounts* → 加一个 STAFF 账号 → 登出 → 用它登录 | 看不到 *Staff accounts*；*Settings* 显示 *Only an admin can change them*，没有 Edit 按钮 |
 | 11 | 用另一个浏览器（或无痕视窗）以 ADMIN 登录，停用那个 STAFF；回到 STAFF 的视窗点 *Requests* | 马上回到登录画面 |

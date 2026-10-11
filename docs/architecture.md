@@ -80,7 +80,7 @@ services              code ('OR', 'S+P', 'RCT' …), name,
                       can_be_third (能否当一格的第 3 人), may_need_1h (可能要 1 hour，由员工看情况决定),
                       ai_can_book (AI 能否自己推荐时段；否 = 收集需求后转员工，见 D16),
                       treatment_group (IMPLANT / DENTURE / ORTHO / RCT / CROWN / BRIDGE：多步骤疗程，后续预约要同一位医生，D21、D33), active
-clinic_closures       closure_date, reason                 -- 假期管理模块维护：全国 + Johor 公共假期、农历新年多休的日子、诊所自定休息日
+clinic_closures       closure_date, reason                 -- 假期管理模块维护：诊所休的 10 种公共假期（D61）、农历新年多休的日子、诊所自定休息日
                                                            -- 每年可用程序预填公共假期（如 Python `holidays` 套件），员工再核对、补上多休的日子
 doctor_leaves         doctor_id, leave_date, reason        -- 本系统记录的医生请假（备用，W25）
 clinic_settings       只有一行：max_per_slot（3）、max_per_slot_for_ai（3；改成 2 = AI 不用第 3 个名额）、clinic_contact_id（34094）

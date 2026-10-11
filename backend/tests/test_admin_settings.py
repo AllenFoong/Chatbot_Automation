@@ -70,11 +70,35 @@ def test_services(boss, session):
     assert boss.patch("/api/services/NOPE", json={"active": False}).status_code == 404
 
 
-def test_import_johor_holidays_then_add_own_closure(boss, session):
+# 诊所给的 2026 年休息的假期（2026-10-11，D61）
+CLINIC_2026 = {
+    "2026-02-17": "Chinese New Year", "2026-02-18": "Chinese New Year Holiday",
+    "2026-03-21": "Hari Raya Aidilfitri", "2026-03-22": "Hari Raya Aidilfitri Holiday",
+    "2026-03-23": "Sultan of Johor's Birthday", "2026-05-01": "Labour Day", "2026-08-31": "Merdeka Day",
+    "2026-09-16": "Malaysia Day", "2026-11-08": "Deepavali", "2026-12-25": "Christmas Day",
+}
+
+
+def test_import_only_the_holidays_the_clinic_closes(boss, session):
     r = boss.post("/api/closures/import-holidays", json={"year": 2026}).json()
     added = {c["closure_date"]: c["reason"] for c in r["added"]}
-    assert added["2026-12-25"] == "Hari Krismas"
-    assert "2026-03-23" in added                    # 苏丹华诞：Johor 州的假期
+    assert added == CLINIC_2026                     # 和诊所的名单一模一样
+    assert "2026-05-31" not in added                # Wesak：诊所照常营业
+    assert "2026-11-09" not in added                # Deepavali 的替代假（observed）：不休
+    assert "2026-03-24" not in added and "2026-03-20" not in added    # Hari Raya 的替代假、additional holiday
+    assert r["already_there"] == 0
+
+
+def test_clinic_holidays_2027_has_the_same_ten():
+    from app.api.settings import clinic_holidays
+    found = clinic_holidays(2027)
+    assert sorted(found.values()) == sorted(CLINIC_2026.values())    # 每一种都找得到（套件改名字的话这里会失败）
+    assert date(2027, 2, 6) in found and date(2027, 2, 9) not in found    # 农历新年在星期六；替代假不休
+
+
+def test_import_holidays_then_add_own_closure(boss, session):
+    r = boss.post("/api/closures/import-holidays", json={"year": 2026}).json()
+    added = {c["closure_date"]: c["reason"] for c in r["added"]}
     assert r["already_there"] == 0
     again = boss.post("/api/closures/import-holidays", json={"year": 2026}).json()
     assert again["added"] == [] and again["already_there"] == len(added)    # 再导入一次不会重复

@@ -54,7 +54,15 @@ export default function ClosuresSection({ canEdit }: { canEdit: boolean }) {
 
   async function importHolidays() {
     setImported(null);
-    if (!window.confirm(`Add the Malaysia + Johor public holidays for ${year}? Days already in the list are kept.`)) return;
+    if (
+      !window.confirm(
+        `Add the public holidays the clinic closes on in ${year}? ` +
+          "(Chinese New Year 2 days, Hari Raya Aidilfitri 2 days, Sultan of Johor's Birthday, Labour Day, " +
+          "Merdeka Day, Malaysia Day, Deepavali, Christmas Day. Replacement days are not added.) " +
+          "Days already in the list are kept.",
+      )
+    )
+      return;
     await action.run(async () => {
       const result = await api.settings.importHolidays(year);
       setImported(
