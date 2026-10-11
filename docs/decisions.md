@@ -45,7 +45,7 @@
 | D38 | 病人传的照片、语音、文件**先不下载**，只存 `[Image]`、`[Voice message]` 等说明；程序日志也不记消息内容和电话号码 | 是病人资料（可能是伤口照片）；存在哪里、保留多久要先决定（A9）。日志常常被复制、贴出去，不能有病人资料 |
 | D39 | 开发用的 WhatsApp access token 用**测试 Business portfolio 里 System User 的 token**：只给测试 App 和测试 WhatsApp 帐号、只有 `whatsapp_business_messaging` + `whatsapp_business_management`、**60 天**失效（不选 *Never*），只存在 `.env`；怀疑外泄就 *Revoke* | *API Setup* 按出来的 token 实测大约 1 小时就失效，测试清单做不完；60 天的 token 外泄了也会自己失效，权限只到测试号码（D34）。上线（5c）的 token 怎么保管，到时再决定 |
 
-D40–D61 是 **Phase 5b（预约提醒）、A1 和 5c 的设计决定**，2026-10-08（设计见 [`architecture.md`](architecture.md) 第 8–10 节）。
+D40–D62 是 **Phase 5b（预约提醒）、A1 和 5c 的设计决定**，2026-10-08（设计见 [`architecture.md`](architecture.md) 第 8–10 节）。
 D48–D50 是按诊所第一轮问卷、D51–D53 是按第二轮问卷（都是 2026-10-08）新增的；D48 取代 D42、D43 的一部分。
 
 | # | 决定 | 原因 |
@@ -72,6 +72,7 @@ D48–D50 是按诊所第一轮问卷、D51–D53 是按第二轮问卷（都是
 | D59 | 只读帐号的做法（D52）：`sql/create_readonly_login.sql` 建 `chatbot_reader`，只 `GRANT SELECT` `Tbl_CAH_Appointment`、`Qry_CAH_Appointment`，`DENY SELECT` `Tbl_User`；用 sqlcmd + Windows 帐号在 GPiS 所在的电脑执行，密码执行时传进去、只写在 `.env`。**读主机的 `GPiS`（`GPIS_EXPECTED_DATABASE=GPiS`）时，系统每次连线先用 `HAS_PERMS_BY_NAME` 检查帐号**：sysadmin、能写入、能改数据库、能执行 stored procedure、读得到 `Tbl_User`，就拒绝读取。读 `GPiS_Dev` 不检查（开发电脑用 Windows 帐号） | W51：柜台另一台的 GPiS 用 `sa` 经局域网连 A，所以 A 不用改设定、不用重开，只要加帐号。程序本来就只有 `SELECT`，但万一有人把连线字符串改成 `sa`，系统也不会用一个能写的帐号碰正式数据库（规则 1、3）。检查只看权限，不读任何资料（规则 5） |
 | D60 | 只读帐号还要在**数据库层 `DENY`** 改结构、写入、备份（`ALTER`、`CREATE TABLE/VIEW/PROCEDURE/FUNCTION/RULE/DEFAULT/TYPE/SCHEMA`、`BACKUP DATABASE/LOG`、`INSERT/UPDATE/DELETE`），而且**除了那两个，其他所有表和视图都 `DENY SELECT`**（取代只 `DENY` `Tbl_User`）；脚本最后用 `chatbot_reader` 的身份检查，读得到的表不是 2 个、或还有别的数据库层权限就报错。系统的检查（D59）也加上 `CREATE VIEW/PROCEDURE/FUNCTION` 等和 `BACKUP`，查不到的权限当作有 | 开发电脑测试（2026-10-11）：`--check-gpis` 说 `chatbot_reader`「可以改数据库的结构」。查到 GPiS 的数据库把 `CREATE TABLE`、`CREATE VIEW`、`CREATE PROCEDURE`、`CREATE FUNCTION`、`CREATE RULE`、`CREATE DEFAULT`、`BACKUP DATABASE`、`BACKUP LOG` 给了 `public`，每个帐号都自动有；`GPiS_Dev` 是主机的备份，主机 A 也一样。`BACKUP DATABASE` = 可以把整个数据库（所有病人资料、`Tbl_User`）备份成档案。`DENY` 压过 `GRANT`，只对 `chatbot_reader` 有效，不用改 `public`，不影响 GPiS（`sa` 不受权限限制）。GPiS 以后新加的表不在 `DENY` 里：`--check-gpis` 会提醒「读得到 N 个表或视图」，那时重建帐号 |
 | D61 | **只导入诊所会休的 10 种公共假期**（修正 D27）：Chinese New Year 两天、Hari Raya Aidilfitri 两天、Sultan of Johor's Birthday、Labour Day、Merdeka Day、Malaysia Day、Deepavali、Christmas Day；名单上用诊所的写法（英文）。其他公共假期和替代假（`observed`、`additional holiday`）不导入。回教节日是套件预估的日期，导入后员工核对；农历新年多休的日子员工自己加 | 诊所给的 2026 年休息名单（2026-10-11）只有这 10 天。照 D27 导入全国 + Johor 的全部假期，2026 年会多出 13 天（Wesak、Hari Raya Haji、替代假 …），那些日子诊所有开，系统却会说休息、不给约。2026 年的名单没有替代假（Hari Raya 的 3 月 24 日、Deepavali 的 11 月 9 日），所以替代假当作照常营业（W56 待确认） |
+| D62 | 5b 试跑装在电脑 B 的做法（`docs/deploy-pc-b.md`）：**FastAPI 同时提供 build 好的网页**（`frontend/dist`），B 只跑一个 uvicorn、不装 Node.js；**只听 `127.0.0.1`**，只有 B 自己的浏览器打得开（`http://localhost:8000`），所以不用 https、`COOKIE_SECURE=false`；工作排程器在**登入 Windows 时**启动，停了自动重开；每次开机先 `pg_dump` 备份本系统的数据库到 B 的硬盘（留 14 份）；程序用 USB 带 zip（`deploy/make-package.ps1`，只有 commit 过的程序 + 网页），B 上不装 git、不登入 GitHub；不收 WhatsApp（webhook、cloudflared 不装）；不印每个网址（`--no-access-log`） | W53：员工在诊所里用就够；*Open in WhatsApp* 要在装 WhatsApp Desktop 的那台按，所以先只给 B 用。开放给局域网就要 https 和更多保护，网页里有病人名字和号码。W54：B 下班会关，所以跟着登入启动、不用 Windows 服务。备份里有病人资料，只留在 B（规则 4）。诊所的电脑不登入私人帐号（数据安全规则） |
 
 ## 数据安全规则（病人资料，受马来西亚 PDPA 保护）
 

@@ -1,0 +1,175 @@
+# 装到柜台电脑 B（Phase 5b 试跑，D53、D62）
+
+柜台有两台电脑：**A**（主机，SQL Server + GPiS 数据库，24 小时开着）、**B**（另一台，下班会关，W54）。
+本系统装在 **B**，经局域网用只读帐号读 A 的 GPiS（D52、D60）。**A 上什么都不装**（规则 1）。
+
+**先在开发电脑照这份文件演练一次**（第 8 节），全部通过才去诊所装。
+
+## 1. 这一版做什么、不做什么
+
+| | |
+|---|---|
+| ✅ 员工在 **B 的浏览器**打开 `http://localhost:8000` | Admin Platform：Reminders 名单（读 A 的实时预约）、*Open in WhatsApp*、*NO WA*、Settings |
+| ✅ 按 *Open in WhatsApp* → **B 上的 WhatsApp Desktop** 打开那位病人的对话，消息已经填好，员工按 Enter | 和现在员工一条条发一样，只是名单、`*C`、家人合并由系统做（D54） |
+| ✅ 登入 Windows 就自动启动；每次开机备份本系统的数据库 | `deploy/install-autostart.ps1`、`deploy/start-chatbot.ps1` |
+| ❌ **只有 B 自己打得开**（`127.0.0.1`），A 或别的电脑、手机都打不开 | 网页里有病人名字和号码；不开放给局域网，就不用 https（D62） |
+| ❌ 不收 WhatsApp 消息（5a 的 webhook、cloudflared 不装） | 要等 5c 接上诊所的号码 |
+| ❌ 不装 Node.js、git、SQL Server | 网页在开发电脑 build 好，用 USB 带过去 |
+
+试跑期间员工**照旧手动发**，同时对照系统的名单 1–2 星期（W42）。
+
+## 2. 去诊所之前
+
+**要先知道的**（下次去诊所看 / 问）：
+
+| | 要求 |
+|---|---|
+| Windows 版本 | Windows 10 或 11，**64 位**（*设定 → 系统 → 关于*） |
+| 内存 | 至少 4 GB（8 GB 比较好）；PostgreSQL + Python 大约用 300–500 MB |
+| 硬盘 | 至少 5 GB 空的 |
+| 帐号 | 员工平常登入 B 的 Windows 帐号（本系统跟着这个帐号启动）；要能装程序（问一下有没有系统管理员密码） |
+| WhatsApp | B 上有没有装 WhatsApp Desktop、登入的是不是诊所的号码？员工现在用哪台电脑 / 手机发提醒？（W58） |
+| 网络 | B 连得到 A（B 的 GPiS 现在就是经局域网连 A，W51），也连得到网络（装套件要用） |
+
+**在开发电脑准备好**：
+
+1. `git pull`，确认 `main` 是最新的、`pytest`、`npm test` 都通过。
+2. 做安装包（在仓库根目录）：
+   ```powershell
+   .\deploy\make-package.ps1
+   ```
+   → 桌面上的 `chatbot-<commit>.zip`：程序 + build 好的网页。**不包含** `.env`、密码、资料库、GPiS 的备份。
+3. 下载这三个安装程序，和 zip 一起放进 USB：
+   - Python 3.12 或以上（python.org，Windows installer 64-bit）
+   - PostgreSQL 17 或以上（postgresql.org → Windows → EDB installer）
+   - ODBC Driver 18 for SQL Server（Microsoft 网站，x64）
+4. 想好 B 要用的两个密码（PostgreSQL 的 `postgres`、`chatbot`），存在**自己的密码管理器**，不写在纸上、不放 USB。
+   `chatbot_reader` 的密码在 B 上产生（第 5 步）。
+
+## 3. 在 B 上安装程序（只做一次）
+
+用员工平常登入的 Windows 帐号。
+
+1. **Python**：执行安装程序，勾选 *Add python.exe to PATH*。装好后开 PowerShell：`python --version` → 3.12 或以上。
+2. **ODBC Driver 18**：执行安装程序。确认：
+   ```powershell
+   Get-OdbcDriver | Where-Object Name -like "*SQL Server*" | Select-Object Name
+   ```
+   → 有 `ODBC Driver 18 for SQL Server`（GPiS 用的旧版 driver 也会在，不要动它）。
+3. **PostgreSQL**：组件只选 *PostgreSQL Server*、*Command Line Tools*（不用 pgAdmin、Stack Builder）；
+   `postgres` 的密码用第 2 节准备的；port `5432`；Windows 防火墙问的话**不要**允许公用网络。
+   开始菜单 → *SQL Shell (psql)* → 一路 Enter → 打 `postgres` 的密码：
+   ```sql
+   CREATE ROLE chatbot LOGIN PASSWORD '换成 chatbot 的密码';
+   CREATE DATABASE chatbot OWNER chatbot;
+   \q
+   ```
+   B 上的数据库叫 `chatbot`（开发电脑是 `chatbot_dev`）。B 上**不建** `chatbot_test`，不在 B 上跑测试。
+4. **备份用的密码档**（`start-chatbot.ps1` 的 `pg_dump` 会读）：
+   ```powershell
+   New-Item -ItemType Directory -Force "$env:APPDATA\postgresql" | Out-Null
+   notepad "$env:APPDATA\postgresql\pgpass.conf"
+   ```
+   写一行（换成 `chatbot` 的密码），存档：
+   ```
+   localhost:5432:chatbot:chatbot:换成chatbot的密码
+   ```
+5. **本系统**：把 zip 解压到 `C:\Chatbot_Automation`（这个位置以后更新也用一样的）。
+   ```powershell
+   cd C:\Chatbot_Automation\backend
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1          # 不让执行的话先跑：Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+   pip install -r requirements.txt       # 只装执行要用的（不装测试工具）
+   copy .env.example .env
+   notepad .env
+   ```
+
+## 4. B 的 `.env`
+
+先用**假资料**确认装好（第 5 步），之后才接 A：
+
+```ini
+GPIS_CONNECTION_STRING=DRIVER={ODBC Driver 18 for SQL Server};SERVER=<主机A的IP>\SQLEXPRESS;DATABASE=GPiS;UID=chatbot_reader;PWD=<第 5 步产生的密码>;TrustServerCertificate=yes;ApplicationIntent=ReadOnly
+GPIS_EXPECTED_DATABASE=GPiS
+DATABASE_URL=postgresql+psycopg://chatbot:<chatbot 的密码>@localhost:5432/chatbot
+COOKIE_SECURE=false
+AI_REPLIES_ENABLED=false
+REMINDER_CLINIC_NAME=<照诊所现在的原文>
+REMINDER_CLINIC_NAME_EN=<照诊所现在的原文>
+REMINDER_BRANCH=<照诊所现在的原文>
+REMINDER_SOURCE=demo
+```
+
+- `COOKIE_SECURE=false`：只在 B 自己用 `http://localhost`，没有 https（D62）。
+- WhatsApp 那几行（`WHATSAPP_*`）留着 `CHANGE_ME`、`WHATSAPP_ALLOWED_RECIPIENTS` 留空：这一版不用 Cloud API 发消息。
+- `TEST_DATABASE_URL` 删掉（B 上不跑测试）。
+- `.env` 有密码：只在 B 上，不复制、不拍照、不贴给 AI（规则 6）。
+
+## 5. 建表、帐号、假期
+
+在 `C:\Chatbot_Automation\backend`（venv 启用中）：
+
+```powershell
+alembic upgrade head                                  # 建表（最后一行是 0004）
+python -m app.db.seed                                 # 初始设置：医生、排班、疗程
+python -m app.db.create_staff boss "Your Name" --admin  # ADMIN 帐号（密码会问两次）
+python -m app.db.create_staff staff1 "员工名字"        # 每位员工一个 STAFF 帐号
+python -m app.reminders_cli 2026-10-12                # REMINDER_SOURCE=demo：应该印出假资料的名单
+```
+
+**不要**跑 `python -m app.db.demo`（假的对话、预约请求，B 上不要有）。
+
+接主机 A（诊所同意、病人少的时候）：
+
+1. 照 [`sql/README.md`](../sql/README.md)「只读帐号」**第二步**：在 B 产生密码 → 写进 `.env` 的 `PWD=` → 在 A 上跑 `create_readonly_login.sql`（`ReadableTablesAndViews = 2`、`OtherDatabasePermissions = 0`）。
+2. `.env` 拿掉 `REMINDER_SOURCE=demo` 那一行。
+3. `python -m app.reminders_cli --check-gpis` → 两个 `[OK]`（读的是 `GPiS`，帐号不是只读的话系统会拒绝，D59）。
+4. `python -m app.reminders_cli` → 明天的名单；和 GPiS 的 Appointment 画面对照人数。
+
+## 6. 登入就自动启动
+
+```powershell
+cd C:\Chatbot_Automation
+.\deploy\install-autostart.ps1
+Start-ScheduledTask -TaskName Chatbot_Automation
+```
+
+等 10 秒，浏览器打开 <http://localhost:8000> → 登入画面。把这个网址加进书签 / 桌面捷径。
+
+- 日志：`%LOCALAPPDATA%\Chatbot\logs\`（`start.log` 每次启动、备份的记录；`uvicorn.log` 这次开机的程序日志）。
+- 备份：`%LOCALAPPDATA%\Chatbot\backup\chatbot-日期.dump`，每次开机一份，留最新 14 份。
+  **里面有病人名字和号码**：只留在 B，不复制到 USB、网盘（规则 4）。
+- 拿掉自动启动：`.\deploy\install-autostart.ps1 -Remove`。
+
+## 7. 装好之后的检查（在 B 上）
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 重新开机，登入 Windows，打开 <http://localhost:8000> | 登入画面（不用开任何视窗） |
+| 2 | `start.log` | `备份：…dump`、`uvicorn 启动` |
+| 3 | 用 ADMIN 登入 → *Settings → Clinic closures* → *Import public holidays for 2026*，再换 2027 | 各 *Added 10 day(s)*；核对 Hari Raya 的日期；补上农历新年多休的日子（W57） |
+| 4 | *Reminders* → 明天 | 名单的人数和 GPiS 一样；家人合并、`*C` 的规则对 |
+| 5 | 挑一行按 *Open in WhatsApp* | WhatsApp Desktop 打开**那位病人**的对话、消息已经填好。**不要按 Enter**（试跑期间员工照旧手动发）→ 关掉 |
+| 6 | 另一台电脑（例如 A）的浏览器打 `http://<B的IP>:8000` | **打不开**（只听 `127.0.0.1`，D62） |
+| 7 | 用 STAFF 帐号登入 | 看得到名单；*Settings* 不能改 |
+
+## 8. 先在开发电脑演练
+
+和 B 一样，只是读 `GPiS_Dev`、用另一个文件夹和数据库，不影响平常开发：
+
+1. **关掉**平常开发用的 uvicorn（port 8000 要空出来）。
+2. 照第 2 节做安装包，解压到 `D:\ChatbotRehearsal`（不是仓库的文件夹）。
+3. 第 3 节的 3–5 步：数据库改叫 `chatbot_rehearsal`（psql：`CREATE DATABASE chatbot_rehearsal OWNER chatbot;`，开发电脑已经有 `chatbot` 这个 role）；
+   `pgpass.conf` 的那一行写 `localhost:5432:chatbot_rehearsal:chatbot:密码`（`start-chatbot.ps1` 照 `.env` 的 `DATABASE_URL` 备份哪个数据库）。
+4. `.env`：`GPIS_CONNECTION_STRING` 用开发电脑的 `chatbot_reader`（`SERVER=localhost\SQLEXPRESS;DATABASE=GPiS_Dev`）、`GPIS_EXPECTED_DATABASE=GPiS_Dev`、`DATABASE_URL` 指到 `chatbot_rehearsal`。
+5. 第 5、6 步（不用接主机 A；`2026-09-02` 当「明天」）。
+6. 第 7 节的检查：第 4 项用 `2026-09-02` → Ready 25；第 5 项读 `GPiS_Dev` 时**没有** *Open in WhatsApp*（D44），用 `REMINDER_SOURCE=demo` 和自己的号码试；第 6 项用手机连同一个 Wi-Fi 打 `http://<开发电脑的IP>:8000` → 打不开。
+7. 演练完：`.\deploy\install-autostart.ps1 -Remove`、删掉 `D:\ChatbotRehearsal`、`%LOCALAPPDATA%\Chatbot`（里面的备份有 `GPiS_Dev` 的病人名字）、`DROP DATABASE chatbot_rehearsal;`，`pgpass.conf` 那一行也删掉。
+
+## 9. 以后更新
+
+1. 开发电脑：新的 `chatbot-<commit>.zip`（第 2 节）。
+2. B：`Stop-ScheduledTask -TaskName Chatbot_Automation`；把 `C:\Chatbot_Automation` 改名成 `C:\Chatbot_Automation.old`（要退回时用）。
+3. 解压新的到 `C:\Chatbot_Automation`；把旧的 `backend\.env` 复制过来；重新建 venv、`pip install -r requirements.txt`。
+4. `alembic upgrade head`（开机时的备份就是改表之前的那一份）。
+5. `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。没问题再删 `.old`。
