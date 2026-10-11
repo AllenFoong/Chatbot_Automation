@@ -87,7 +87,7 @@
 - **`Tbl_CAH_RefAppointmentStatus`**：`Waiting`、`Canceled`、`Postpone`、`Closed`、`Rearrange`、`Confirmed`
 - **`Qry_CAH_Resource_Sch`（医生）**：`PHANG`、`GOH`、`DOCTOR`（`DOCTOR` 疑似"不指定医生"的通用账号）
 
-- **营业时间**：GPiS 里没有，由诊所提供：9:00–17:00，最后预约 16:30，星期六、日营业（和平日一样），全国 + Johor 公共假期休息；医生排班、午休见 [`clinic-workflow.md`](clinic-workflow.md) 第 1 节。
+- **营业时间**：GPiS 里没有，由诊所提供：9:00–17:00，最后预约 16:30，星期六、日营业（和平日一样），只有 10 种公共假期休息（D61）；医生排班、午休见 [`clinic-workflow.md`](clinic-workflow.md) 第 1 节。
 
 ### 状态是否占用时段（按 staff 实际用法，待统计验证）
 

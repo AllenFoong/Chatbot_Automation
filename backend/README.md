@@ -163,7 +163,7 @@ python -m app.db.demo                    # 放假资料（4 段对话、4 个预
 | `PUT /api/reminders/opt-out`（`{phone, opted_out}`） | STAFF | 这个号码不要提醒（签名表写 NO WA，D55）/ 改回照常提醒 |
 | `GET /api/doctors`、`services`、`closures`、`leaves`、`settings` | STAFF | 看设置 |
 | 上面这些设置的 `POST` / `PUT` / `PATCH` / `DELETE` | **ADMIN** | 改医生、排班（一次 7 天）、疗程、休息日、请假、每格上限 |
-| `POST /api/closures/import-holidays` | **ADMIN** | 预填一年的全国 + Johor 公共假期；农历新年多休的日子要自己加，回教节日是预估日期要核对 |
+| `POST /api/closures/import-holidays` | **ADMIN** | 预填一年诊所会休的公共假期（全国 + Johor 里挑出来的 10 种 + 1 月 1 日，替代假不算，D61）；农历新年多休的日子要自己加，回教节日是预估日期要核对 |
 | `/api/staff` | **ADMIN** | 员工账号：新增、改权限、停用、重设密码（至少要留一个 ADMIN） |
 
 - 员工回复病人：Phase 5a 加上了（见下面「Phase 5a」）。

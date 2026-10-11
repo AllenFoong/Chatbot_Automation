@@ -70,11 +70,47 @@ def test_services(boss, session):
     assert boss.patch("/api/services/NOPE", json={"active": False}).status_code == 404
 
 
-def test_import_johor_holidays_then_add_own_closure(boss, session):
+# 诊所给的 2026 年休息的假期（2026-10-11，D61）；New Year's Day 是 2027 年的名单才有的（W57），每年都加
+CLINIC_2026 = {
+    "2026-01-01": "New Year's Day",
+    "2026-02-17": "Chinese New Year", "2026-02-18": "Chinese New Year Holiday",
+    "2026-03-21": "Hari Raya Aidilfitri", "2026-03-22": "Hari Raya Aidilfitri Holiday",
+    "2026-03-23": "Sultan of Johor's Birthday", "2026-05-01": "Labour Day", "2026-08-31": "Merdeka Day",
+    "2026-09-16": "Malaysia Day", "2026-11-08": "Deepavali", "2026-12-25": "Christmas Day",
+}
+
+
+def test_import_only_the_holidays_the_clinic_closes(boss, session):
     r = boss.post("/api/closures/import-holidays", json={"year": 2026}).json()
     added = {c["closure_date"]: c["reason"] for c in r["added"]}
-    assert added["2026-12-25"] == "Hari Krismas"
-    assert "2026-03-23" in added                    # 苏丹华诞：Johor 州的假期
+    assert added == CLINIC_2026                     # 和诊所的名单一模一样
+    assert "2026-05-31" not in added                # Wesak：诊所照常营业
+    assert "2026-11-09" not in added                # Deepavali 的替代假（observed）：不休
+    assert "2026-03-24" not in added and "2026-03-20" not in added    # Hari Raya 的替代假、additional holiday
+    assert r["already_there"] == 0
+
+
+# 诊所给的 2027 年名单（2026-10-12，W57）。Deepavali（10 月 28 日）是诊所漏写的，照样休（W59）
+CLINIC_2027 = {
+    date(2027, 1, 1): "New Year's Day", date(2027, 2, 6): "Chinese New Year",
+    date(2027, 2, 7): "Chinese New Year Holiday", date(2027, 3, 10): "Hari Raya Aidilfitri",
+    date(2027, 3, 11): "Hari Raya Aidilfitri Holiday", date(2027, 3, 23): "Sultan of Johor's Birthday",
+    date(2027, 5, 1): "Labour Day", date(2027, 8, 31): "Merdeka Day", date(2027, 9, 16): "Malaysia Day",
+    date(2027, 12, 25): "Christmas Day",
+}
+
+
+def test_clinic_holidays_2027_matches_the_clinic_list():
+    from app.api.settings import clinic_holidays
+    found = clinic_holidays(2027)
+    assert {d: n for d, n in found.items() if d in CLINIC_2027} == CLINIC_2027    # 诊所名单上的每一天都有
+    assert set(found) - set(CLINIC_2027) == {date(2027, 10, 28)}                 # 加上漏写的 Deepavali（W59）
+    assert date(2027, 2, 9) not in found        # 农历新年在星期日的替代假：不休（W56）
+
+
+def test_import_holidays_then_add_own_closure(boss, session):
+    r = boss.post("/api/closures/import-holidays", json={"year": 2026}).json()
+    added = {c["closure_date"]: c["reason"] for c in r["added"]}
     assert r["already_there"] == 0
     again = boss.post("/api/closures/import-holidays", json={"year": 2026}).json()
     assert again["added"] == [] and again["already_there"] == len(added)    # 再导入一次不会重复

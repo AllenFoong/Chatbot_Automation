@@ -101,7 +101,7 @@ npm run build       # TypeScript 检查 + 打包到 dist\（不进仓库）
 | 5 | **Hand back to AI** | 回到 *The AI is replying …* |
 | 6 | *Settings → Doctors & schedules*：星期六 *Last slot* 选比 *Start* 早的时间 | 红字说明哪里错，*Save schedule* 不能按；改回来 → *Saved.* |
 | 7 | *Treatments* → `C/UP` → Edit → 改名字 → Save；`SC` → Edit → *Group* 选 `CROWN` → Save；`SCAN B` → *Group* 选 `BRIDGE` | 名字更新（代码里有 `/` 也没问题）；`SC`、`ISSUE CROWN` 都是 `CROWN`，`SCAN B`、`ISSUE BRIDGE` 都是 `BRIDGE` |
-| 8 | *Clinic closures* → **Import public holidays for 2026** | *Added 23 day(s)*（已经在 4a 导入过的话：*Added 0 day(s); 23 were already there*） |
+| 8 | *Clinic closures* → **Import public holidays for 2026** | *Added 11 day(s)*（诊所休的那几种，D61；已经导入过的话：*Added 0 day(s); 11 were already there*） |
 | 9 | 加一个已经有的日子（例 2026-02-17） | *This date is already a closure day.* |
 | 10 | *Staff accounts* → 加一个 STAFF 账号 → 登出 → 用它登录 | 看不到 *Staff accounts*；*Settings* 显示 *Only an admin can change them*，没有 Edit 按钮 |
 | 11 | 用另一个浏览器（或无痕视窗）以 ADMIN 登录，停用那个 STAFF；回到 STAFF 的视窗点 *Requests* | 马上回到登录画面 |
@@ -121,10 +121,14 @@ CREATE DATABASE chatbot_dev OWNER chatbot;
 再到 `backend` 跑 `alembic upgrade head` → `python -m app.db.seed` → `python -m app.db.create_staff …` → `python -m app.db.demo`。
 **只对 `chatbot_dev` 做**，它里面只有假资料。
 
-## 上线（以后，Phase 7）
+## 上线
 
-`npm run build` 产生的 `dist\` 是普通的 HTML / JS / CSS 文件，要和 `/api` 放在**同一个网址**下（例如 FastAPI 或 nginx 同时提供两者），
-cookie 才会带上；那时要用 https 并把 `COOKIE_SECURE=true`。现在先只在开发电脑上用 `npm run dev`。
+`npm run build` 产生的 `dist\` 是普通的 HTML / JS / CSS 文件，要和 `/api` 放在**同一个网址**下，cookie 才会带上。
+
+- **5b 试跑（电脑 B）**：FastAPI 同时提供 `dist\`，只听 `127.0.0.1`，用 `http://localhost:8000`（D62，步骤见 [`docs/deploy-pc-b.md`](../docs/deploy-pc-b.md)）。
+- **以后放到网络上（Phase 7）**：要用 https 并把 `COOKIE_SECURE=true`。
+
+开发时照旧用 `npm run dev`。
 
 ## 测试记录
 
@@ -142,3 +146,11 @@ cookie 才会带上；那时要用 https 并把 `COOKIE_SECURE=true`。现在先
 - 测试清单 1–12 项全部正常（包括 `SC`、`SCAN B` 的 *Group* 改成 `CROWN`、`BRIDGE`）。
 
 结论：Phase 4b 完成。
+
+### 公共假期只导入诊所休的日子（D61，2026-10-12，开发电脑）
+
+- `pytest` 300 passed、`npm test` 44 passed。
+- 先在 `chatbot_dev` 删掉以前导入的 24 天（Phase 4a 的 23 天 + 测试加的 1 天）。
+- *Import public holidays for 2026* → *Added 11 day(s)*：1 月 1 日 + 诊所给的 10 天，没有替代假（3 月 24 日、11 月 9 日）。
+- *Import public holidays for 2027* → *Added 11 day(s)*：和诊所的名单一样（Deepavali 10 月 28 日：诊所漏写了，W59）。
+- 加 `2026-09-02 Test closure`：`python -m app.cli 2026-09-02 PHANG S+P` → `CLINIC_CLOSED`；`python -m app.reminders_cli 2026-09-02` → Ready 0，25 个预约在 *Needs staff*（*Clinic is closed that day (Test closure)*）；删掉之后变回 `OK`（W56）。

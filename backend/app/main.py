@@ -19,6 +19,7 @@ from .clinic_rules import ClinicRules
 from .config import get_settings
 from .db.rules import RulesNotConfigured, load_clinic_rules
 from .db.session import get_session
+from .frontend_files import frontend_dist, mount_frontend
 from .gpis import AppointmentSource, GpisReader, WrongDatabaseError
 
 log = logging.getLogger(__name__)
@@ -146,3 +147,9 @@ def availability(
         if debug
         else None,
     )
+
+
+# 上线（电脑 B）：同一个网址提供网页（D62）。放在最后：上面的 API 路由先配对
+_dist = frontend_dist()
+if _dist is not None:
+    mount_frontend(app, _dist)

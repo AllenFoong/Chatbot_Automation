@@ -29,7 +29,10 @@ function AddClosureForm({ year, onAdded }: { year: number; onAdded: () => void }
   return (
     <form className="card inline-form" onSubmit={submit}>
       <h3>Add a closure day</h3>
-      <p className="muted small">For example the extra Chinese New Year days, or a clinic holiday.</p>
+      <p className="muted small">
+        For example a day the clinic decides to close. No new bookings on that day; appointments
+        already there show under <em>Needs staff</em> on the Reminders page, so you can tell the patients.
+      </p>
       <div className="fields">
         <label>
           Date
@@ -54,12 +57,20 @@ export default function ClosuresSection({ canEdit }: { canEdit: boolean }) {
 
   async function importHolidays() {
     setImported(null);
-    if (!window.confirm(`Add the Malaysia + Johor public holidays for ${year}? Days already in the list are kept.`)) return;
+    if (
+      !window.confirm(
+        `Add the public holidays the clinic closes on in ${year}? ` +
+          "(New Year's Day, Chinese New Year 2 days, Hari Raya Aidilfitri 2 days, Sultan of Johor's Birthday, Labour Day, " +
+          "Merdeka Day, Malaysia Day, Deepavali, Christmas Day. Replacement days are not added.) " +
+          "Days already in the list are kept.",
+      )
+    )
+      return;
     await action.run(async () => {
       const result = await api.settings.importHolidays(year);
       setImported(
         `Added ${result.added.length} day(s); ${result.already_there} were already there. ` +
-          "Please check the Islamic holidays (their dates are estimates) and add the extra Chinese New Year days.",
+          "Please check the Hari Raya dates (they are estimates) and add any other day the clinic closes.",
       );
       closures.reload();
     });
