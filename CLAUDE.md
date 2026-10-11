@@ -83,6 +83,7 @@
 - [x] 诊所回答 W56（替代假不休；临时休息的日子员工自己加、自己通知病人）、W57（2027 年的名单：多了 New Year's Day、农历新年不多休）、W59（2027 的 Deepavali 是漏写的）→ 导入每年加上 1 月 1 日（D61）
 - [x] 假期：开发电脑测试通过（2026-10-12，2026、2027 年各导入 11 天，和诊所的名单一样；临时休息日不能约、已有的预约进 *Needs staff*；记录见 `frontend/README.md`）；`chatbot_dev` 已经照新规则重新导入
 - [x] 装到电脑 B 的文件和脚本（草稿）：`docs/deploy-pc-b.md`、`deploy/`（做安装包、登入自动启动、开机备份）；FastAPI 也提供网页、只听 `127.0.0.1`（D62）；要问 W58（B 上的 WhatsApp Desktop）；云端 `pytest` 300 个；PowerShell 脚本只在云端检查过语法
+- [x] 假期（D61）和电脑 B 的安装草稿（D62）合并进 `main`（PR #17）
 - [ ] 开发电脑照 `docs/deploy-pc-b.md` 第 8 节演练
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
