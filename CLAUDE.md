@@ -15,6 +15,7 @@
 | [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
 | [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API；Phase 3：PostgreSQL（安装、建表、改表结构的步骤）；Phase 4a：员工登录、Admin API；Phase 5a：WhatsApp（Meta 测试 App、tunnel、测试清单）；Phase 5b：预约提醒（名单、Open in WhatsApp、测试清单）；对照步骤 |
 | [`frontend/README.md`](frontend/README.md) | Phase 4b：Admin Platform 网页（React + TypeScript）：安装、启动、测试清单 |
+| [`docs/code-guide.md`](docs/code-guide.md) | 代码导读（学习笔记）：系统地图、数据流、架构选择、表和 JOIN、关键函数、测试与部署 |
 
 开始新 session 时先读这四个文件。
 
