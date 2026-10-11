@@ -85,11 +85,11 @@ def check_gpis() -> int:
         for p in problems:
             print(f"     {p}")
         print("     读主机的 GPiS 时系统会拒绝。开发电脑用 Windows 帐号（Trusted_Connection）连 GPiS_Dev 时，看到这个是正常的。")
-        return 1 if source.is_production else 0
-    print(f"[OK] 帐号 {perms.LoginName} 是只读的：读得到预约，读不到 Tbl_User，不能写。")
+    else:
+        print(f"[OK] 帐号 {perms.LoginName} 是只读的：读得到预约，读不到 Tbl_User，不能写、不能备份。")
     for w in warnings:
         print(f"[提醒] {w}")
-    return 0
+    return 1 if problems and source.is_production else 0
 
 
 def main(argv: list[str]) -> int:

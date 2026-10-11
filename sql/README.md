@@ -93,10 +93,14 @@ T5、T11 的规则已在 T4、T8、T3 里覆盖。测试后修正了两处显示
 本系统读 GPiS 要用一个**只能看预约**的帐号 `chatbot_reader`，不用 `sa`（`sa` 什么都能改，规则 1、3）。
 
 - 只给两个 `SELECT`：`dbo.Tbl_CAH_Appointment`（预约）、`dbo.Qry_CAH_Appointment`（视图，手机号码）。
-- 明确 `DENY` `dbo.Tbl_User`（规则 5）。不能写、不能改数据库、不能执行 stored procedure。
+- 其他所有表和视图都 `DENY SELECT`（包括 `dbo.Tbl_User`，规则 5）。不能写、不能改数据库、不能备份、不能执行 stored procedure。
+- **GPiS 的数据库把 `CREATE TABLE`、`CREATE PROCEDURE`、`BACKUP DATABASE` 等给了 `public`**（每个帐号都自动属于 `public`，2026-10-11 在 `GPiS_Dev` 查到；`GPiS_Dev` 是主机的备份，所以主机 A 也一样）。
+  脚本在数据库层 `DENY` 这些给 `chatbot_reader`：`DENY` 压过 `public` 的 `GRANT`，不动 `public`，不影响 GPiS（GPiS 用 `sa`）（D60）。
 - **读主机的 `GPiS` 时，系统每次连线都先检查帐号**：是 `sa` 或能写入就拒绝读取（`app/gpis.py`，D59）。
 - 脚本**不改 GPiS 的资料、不改 `sa`、不改 SQL Server 设定、不用重开 SQL Server**。
 - 密码不写在任何档案里（规则 6）：执行时传进去，再写进那台电脑的 `backend/.env`。
+- `sqlcmd` 都要加 `-C -f 65001`：新版 `sqlcmd`（ODBC Driver 18）一定加密，SQL Server 自己产生的证书不被信任，`-C` = 信任这台的证书（还是有加密，和 `.env` 的 `TrustServerCertificate=yes` 一样）；
+  `-f 65001` = 用 UTF-8 读 `.sql`，不然脚本里的中文变乱码。PowerShell 画面上中文显示成 `??` 不影响结果；要看中文就先跑 `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`。
 
 ### 从电脑 B 的 config 看到的（W51，2026-10-09）
 
@@ -113,19 +117,34 @@ T5、T11 的规则已在 T4、T8、T3 里覆盖。测试后修正了两处显示
 SSMS → 在服务器名字上按右键 → *Properties* → *Security* → 选 *SQL Server and Windows Authentication mode* → OK
 → 再在服务器名字上按右键 → *Restart*。（只在开发电脑重开。）
 
-**2. 产生密码、建帐号**（PowerShell，在仓库的 `sql` 文件夹里）
+确认：`sqlcmd -S .\SQLEXPRESS -E -C -f 65001 -Q "SELECT SERVERPROPERTY('IsIntegratedSecurityOnly') AS WindowsOnly"` → `0`（`1` = 还没生效，多半是没有 *Restart*）。
+
+**2. 产生密码、建帐号**（普通的 PowerShell，在仓库的 `sql` 文件夹里；第 2 步到第 4 项检查都用同一个视窗，`$pw` 只在这个视窗里）
 
 ```powershell
-# 24 个英文字母和数字，随机产生
+# 24 个英文字母和数字，随机产生（不印在画面上）
 $pw = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
-sqlcmd -S .\SQLEXPRESS -E -i create_readonly_login.sql -v DatabaseName="GPiS_Dev" ReaderPassword="$pw"
-$pw          # 印出密码，下一步贴进 .env
+sqlcmd -S .\SQLEXPRESS -E -C -f 65001 -i create_readonly_login.sql -v DatabaseName="GPiS_Dev" ReaderPassword="$pw"
 ```
 
-最后印出的权限应该是：`GRANT CONNECT`、`GRANT SELECT` 两个（`Qry_CAH_Appointment`、`Tbl_CAH_Appointment`）、`DENY SELECT`（`Tbl_User`），
-然后 `完成：chatbot_reader 只能读 …`。
+应该印出：
+- 权限：`GRANT CONNECT`、`GRANT SELECT` 两个（`Qry_CAH_Appointment`、`Tbl_CAH_Appointment`）；
+  `DENY` 数据库层 14 个（`ALTER`、`BACKUP DATABASE`、`BACKUP LOG`、`CREATE …` 8 个、`DELETE`、`INSERT`、`UPDATE`）、`DENY SELECT`（`Tbl_User`）
+- `DeniedTablesAndViews`：其他表和视图的数目（`Tbl_User` 也在里面）
+- `ReadableTablesAndViews = 2`、`OtherDatabasePermissions = 0`（用 `chatbot_reader` 的身份查的）；不是的话脚本报错停下
+- 最后 `完成：chatbot_reader 只能读 …`
+
+再用这个帐号登入一次，确认密码没问题：
+
+```powershell
+sqlcmd -S .\SQLEXPRESS -C -f 65001 -U chatbot_reader -P "$pw" -d GPiS_Dev -Q "SELECT SUSER_NAME() AS LoginName, DB_NAME() AS Db"
+```
+
+→ `chatbot_reader  GPiS_Dev`。
 
 **3. 改 `backend/.env`**（密码只写在这里）
+
+`$pw | Set-Clipboard`（密码进剪贴簿，不印在画面上），在 `.env` 里 `PWD=` 后面 Ctrl+V，存档：
 
 ```ini
 GPIS_CONNECTION_STRING=DRIVER={ODBC Driver 18 for SQL Server};SERVER=localhost\SQLEXPRESS;DATABASE=GPiS_Dev;UID=chatbot_reader;PWD=<上一步的密码>;TrustServerCertificate=yes;ApplicationIntent=ReadOnly
@@ -138,14 +157,35 @@ GPIS_EXPECTED_DATABASE=GPiS_Dev
 
 | # | 做什么 | 应该看到 |
 |---|---|---|
-| 1 | `python -m app.reminders_cli --check-gpis` | `[OK] GPiS_Dev 有提醒名单要用的全部栏位` 和 `[OK] 帐号 chatbot_reader 是只读的`（有 `[提醒] 读得到 N 个表或视图` 的话贴回来） |
+| 1 | `python -m app.reminders_cli --check-gpis` | `[OK] GPiS_Dev 有提醒名单要用的全部栏位` 和 `[OK] 帐号 chatbot_reader 是只读的`（有 `[提醒] 读得到 N 个表或视图` 的话贴回来）。*Login failed*：上面 sqlcmd 登入得了的话，就是 `.env` 的密码贴错了 |
 | 2 | `python -m app.reminders_cli 2026-09-02` | 和以前一样：Ready 25（视图读得到 = 手机号码都有） |
 | 3 | `python -m app.cli 2026-09-02 PHANG S+P` | 和 Phase 2 的 T6 一样（空档也用这个帐号读） |
-| 4 | （和第 2 步同一个 PowerShell 视窗，`$pw` 还在；不然把 `"$pw"` 换成 `.env` 里的密码）`sqlcmd -S .\SQLEXPRESS -U chatbot_reader -P "$pw" -d GPiS_Dev -Q "UPDATE dbo.Tbl_CAH_Appointment SET Remarks = Remarks WHERE 1 = 0"` | 错误 229：*The UPDATE permission was denied*（`WHERE 1 = 0` = 就算有权限也一行都不会改） |
+| 4 | （和第 2 步同一个 PowerShell 视窗，`$pw` 还在；不然把 `"$pw"` 换成 `.env` 里的密码）`sqlcmd -S .\SQLEXPRESS -C -f 65001 -U chatbot_reader -P "$pw" -d GPiS_Dev -Q "UPDATE dbo.Tbl_CAH_Appointment SET Remarks = Remarks WHERE 1 = 0"` | 错误 229：*The UPDATE permission was denied*（`WHERE 1 = 0` = 就算有权限也一行都不会改） |
 | 5 | 把 `.env` 改回 `Trusted_Connection=yes`，再跑第 1 项 | `[!!] 帐号 … 不是只读的 …`（开发电脑用 Windows 帐号时是正常的），证明检查有效；跑完改回 `chatbot_reader` |
-| 6 | 关掉 uvicorn；`sqlcmd -S .\SQLEXPRESS -E -i drop_readonly_login.sql -v DatabaseName="GPiS_Dev"`；再跑第 1 项 | `完成：chatbot_reader 已经拿掉`；第 1 项连不上（*Login failed*）。之后再照第 2 步建回来（新的密码），以后开发都用它 |
+| 6 | 关掉 uvicorn；`sqlcmd -S .\SQLEXPRESS -E -C -f 65001 -i drop_readonly_login.sql -v DatabaseName="GPiS_Dev"`；再跑第 1 项 | `完成：chatbot_reader 已经拿掉`；第 1 项连不上（*Login failed*）。之后再照第 2 步建回来（新的密码），以后开发都用它 |
 
 **不要**为了测试去 `SELECT` `Tbl_User`（规则 5）：读不到的检查用第 1 项（只看权限，不读资料）。
+
+### 第一步的测试记录（2026-10-11，开发电脑，`GPiS_Dev`）
+
+SQL Server 2025 Express；`IsIntegratedSecurityOnly = 0`；`sqlcmd` 用 `-C -f 65001`。
+
+| # | 结果 |
+|---|---|
+| 建帐号 | ✅ `GRANT` 3（`CONNECT`、两个 `SELECT`）；`DENY` 数据库层 14 个 + `SELECT Tbl_User`；`DeniedTablesAndViews = 201`（GPiS 一共 203 个表和视图）；`ReadableTablesAndViews = 2`、`OtherDatabasePermissions = 0`；sqlcmd 用 `chatbot_reader` 登入得到 `GPiS_Dev` |
+| 1 | ✅ 两个 `[OK]`（「不能写、不能备份」） |
+| 2 | ✅ 09-02：Ready 25 个号码 / 25 个预约、Needs staff 0；取消 3、`00:00` 1；5 个新加坡号码，和 10-09 一样。底下的表都 `DENY` 了，视图还是读得到号码（同一个 owner） |
+| 3 | ✅ `OK  Patients=25`，和 T6 一样 |
+| 4 | ✅ `Msg 229`：*The UPDATE permission was denied on the object 'Tbl_CAH_Appointment'* |
+| 5 | ✅ Windows 帐号：`[!!]` sysadmin、改结构、备份、写入 203 个、读得到 `Tbl_User`；`[提醒] 读得到 203 个`；改回来两个 `[OK]` |
+| 6 | ✅ 拿掉后 *Login failed for user 'chatbot_reader'*；用新密码建回来，两个 `[OK]` |
+
+测试时找到、已经改好的：
+
+- **第一次跑第 1 项是 `[!!] 可以改数据库的结构`**：GPiS 的数据库把 `CREATE TABLE`、`CREATE VIEW`、`CREATE PROCEDURE`、`CREATE FUNCTION`、`CREATE RULE`、`CREATE DEFAULT`、`BACKUP DATABASE`、`BACKUP LOG` 给了 `public`。
+  `BACKUP DATABASE` = 能把整个数据库备份成档案。脚本改成数据库层 `DENY`、其他表和视图全部 `DENY SELECT`、最后自己检查；`--check-gpis` 也检查 `BACKUP` 和其他 `CREATE`（D60）。主机 A 一样会有这些 `GRANT`。
+- `sqlcmd` 连不上（*The certificate chain was issued by an authority that is not trusted*）→ 加 `-C`；中文乱码 → 加 `-f 65001`。
+- 第一次 *Login failed*：sqlcmd 用 `$pw` 登入得了，所以是 `.env` 的密码贴错 → 改用 `$pw | Set-Clipboard`。
 
 ### 第二步：在主机 A 执行（装到柜台另一台电脑时，诊所同意后）
 
@@ -158,12 +198,12 @@ GPIS_EXPECTED_DATABASE=GPiS_Dev
 2. 把 `create_readonly_login.sql` 用 USB 带到**主机 A**，在 A 上开 PowerShell（营业时间也可以，不影响 GPiS；最好在病人少的时候）：
    ```powershell
    $pw = Read-Host "chatbot_reader 的密码"        # 打上一步的密码（不会存进 PowerShell 的历史记录）
-   sqlcmd -S .\SQLEXPRESS -E -i create_readonly_login.sql -v DatabaseName="GPiS" ReaderPassword="$pw"
+   sqlcmd -S .\SQLEXPRESS -E -C -f 65001 -i create_readonly_login.sql -v DatabaseName="GPiS" ReaderPassword="$pw"
    Remove-Variable pw
    ```
-   印出的权限要和开发电脑一样。A 上**不跑别的**（规则 1）。
+   印出的权限要和开发电脑一样（`ReadableTablesAndViews = 2`、`OtherDatabasePermissions = 0`）。A 上**不跑别的**（规则 1）。
 3. 回到柜台另一台电脑：`python -m app.reminders_cli --check-gpis` → 两个 `[OK]`。
 4. 连不上时：
-   - *Login failed*：密码打错 → 在 A 上跑 `drop_readonly_login.sql`（`DatabaseName="GPiS"`），再从第 1 步重来。
+   - *Login failed*：密码打错 → 在 A 上跑 `drop_readonly_login.sql`（`-C -f 65001`，`DatabaseName="GPiS"`），再从第 1 步重来。
    - SSL / TLS 的错误：SQL Server 2012 太旧，和 ODBC Driver 18 谈不拢加密。先把错误讯息贴回来再决定（可能要在连线字符串加 `Encrypt=no`：局域网里传的资料不加密，和 GPiS 现在一样）。
 

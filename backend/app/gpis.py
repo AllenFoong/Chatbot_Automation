@@ -49,14 +49,23 @@ WHERE TABLE_NAME IN ('Tbl_CAH_Appointment', 'Qry_CAH_Appointment')
 
 # 连接用的帐号能做什么（D52）。只看权限，不读任何资料（也不读 Tbl_User，规则 5）。
 _OBJECT = "QUOTENAME(SCHEMA_NAME(o.schema_id)) + '.' + QUOTENAME(o.name)"
+
+
+def _database_perms(*names: str) -> str:
+    """有几个数据库层的权限。查不到（NULL）当作有，宁可拒绝。"""
+    return " + ".join(f"ISNULL(HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', '{n}'), 1)" for n in names)
+
+
+# GPiS 的数据库把 CREATE TABLE、BACKUP DATABASE 等给了 public（每个帐号都自动有），D60
 PERMISSIONS_SQL = f"""
 SELECT SUSER_SNAME() AS LoginName,
        IS_SRVROLEMEMBER('sysadmin') AS IsSysadmin,
        HAS_PERMS_BY_NAME('dbo.Tbl_CAH_Appointment', 'OBJECT', 'SELECT') AS ReadAppointments,
        HAS_PERMS_BY_NAME('dbo.Qry_CAH_Appointment', 'OBJECT', 'SELECT') AS ReadView,
        HAS_PERMS_BY_NAME('dbo.Tbl_User', 'OBJECT', 'SELECT') AS ReadUsers,
-       HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'ALTER') + HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CREATE TABLE')
-           AS ChangeDatabase,
+       {_database_perms('ALTER', 'CREATE TABLE', 'CREATE VIEW', 'CREATE PROCEDURE', 'CREATE FUNCTION',
+                        'CREATE RULE', 'CREATE DEFAULT', 'CREATE TYPE', 'CREATE SCHEMA')} AS ChangeDatabase,
+       {_database_perms('BACKUP DATABASE', 'BACKUP LOG')} AS BackupDatabase,
        (SELECT COUNT(*) FROM sys.objects o WHERE o.type IN ('U', 'V') AND o.is_ms_shipped = 0
           AND (HAS_PERMS_BY_NAME({_OBJECT}, 'OBJECT', 'INSERT') = 1
             OR HAS_PERMS_BY_NAME({_OBJECT}, 'OBJECT', 'UPDATE') = 1
@@ -77,6 +86,8 @@ def permission_problems(r) -> tuple[list[str], list[str]]:
         problems.append(f"{r.LoginName} 是 sysadmin，什么都能改")
     if r.ChangeDatabase:
         problems.append("可以改数据库的结构")
+    if r.BackupDatabase:
+        problems.append("可以备份整个数据库（包括所有病人资料和 Tbl_User）")
     if r.WritableObjects:
         problems.append(f"可以写入 {r.WritableObjects} 个表或视图")
     if r.ExecutableProcedures:

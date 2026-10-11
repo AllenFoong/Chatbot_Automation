@@ -45,7 +45,7 @@
 | D38 | 病人传的照片、语音、文件**先不下载**，只存 `[Image]`、`[Voice message]` 等说明；程序日志也不记消息内容和电话号码 | 是病人资料（可能是伤口照片）；存在哪里、保留多久要先决定（A9）。日志常常被复制、贴出去，不能有病人资料 |
 | D39 | 开发用的 WhatsApp access token 用**测试 Business portfolio 里 System User 的 token**：只给测试 App 和测试 WhatsApp 帐号、只有 `whatsapp_business_messaging` + `whatsapp_business_management`、**60 天**失效（不选 *Never*），只存在 `.env`；怀疑外泄就 *Revoke* | *API Setup* 按出来的 token 实测大约 1 小时就失效，测试清单做不完；60 天的 token 外泄了也会自己失效，权限只到测试号码（D34）。上线（5c）的 token 怎么保管，到时再决定 |
 
-D40–D59 是 **Phase 5b（预约提醒）、A1 和 5c 的设计决定**，2026-10-08（设计见 [`architecture.md`](architecture.md) 第 8–10 节）。
+D40–D60 是 **Phase 5b（预约提醒）、A1 和 5c 的设计决定**，2026-10-08（设计见 [`architecture.md`](architecture.md) 第 8–10 节）。
 D48–D50 是按诊所第一轮问卷、D51–D53 是按第二轮问卷（都是 2026-10-08）新增的；D48 取代 D42、D43 的一部分。
 
 | # | 决定 | 原因 |
@@ -70,6 +70,7 @@ D48–D50 是按诊所第一轮问卷、D51–D53 是按第二轮问卷（都是
 | D57 | 戴牙的代码前面是 `AFTER`（例 `C/UP AFTER ISSUE DENTURE`）**不算**要等技工所（修正 D50）；同一条 Remarks 后面还有别的戴牙代码，照常要 `*C` | 开发电脑测试（2026-10-09）：AppointmentID 129387 是装好假牙之后的检查，被当成没有 `*C` 放进 *Needs staff*。这种复诊不用等技工所 |
 | D58 | `reminders` 表**只记员工做过的事**：一个号码、一个预约日期一条（UNIQUE），现在只有 `OPENED`（按了 *Open in WhatsApp*）、`NOT_SENT`（员工说没发出去），加上填好的消息和包括哪几个 GPiS 预约；名单本身不存，每次重新读 GPiS。按的时候后端重新算那一天，确认还在 *Ready*、还能打开（D54）才记；之后 GPiS 的预约变了就提醒员工。*NO WA*：员工在 `wa_contacts` 标记整个号码不要提醒（`reminders_opt_out_*`，by = `STAFF`），可以改回来 | 两位员工、两台电脑、重新整理都要看得到谁按过，避免同一个号码发两次；系统不知道员工有没有按 Enter，所以要能改回 *Not sent*。不信任画面送来的消息，避免记错。号码是提醒的单位（家人共用，D49），所以 opt-out 也按号码。系统自己发（5c）时再加 `SENDING`、`ACCEPTED` 等状态 |
 | D59 | 只读帐号的做法（D52）：`sql/create_readonly_login.sql` 建 `chatbot_reader`，只 `GRANT SELECT` `Tbl_CAH_Appointment`、`Qry_CAH_Appointment`，`DENY SELECT` `Tbl_User`；用 sqlcmd + Windows 帐号在 GPiS 所在的电脑执行，密码执行时传进去、只写在 `.env`。**读主机的 `GPiS`（`GPIS_EXPECTED_DATABASE=GPiS`）时，系统每次连线先用 `HAS_PERMS_BY_NAME` 检查帐号**：sysadmin、能写入、能改数据库、能执行 stored procedure、读得到 `Tbl_User`，就拒绝读取。读 `GPiS_Dev` 不检查（开发电脑用 Windows 帐号） | W51：柜台另一台的 GPiS 用 `sa` 经局域网连 A，所以 A 不用改设定、不用重开，只要加帐号。程序本来就只有 `SELECT`，但万一有人把连线字符串改成 `sa`，系统也不会用一个能写的帐号碰正式数据库（规则 1、3）。检查只看权限，不读任何资料（规则 5） |
+| D60 | 只读帐号还要在**数据库层 `DENY`** 改结构、写入、备份（`ALTER`、`CREATE TABLE/VIEW/PROCEDURE/FUNCTION/RULE/DEFAULT/TYPE/SCHEMA`、`BACKUP DATABASE/LOG`、`INSERT/UPDATE/DELETE`），而且**除了那两个，其他所有表和视图都 `DENY SELECT`**（取代只 `DENY` `Tbl_User`）；脚本最后用 `chatbot_reader` 的身份检查，读得到的表不是 2 个、或还有别的数据库层权限就报错。系统的检查（D59）也加上 `CREATE VIEW/PROCEDURE/FUNCTION` 等和 `BACKUP`，查不到的权限当作有 | 开发电脑测试（2026-10-11）：`--check-gpis` 说 `chatbot_reader`「可以改数据库的结构」。查到 GPiS 的数据库把 `CREATE TABLE`、`CREATE VIEW`、`CREATE PROCEDURE`、`CREATE FUNCTION`、`CREATE RULE`、`CREATE DEFAULT`、`BACKUP DATABASE`、`BACKUP LOG` 给了 `public`，每个帐号都自动有；`GPiS_Dev` 是主机的备份，主机 A 也一样。`BACKUP DATABASE` = 可以把整个数据库（所有病人资料、`Tbl_User`）备份成档案。`DENY` 压过 `GRANT`，只对 `chatbot_reader` 有效，不用改 `public`，不影响 GPiS（`sa` 不受权限限制）。GPiS 以后新加的表不在 `DENY` 里：`--check-gpis` 会提醒「读得到 N 个表或视图」，那时重建帐号 |
 
 ## 数据安全规则（病人资料，受马来西亚 PDPA 保护）
 
