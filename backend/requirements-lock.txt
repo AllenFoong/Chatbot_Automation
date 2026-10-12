@@ -1,7 +1,8 @@
-# 电脑 B 装的套件版本（docs/deploy-pc-b.md 第 3 节）：开发电脑演练时（2026-10-12，Windows、Python 3.11.9）
-# 照 requirements.txt 装、全部检查通过的那个 venv 的 pip freeze。B 装这个，版本就和测过的一样。
-# 开发和云端测试照旧用 requirements.txt / requirements-dev.txt。
-# requirements.txt 改了、或要换新版本：在开发电脑重新演练（第 8 节），再用那个 venv 的 pip freeze 更新这个档案。
+# Package versions for PC B (docs/deploy-pc-b.md section 3): pip freeze of the venv that passed the
+# rehearsal on the dev PC (2026-10-12, Windows, Python 3.11.9, installed from requirements.txt).
+# Development and cloud tests keep using requirements.txt / requirements-dev.txt.
+# requirements.txt changed or new versions wanted: rehearse again (section 8), then pip freeze into this file.
+# Keep this file ASCII only: pip reads it with the Windows code page (cp1252 on English Windows, PC B 2026-10-12).
 alembic==1.20.0
 annotated-doc==0.0.5
 annotated-types==0.8.0

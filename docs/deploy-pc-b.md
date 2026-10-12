@@ -42,7 +42,8 @@
    ```
    → 桌面上的 `chatbot-<commit>.zip`：程序 + build 好的网页。**不包含** `.env`、密码、资料库、GPiS 的备份。
 3. 下载这三个安装程序，和 zip 一起放进 USB：
-   - Python **3.11.9**（python.org，Windows installer 64-bit）：和开发电脑一样（演练、测试都是 3.11.9；3.11 最后一个有 Windows 安装程序的版本）
+   - Python **3.11.9**（python.org，Windows installer 64-bit，档名 `python-3.11.9-amd64.exe`，网址 `https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe`）：和开发电脑一样（演练、测试都是 3.11.9；3.11 最后一个有 Windows 安装程序的版本）。
+     **不是** python.org 首页的 *Python install manager*（`.msix`），也不是 Microsoft Store 的 Python
    - PostgreSQL **18**（postgresql.org → Windows → EDB installer）：和开发电脑演练的一样
    - ODBC Driver 18 for SQL Server（Microsoft 网站，x64）
 4. 想好 B 要用的两个密码（PostgreSQL 的 `postgres`、`chatbot`），存在**自己的密码管理器**，不写在纸上、不放 USB。
@@ -53,7 +54,11 @@
 
 用员工平常登入的 Windows 帐号。
 
-1. **Python**：执行安装程序，勾选 *Add python.exe to PATH*。装好后开 PowerShell：`python --version` → `Python 3.11.9`。
+1. **Python**：先在 *设定 → 应用* 搜 `Python`，看 B 本来有没有别的 Python。执行 `python-3.11.9-amd64.exe`：
+   - B 上**没有**别的 Python：勾 *Add python.exe to PATH*。
+   - B 上**已经有**（电脑 B 本来就有 Microsoft Store 的 Python 3.11 和 Python 3.12.0，第 11 节）：**不勾**，不改别人在用的 `python`；第 5 步用完整路径建 venv。
+   - 按 *Install Now*（装在 `%LOCALAPPDATA%\Programs\Python\Python311`）。确认：`& "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" --version` → `Python 3.11.9`。
+   - `python --version` 是 3.11.9 **不够**：Microsoft Store 的 Python 也是 3.11.9，但它在 `WindowsApps` 里，Python 官方说主要给互动用，写入 AppData 的档案会被转到别的地方。B 要用 python.org 的（演练用的就是它）。
 2. **ODBC Driver 18**：执行安装程序。确认：
    ```powershell
    Get-OdbcDriver | Where-Object Name -like "*SQL Server*" | Select-Object Name
@@ -63,10 +68,12 @@
    `postgres` 的密码用第 2 节准备的；port `5432`；Windows 防火墙问的话**不要**允许公用网络。
    开始菜单 → *SQL Shell (psql)* → 一路 Enter → 打 `postgres` 的密码：
    ```sql
-   CREATE ROLE chatbot LOGIN PASSWORD '换成 chatbot 的密码';
+   CREATE ROLE chatbot LOGIN;
+   \password chatbot
    CREATE DATABASE chatbot OWNER chatbot;
    \q
    ```
+   `\password` 会问两次 `chatbot` 的密码，画面上不显示（密码不出现在指令里）。安装时 `postgres` 打的不是第 2 节准备的密码的话，先 `\password postgres` 换掉，再重新登入一次确认。
    B 上的数据库叫 `chatbot`（开发电脑是 `chatbot_dev`）。B 上**不建** `chatbot_test`，不在 B 上跑测试。
 4. **备份用的密码档**（`start-chatbot.ps1` 的 `pg_dump` 会读）：
    ```powershell
@@ -82,11 +89,13 @@
    & "C:\Program Files\PostgreSQL\<版本>\bin\psql.exe" -h localhost -U chatbot -d chatbot -w -c "SELECT current_database();"
    ```
    → `chatbot`。`no password supplied` / `authentication failed` = 那一行写错（档名也要是 `pgpass.conf`，不是 `.txt`）。
-5. **本系统**：把 zip 解压到 `C:\Chatbot_Automation`（这个位置以后更新也用一样的）。
+5. **本系统**：把 zip 解压到 `C:\Chatbot_Automation`（这个位置以后更新也用一样的），`C:\Chatbot_Automation\backend` 要直接在里面（不要多一层 `chatbot-<commit>`）。
+   zip 是从网络下载的（不是 USB 带的）：解压后先跑 `Get-ChildItem C:\Chatbot_Automation -Recurse -File | Unblock-File`，不然 `deploy\` 的脚本会被挡。
    ```powershell
-   cd C:\Chatbot_Automation\backend
-   python -m venv .venv
+   cd C:\Chatbot_Automation\backend      # venv 一定建在 backend 里（start-chatbot.ps1 找 backend\.venv）
+   & "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" -m venv .venv   # 完整路径，不靠 PATH
    .\.venv\Scripts\Activate.ps1          # 不让执行的话先跑：Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+   python -c "import sys; print(sys.version); print(sys.base_prefix)"   # 3.11.9；路径是 ...\Programs\Python\Python311，不能有 WindowsApps
    pip install -r requirements-lock.txt  # 演练测过的版本（固定版本、不装测试工具）
    copy .env.example .env
    notepad .env
@@ -235,3 +244,38 @@ $LASTEXITCODE                                                        # → 0
 
 `--clean` = 先拿掉现在的表，再从备份建回来。更新失败要退回的话，程序也要换回旧的（`C:\Chatbot_Automation.old`，第 9 节）：备份是旧版本的表结构。
 然后 `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。
+
+## 11. 安装记录（电脑 B）
+
+### 第一天（2026-10-12）
+
+没有带 USB，所以 A 的只读帐号没有建（`.sql` 要带到 A 上跑，A 不开浏览器下载）；B 先用**假资料**（`REMINDER_SOURCE=demo`）装好。安装包是 `main` 的 `chatbot-<commit>.zip`。
+
+| 步骤 | 结果 |
+|---|---|
+| 带程序过去 | 开发电脑 `make-package.ps1` → 上传 Google Drive、共用链接 → B 的 Edge InPrivate 视窗照着打链接下载（B 上不登入 Google）。从网络下载的档案要 `Unblock-File`（第 3 节第 5 步） |
+| B 的规格 | Windows 10 64 位、内存 64 GB、`C:` 空 243 GB、时区 Singapore Standard Time；员工的 Windows 帐号是系统管理员（UAC 只按「是」）；连得到 `pypi.org`；port 8000、5432 空着；WhatsApp Desktop 登入的是诊所的号码（W58 的一部分） |
+| B 本来就有 | Python 3.11（Microsoft Store，2024-05）、Python 3.12.0 64-bit（2024-05）、Python Launcher（2024-01）：都不动 |
+| ODBC 18、PostgreSQL 18 | ✅ 先装 ODBC 再装 PostgreSQL；安装时 `postgres` 打的不是准备好的密码 → psql `\password postgres` 换成密码管理器的、重新登入确认；`chatbot` 用 `\password` 设 |
+| pgpass | ✅ `psql -w` → `chatbot` |
+| Python | ⚠️ `python --version` 是 3.11.9，但那是 Microsoft Store 的（路径有 `WindowsApps`）。下载时先拿到 python.org 首页的 *Python install manager*（`.msix`），它跑了一个设定程序，开了「允许超过 260 个字的路径」（整台电脑，重开机后生效；留着，不影响 GPiS），要把它移除（第二天确认）。改装 `python-3.11.9-amd64.exe`：只给这个帐号、**没有**加 PATH；venv 用完整路径建，`sys.base_prefix` 是 `...\Programs\Python\Python311` |
+| venv、套件 | ⚠️ venv 第一次建在 `C:\Chatbot_Automation`（不是 `backend`）→ 删掉重建。`pip install -r requirements-lock.txt` → `UnicodeDecodeError`（cp1252）：档案开头的中文说明，英文 Windows 的 pip 读不了；那次用 `$env:PYTHONUTF8 = "1"` 装好；之后档案改成只有 ASCII，加测试 |
+| `.env` | 9 行：GPiS 那行先放着（`PWD=` 空的）、`REMINDER_SOURCE=demo` |
+| 建表、设置 | ✅ `0004`；seed 1 / 14 / 2 / 26（和演练一样） |
+| 帐号 | 诊所要两个**共用**帐号：`admin`（ADMIN）、`staff`（STAFF）。名单上「谁按的」只显示 `Staff`，分不出是哪位员工（D58）；以后要分开，ADMIN 在网页加 |
+| 假资料名单 | ✅ Ready 2 个号码 / 3 个预约、Needs staff 3、取消 1、`00:00` 1（和演练一样） |
+| 自动启动 | ✅ `install-autostart.ps1`、`Start-ScheduledTask`；`start.log` 3 行（启动、备份、uvicorn 启动） |
+| 第 7 节第 6 项 | ✅ B 的局域网 IP → `False`、`127.0.0.1` → `True` |
+| `postgres` 要密码 | ✅ `no password supplied` |
+| PowerShell 的中文 | B 是英文 Windows：脚本印的中文显示成 `?`、方块；程序本身正常，网页正常 |
+
+还没做（第二天）：
+
+- 第 7 节第 1、2 项（重开机：先请员工关 B 上的 GPiS）、第 3 项（假期 2026、2027 各 11 天，核对 Hari Raya）、第 7 项（`staff` 登入）
+- `Get-Content C:\Chatbot_Automation\VERSION.txt` 和开发电脑的 commit 一样（第一天解压前没有对 hash）
+- `start.log` 的时间（23:52）和实际时间一样吗
+- *设定 → 应用* 已经没有 *Python Install Manager*
+- 清理：B 的「下载」（zip、安装程序、`.msix`）；Google Drive 的 zip 和垃圾桶
+- 告诉员工：现在的名单是**假资料**，不能拿来发提醒；试跑等接上 A 才开始
+
+下次带 USB：A 的只读帐号（`sql/README.md` 第二步）→ `.env` 第一行填 A 的 IP 和密码、拿掉 `REMINDER_SOURCE=demo` → `stop-chatbot.ps1`、`Start-ScheduledTask` → `--check-gpis` → 第 7 节第 4、5 项 → 员工开始试跑（W42）。

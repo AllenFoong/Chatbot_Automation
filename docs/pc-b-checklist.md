@@ -45,7 +45,7 @@
 
 **安装程序**（只从官网下载，放进 `ToClinic\B\`；下载后右键 → *内容* → *数位签章*，看发行者对不对）
 
-- [ ] Python **3.11.9**，Windows installer (64-bit)（Python Software Foundation）
+- [ ] Python **3.11.9**，Windows installer (64-bit)（Python Software Foundation）：档名 `python-3.11.9-amd64.exe`，**不是** python.org 首页的 *Python install manager*（`.msix`）
 - [ ] PostgreSQL **18.x**，Windows x86-64，EDB installer（EnterpriseDB）。和开发电脑、演练一样是 18
 - [ ] ODBC Driver **18** for SQL Server，x64（Microsoft）。顺便在开发电脑 *设定 → 应用程式* 看装的是哪个版本，记下来
 - [ ] 备用，放 `ToClinic\B\备用\`（第 4 节出问题才装，平常不装）：
@@ -107,6 +107,9 @@ USB\
 - [ ] **不能放**：任何 `.env`；密码（也不写在纸上带去）；GPiS 的备份（`.bak`、`.7z`）；`GPiS_Dev` 查出来的东西；`%LOCALAPPDATA%\Chatbot\backup` 的 `.dump`（有病人资料）；截图
 - [ ] **回来时** USB 里不能多出东西：B 的备份、日志、`.env` 都不复制到 USB（规则 4、6）
 
+忘了带 USB（2026-10-12 就是这样）：zip 可以上传 Google Drive、设「知道链接的任何人」，在 B 的 Edge InPrivate 视窗照着打链接下载（**B 上不登入 Google**）；对 hash、解压后 `Unblock-File`（`deploy-pc-b.md` 第 3 节第 5 步），马上删掉 Drive 的档案、清空垃圾桶。
+安装程序在 B 上直接从官网下载。**A 的 `.sql` 不能这样带**（A 不开浏览器），只读帐号等下次带 USB。
+
 ## 3. 到了先看、先问（还没装任何东西）
 
 **问诊所**
@@ -156,11 +159,11 @@ USB\
 | # | 哪台 | 做什么 | 照 | 大约 |
 |---|---|---|---|---|
 | 1 | B | 第 3 节看过、问过，都合要求 | 上面 | 15 分钟 |
-| 2 | B | 装 Python 3.11.9（勾 *Add python.exe to PATH*）→ **开新的 PowerShell** → `python --version` = `Python 3.11.9` | 第 3 节第 1 步 | 5 分钟 |
+| 2 | B | 装 python.org 的 Python 3.11.9（B 上已经有别的 Python 就**不勾** *Add python.exe to PATH*）→ `& "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" --version` = `Python 3.11.9` | 第 3 节第 1 步 | 5 分钟 |
 | 3 | B | 装 ODBC Driver 18 → `Get-OdbcDriver` 看得到它；GPiS 原来的 driver 也还在、不动 | 第 3 节第 2 步 | 5 分钟 |
 | 4 | B | 装 PostgreSQL 18（只选 *PostgreSQL Server*、*Command Line Tools*；`postgres` 的密码；port `5432`；防火墙不允许公用网络）→ psql 建 `chatbot` role 和数据库 | 第 3 节第 3 步 | 15–20 分钟 |
 | 5 | B | `pgpass.conf` → `psql … -w` 印出 `chatbot` | 第 3 节第 4 步 | 5 分钟 |
-| 6 | B | 解压到 `C:\Chatbot_Automation` → venv → `pip install -r requirements-lock.txt` → `.env`（先加 `REMINDER_SOURCE=demo`；`PWD=` 先空着） | 第 3 节第 5 步、第 4 节 | 20–30 分钟 |
+| 6 | B | 解压到 `C:\Chatbot_Automation` → **在 `backend` 里**用完整路径建 venv（`sys.base_prefix` 没有 `WindowsApps`）→ `pip install -r requirements-lock.txt` → `.env`（先加 `REMINDER_SOURCE=demo`；`PWD=` 先空着） | 第 3 节第 5 步、第 4 节 | 20–30 分钟 |
 | 7 | B | 确认数据库名字是 `chatbot` → `alembic upgrade head`（`0004`）→ seed → ADMIN、STAFF 帐号（各人自己打密码）→ 假资料的名单印得出来。**不跑** `app.db.demo` | 第 5 节 | 15–20 分钟 |
 | 8 | B | `notepad .env`，看着手机把 `chatbot_reader` 的密码打在 `PWD=` 后面，存档 | `sql/README.md` 第二步 1 | 5 分钟 |
 | 9 | **A** | 下面的「在 A 上」 | `sql/README.md` 第二步 2 | 10–15 分钟 |
@@ -183,11 +186,14 @@ USB\
 
 | 第几步 | 看到 | 怎么办 |
 |---|---|---|
-| 2 | 新开的 PowerShell，`python --version` 还不是 3.11.9 | B 有别的 Python 排在前面：venv 用完整路径建，`& "<安装程序最后显示的位置>\python.exe" -m venv .venv`（之后 venv 里的就是 3.11.9） |
+| 2 | `python --version` 是 3.11.9，但 `(Get-Command python).Source` 有 `WindowsApps` | 那是 Microsoft Store 的 Python，不能用（`deploy-pc-b.md` 第 3 节第 1 步）。装 `python-3.11.9-amd64.exe`，venv 用完整路径建 |
+| 2 | 下载到的是 `.msix`，跳出 *Python installation manager configuration helper* | 拿错了档案。问题都答 `N`，*设定 → 应用* 移除 *Python Install Manager*（只移除它），改下载 `python-3.11.9-amd64.exe` |
 | 3 | ODBC 装不上，说少了 Visual C++ | 装 `备用\vc_redist.x64.exe`，再装一次 ODBC |
 | 4 | PostgreSQL 装到一半失败 | 记下讯息，不要换别的版本；回来问 |
 | 6 | `Activate.ps1` 不让执行，`Set-ExecutionPolicy` 也被挡 | 不用 activate：之后的指令前面都加 `.\.venv\Scripts\`（例：`.\.venv\Scripts\python.exe -m pip …`、`.\.venv\Scripts\alembic.exe upgrade head`）。自动启动不受影响（它自己用 `-ExecutionPolicy Bypass`） |
 | 6 | pip 连不上或很慢 | `pip install --no-index --find-links <USB>:\B\wheels -r requirements-lock.txt` |
+| 6 | `Could not open requirements file` | 不在 `backend` 里：`cd C:\Chatbot_Automation\backend`。venv 也要在 `backend\.venv`（建错地方就删掉重建） |
+| 6 | pip `UnicodeDecodeError: 'charmap' codec …` | 旧的 `requirements-lock.txt` 有中文说明（2026-10-12 改成只有 ASCII）：先 `$env:PYTHONUTF8 = "1"` 再装 |
 | 9 | 脚本第一句就停：`要用有管理权限（sysadmin）的 Windows 帐号` | 这个 Windows 帐号在 SQL Server 不是 sysadmin。以前在 A 用 `-E` 做过 `COPY_ONLY` 备份，所以先试：PowerShell 按右键 *以系统管理员身分执行*（诊所的人打密码），再跑一次。还是不行就停，**不要改用 `sa`**，回来再想 |
 | 9 | `Password validation failed` | 密码不够复杂，**还没建任何东西**。密码管理器换一个（大写、小写、数字都有），B 的 `.env` 也改，再跑 |
 | 9 | `帐号 chatbot_reader 已经存在` | 不要猜是谁建的：先跑 `drop_readonly_login.sql`（`-C -f 65001`，`-v DatabaseName="GPiS"`），再跑一次 |
