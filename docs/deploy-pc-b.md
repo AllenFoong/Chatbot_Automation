@@ -208,7 +208,7 @@ Windows PowerShell 5.1、Python 3.11.9、PostgreSQL 18.6、`GPiS_Dev`（`chatbot
 - **Python 版本**：文件写 3.12 以上，开发电脑和所有测试其实都是 3.11.9 → B 装 3.11.9；套件装 `requirements-lock.txt`（D63）。
 - **备份没有还原的步骤** → 加第 10 节，演练测过。
 - 第 3 节第 4 步加 pgpass 的检查；第 5 节先确认 `.env` 指到哪个数据库（演练时 `DATABASE_URL` 还是 `chatbot_dev`，跑之前查到）。
-- 开发电脑的 `postgres` 一开始不用密码就连得上（不是 pgpass；`pg_hba.conf` 的档案是正常的），重新读设定后要密码了，但**没有人知道 `postgres` 的密码**：演练不需要它（`chatbot` 自己能删 `chatbot_rehearsal`），之后用系统管理员重设。B 装好后也确认 `postgres` 要密码。
+- 开发电脑的 `postgres` 一开始不用密码就连得上（不是 pgpass；`pg_hba.conf` 的档案是正常的），重新读设定后要密码了，但**没有人知道 `postgres` 的密码**：演练不需要它（`chatbot` 自己能删 `chatbot_rehearsal`）；演练完用系统管理员视窗重设好了（`pg_hba.conf` 最前面暂时加两行只给本机 `postgres` 的 `trust` → 重开服务 → `\password postgres` → 改回原来的档案、重开 → 确认要密码）。B 装好后也确认 `postgres` 要密码。
 
 ## 9. 以后更新
 
