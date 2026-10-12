@@ -20,6 +20,8 @@
 
 ## 2. 去诊所之前
 
+一项一项打勾的清单（要准备、要带的东西，到了先看先问的事，B 不合要求、连不上 A 怎么办，离开前的确认）：[`pc-b-checklist.md`](pc-b-checklist.md)。
+
 **要先知道的**（下次去诊所看 / 问）：
 
 | | 要求 |
@@ -41,7 +43,7 @@
    → 桌面上的 `chatbot-<commit>.zip`：程序 + build 好的网页。**不包含** `.env`、密码、资料库、GPiS 的备份。
 3. 下载这三个安装程序，和 zip 一起放进 USB：
    - Python **3.11.9**（python.org，Windows installer 64-bit）：和开发电脑一样（演练、测试都是 3.11.9；3.11 最后一个有 Windows 安装程序的版本）
-   - PostgreSQL 17 或以上（postgresql.org → Windows → EDB installer）
+   - PostgreSQL **18**（postgresql.org → Windows → EDB installer）：和开发电脑演练的一样
    - ODBC Driver 18 for SQL Server（Microsoft 网站，x64）
 4. 想好 B 要用的两个密码（PostgreSQL 的 `postgres`、`chatbot`），存在**自己的密码管理器**，不写在纸上、不放 USB。
    `postgres` 的密码一定要存好：开发电脑演练时发现没有人记得，要用系统管理员才能重设。
@@ -159,8 +161,8 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 | 2 | `start.log` | `备份：…dump`、`uvicorn 启动` |
 | 3 | 用 ADMIN 登入 → *Settings → Clinic closures* → *Import public holidays for 2026*，再换 2027 | 各 *Added 11 day(s)*；和 `clinic-workflow.md` 第 1 节的表对照；核对 Hari Raya 的日期 |
 | 4 | *Reminders* → 明天 | 名单的人数和 GPiS 一样；家人合并、`*C` 的规则对 |
-| 5 | 挑一行按 *Open in WhatsApp* | WhatsApp Desktop 打开**那位病人**的对话、消息已经填好。**不要按 Enter**（试跑期间员工照旧手动发）→ 关掉 |
-| 6 | 另一台电脑（例如 A）的浏览器打 `http://<B的IP>:8000` | **打不开**（只听 `127.0.0.1`，D62） |
+| 5 | 请员工挑一行按 *Open in WhatsApp* | WhatsApp Desktop 打开**那位病人**的对话、消息已经填好。**不要按 Enter**（试跑期间员工照旧手动发）→ 关掉 → 那一行按 *Mark as not sent*（按过就记成已打开，D58，不改回来员工会以为发过了） |
+| 6 | 在 B 上：`Test-NetConnection <B的IP> -Port 8000`、`Test-NetConnection 127.0.0.1 -Port 8000` | 第一个 `False`、第二个 `True`（只听 `127.0.0.1`，D62）。不用 A 的浏览器试：A 上只跑只读帐号的脚本（规则 1） |
 | 7 | 用 STAFF 帐号登入 | 看得到名单；*Settings* 不能改 |
 
 ## 8. 先在开发电脑演练
