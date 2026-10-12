@@ -39,7 +39,7 @@
 
 ## 在开发电脑上安装（Windows，只做一次）
 
-1. 安装 **Python 3.12 或以上**（python.org，安装时勾选 *Add python.exe to PATH*）。
+1. 安装 **Python 3.11 或以上**（开发电脑是 3.11.9；python.org，安装时勾选 *Add python.exe to PATH*）。
 2. 确认有 **ODBC Driver 18 for SQL Server**。在 PowerShell 执行：
    ```powershell
    Get-OdbcDriver | Where-Object Name -like "*SQL Server*" | Select-Object Name
