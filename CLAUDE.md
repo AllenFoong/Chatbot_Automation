@@ -16,6 +16,7 @@
 | [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API；Phase 3：PostgreSQL（安装、建表、改表结构的步骤）；Phase 4a：员工登录、Admin API；Phase 5a：WhatsApp（Meta 测试 App、tunnel、测试清单）；Phase 5b：预约提醒（名单、Open in WhatsApp、测试清单）；对照步骤 |
 | [`frontend/README.md`](frontend/README.md) | Phase 4b：Admin Platform 网页（React + TypeScript）：安装、启动、测试清单 |
 | [`docs/deploy-pc-b.md`](docs/deploy-pc-b.md) | 5b 试跑：装到柜台电脑 B（要准备什么、安装、自动启动、备份、检查、先在开发电脑演练和记录、更新、还原备份）；脚本在 `deploy/` |
+| [`docs/pc-b-checklist.md`](docs/pc-b-checklist.md) | 去诊所装电脑 B 的打勾清单：出发前、USB、到了先看先问、B 和 A 的步骤和时间、B 不合要求 / 连不上 A 怎么办、离开前 |
 
 开始新 session 时先读这四个文件。
 
@@ -87,6 +88,7 @@
 - [x] 开发电脑照 `docs/deploy-pc-b.md` 第 8 节演练（2026-10-12，记录在第 8 节）：第 7 节 1–7 项、停止 / 自己重开、还原备份全部通过；演练前改了：uvicorn 停了由 `start-chatbot.ps1` 自己重开、加 `stop-chatbot.ps1`；演练找到：只用 `Stop-ScheduledTask` 停不干净、B 要装 Python 3.11.9（不是 3.12）和固定版本 `backend/requirements-lock.txt`、加还原备份的步骤（第 10 节）（D63）；已经清理干净
 - [x] 演练的修改和记录（D63）合并进 `main`（PR #18）
 - [x] 开发电脑重设 `postgres` 的密码（2026-10-12，系统管理员视窗：暂时只让本机的 `postgres` 不用密码 → `\password` → 改回来；新密码在密码管理器）
+- [x] 去诊所装电脑 B 的清单（`docs/pc-b-checklist.md`）；顺便改：B 装 PostgreSQL 18、第 7 节第 5 项按过要 *Mark as not sent*、第 6 项在 B 上测（不用 A 的浏览器）、`chatbot_reader` 的密码用密码管理器产生（A 上要看着打）、连 A 有 SSL / TLS 错误时只改 B（`Encrypt=no` → ODBC Driver 17）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
@@ -94,7 +96,7 @@
 ## 下一步
 
 1. 下次去诊所：看柜台另一台电脑的 Windows 版本、内存、硬盘（`Database.Server` 已经看了，要求见 `docs/deploy-pc-b.md` 第 2 节）；问 W54、W55、W58；确认主机 A 已经登出私人网盘帐号；问诊所之后，删掉主机 A 上我们做的 `COPY_ONLY` 备份 `.bak` 和 `.7z`（只删这两个）。拍表格、画面时只拍空白的，或先遮住手写的部分（规则 4）。
-2. 5b：只读帐号在开发电脑已经测过（D59、D60）；开发电脑已经照 `docs/deploy-pc-b.md` 第 8 节演练过（D63）；去之前用最新的 `main` 重做安装包，USB 带 Python 3.11.9，装到柜台另一台电脑试跑（D53、D62），那时才在主机 A 建帐号（`sql/README.md`「只读帐号」第二步），员工照旧手动发、同时对照名单 1–2 星期（W42）。第一版模板没有按钮（D48）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
+2. 5b：只读帐号在开发电脑已经测过（D59、D60）；开发电脑已经照 `docs/deploy-pc-b.md` 第 8 节演练过（D63）；去之前照 `docs/pc-b-checklist.md` 准备（用最新的 `main` 重做安装包，USB 带 Python 3.11.9 等），装到柜台另一台电脑试跑（D53、D62），那时才在主机 A 建帐号（`sql/README.md`「只读帐号」第二步），员工照旧手动发、同时对照名单 1–2 星期（W42）。第一版模板没有按钮（D48）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
 3. 员工按「Open in WhatsApp」发，只要 A1 做好（第 4 点）。系统用模板自动发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（读主机的实时预约）、病人同意（W40、D46）。
 4. A1：5b 先把本系统装在柜台另一台电脑（D53），主机 A 的只读帐号照 D52、D60 做（脚本已在开发电脑试过）。Phase 6 之前决定长期放哪里（W54、`docs/architecture.md` 9.4）。
 5. 上线前：用 Admin Platform（*Settings → Clinic closures*）导入 2026、2027 年的公共假期（只有诊所休的那几种，D61），核对 Hari Raya 的日期（电脑 B 装好时 `clinic_closures` 是空的；提醒也要靠它决定假期前提早发；开发电脑的 `chatbot_dev` 已经导入好）。
