@@ -85,7 +85,7 @@
 - [x] 装到电脑 B 的文件和脚本（草稿）：`docs/deploy-pc-b.md`、`deploy/`（做安装包、登入自动启动、开机备份）；FastAPI 也提供网页、只听 `127.0.0.1`（D62）；要问 W58（B 上的 WhatsApp Desktop）；云端 `pytest` 300 个；PowerShell 脚本只在云端检查过语法
 - [x] 假期（D61）和电脑 B 的安装草稿（D62）合并进 `main`（PR #17）
 - [x] 开发电脑照 `docs/deploy-pc-b.md` 第 8 节演练（2026-10-12，记录在第 8 节）：第 7 节 1–7 项、停止 / 自己重开、还原备份全部通过；演练前改了：uvicorn 停了由 `start-chatbot.ps1` 自己重开、加 `stop-chatbot.ps1`；演练找到：只用 `Stop-ScheduledTask` 停不干净、B 要装 Python 3.11.9（不是 3.12）和固定版本 `backend/requirements-lock.txt`、加还原备份的步骤（第 10 节）（D63）；已经清理干净
-- [ ] 演练的修改合并进 `main`（分支 `claude/intelligent-tesla-5csuu5`）
+- [x] 演练的修改和记录（D63）合并进 `main`（PR #18）
 - [ ] 开发电脑重设 `postgres` 的密码（演练时发现没有人知道；要用系统管理员视窗）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
