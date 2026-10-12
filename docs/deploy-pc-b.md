@@ -40,7 +40,7 @@
    ```
    → 桌面上的 `chatbot-<commit>.zip`：程序 + build 好的网页。**不包含** `.env`、密码、资料库、GPiS 的备份。
 3. 下载这三个安装程序，和 zip 一起放进 USB：
-   - Python 3.12 或以上（python.org，Windows installer 64-bit）
+   - Python **3.11.9**（python.org，Windows installer 64-bit）：和开发电脑一样（演练、测试都是 3.11.9；3.11 最后一个有 Windows 安装程序的版本）
    - PostgreSQL 17 或以上（postgresql.org → Windows → EDB installer）
    - ODBC Driver 18 for SQL Server（Microsoft 网站，x64）
 4. 想好 B 要用的两个密码（PostgreSQL 的 `postgres`、`chatbot`），存在**自己的密码管理器**，不写在纸上、不放 USB。
@@ -50,7 +50,7 @@
 
 用员工平常登入的 Windows 帐号。
 
-1. **Python**：执行安装程序，勾选 *Add python.exe to PATH*。装好后开 PowerShell：`python --version` → 3.12 或以上。
+1. **Python**：执行安装程序，勾选 *Add python.exe to PATH*。装好后开 PowerShell：`python --version` → `Python 3.11.9`。
 2. **ODBC Driver 18**：执行安装程序。确认：
    ```powershell
    Get-OdbcDriver | Where-Object Name -like "*SQL Server*" | Select-Object Name
@@ -79,7 +79,7 @@
    cd C:\Chatbot_Automation\backend
    python -m venv .venv
    .\.venv\Scripts\Activate.ps1          # 不让执行的话先跑：Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-   pip install -r requirements.txt       # 只装执行要用的（不装测试工具）
+   pip install -r requirements-lock.txt  # 演练测过的版本（固定版本、不装测试工具）
    copy .env.example .env
    notepad .env
    ```
@@ -162,7 +162,7 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 
 1. **关掉**平常开发用的 uvicorn（port 8000 要空出来）。
 2. 照第 2 节做安装包，解压到 `D:\ChatbotRehearsal`（不是仓库的文件夹）。
-3. 第 3 节的 3–5 步：数据库改叫 `chatbot_rehearsal`（psql：`CREATE DATABASE chatbot_rehearsal OWNER chatbot;`，开发电脑已经有 `chatbot` 这个 role）；
+3. 第 3 节的 3–5 步（但 `pip install -r requirements.txt`：装当时最新的版本来测；全部通过后用这个 venv 的 `pip freeze` 更新 `backend/requirements-lock.txt`）：数据库改叫 `chatbot_rehearsal`（psql：`CREATE DATABASE chatbot_rehearsal OWNER chatbot;`，开发电脑已经有 `chatbot` 这个 role）；
    `pgpass.conf` 的那一行写 `localhost:5432:chatbot_rehearsal:chatbot:密码`（`start-chatbot.ps1` 照 `.env` 的 `DATABASE_URL` 备份哪个数据库）。
 4. `.env`：`GPIS_CONNECTION_STRING` 用开发电脑的 `chatbot_reader`（`SERVER=localhost\SQLEXPRESS;DATABASE=GPiS_Dev`）、`GPIS_EXPECTED_DATABASE=GPiS_Dev`、`DATABASE_URL` 指到 `chatbot_rehearsal`。
 5. 第 5、6 步（不用接主机 A；`2026-09-02` 当「明天」）。
@@ -174,6 +174,6 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 1. 开发电脑：新的 `chatbot-<commit>.zip`（第 2 节）。
 2. B：`C:\Chatbot_Automation\deploy\stop-chatbot.ps1` → `已经停了`；`cd C:\`（PowerShell 在那个文件夹里就改不了名），
    把 `C:\Chatbot_Automation` 改名成 `C:\Chatbot_Automation.old`（要退回时用）。
-3. 解压新的到 `C:\Chatbot_Automation`；把旧的 `backend\.env` 复制过来；重新建 venv、`pip install -r requirements.txt`。
+3. 解压新的到 `C:\Chatbot_Automation`；把旧的 `backend\.env` 复制过来；重新建 venv、`pip install -r requirements-lock.txt`。
 4. `alembic upgrade head`（开机时的备份就是改表之前的那一份）。
 5. `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。没问题再删 `.old`。
