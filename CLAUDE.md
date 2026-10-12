@@ -88,7 +88,7 @@
 - [x] 开发电脑照 `docs/deploy-pc-b.md` 第 8 节演练（2026-10-12，记录在第 8 节）：第 7 节 1–7 项、停止 / 自己重开、还原备份全部通过；演练前改了：uvicorn 停了由 `start-chatbot.ps1` 自己重开、加 `stop-chatbot.ps1`；演练找到：只用 `Stop-ScheduledTask` 停不干净、B 要装 Python 3.11.9（不是 3.12）和固定版本 `backend/requirements-lock.txt`、加还原备份的步骤（第 10 节）（D63）；已经清理干净
 - [x] 演练的修改和记录（D63）合并进 `main`（PR #18）
 - [x] 开发电脑重设 `postgres` 的密码（2026-10-12，系统管理员视窗：暂时只让本机的 `postgres` 不用密码 → `\password` → 改回来；新密码在密码管理器）
-- [x] 去诊所装电脑 B 的清单（`docs/pc-b-checklist.md`）；顺便改：B 装 PostgreSQL 18、第 7 节第 5 项按过要 *Mark as not sent*、第 6 项在 B 上测（不用 A 的浏览器）、`chatbot_reader` 的密码用密码管理器产生（A 上要看着打）、连 A 有 SSL / TLS 错误时只改 B（`Encrypt=no` → ODBC Driver 17）
+- [x] 去诊所装电脑 B 的清单（`docs/pc-b-checklist.md`）；顺便改：B 装 PostgreSQL 18、第 7 节第 5 项按过要 *Mark as not sent*、第 6 项在 B 上测（不用 A 的浏览器）、`chatbot_reader` 的密码用密码管理器产生（A 上要看着打）、连 A 有 SSL / TLS 错误时只改 B（`Encrypt=no` → ODBC Driver 17）；合并进 `main`（PR #20）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
