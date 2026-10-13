@@ -189,7 +189,7 @@ CREATE DATABASE chatbot_dev OWNER chatbot;
 - ☰：1366 宽收起后选单 72px、只有图示，重新整理还是收起；400 宽按 ☰ 选单滑出来，选了 *Settings* 就关；1366、1024、400 宽都不会左右捲。
 - headless Chromium（1366×768）截图每一页：登录、Reminders（Ready / Opened / Needs staff / Not appointments）、Conversations、Requests（Confirm 表单）、Settings 5 页、Staff accounts、My account；浏览器 console 没有错误。
 - 1920、1024、400 宽：页面都不会左右捲（`scrollWidth` 和视窗一样宽）。
-- 还没有在开发电脑（Windows、Segoe UI）上测：照上面「画面整理（D66）」的清单。
+- 开发电脑（2026-10-13，Windows、`main` 的 PR #23）：「画面整理（D66）」15 项全部通过。
 
 ### 公共假期只导入诊所休的日子（D61，2026-10-12，开发电脑）
 
