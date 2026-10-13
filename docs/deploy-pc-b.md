@@ -14,7 +14,7 @@
 | ✅ 登入 Windows 就自动启动、停了自己重开；每次开机备份本系统的数据库 | `deploy/install-autostart.ps1`、`deploy/start-chatbot.ps1`（停下用 `deploy/stop-chatbot.ps1`） |
 | ❌ **只有 B 自己打得开**（`127.0.0.1`），A 或别的电脑、手机都打不开 | 网页里有病人名字和号码；不开放给局域网，就不用 https（D62） |
 | ❌ 不收 WhatsApp 消息（5a 的 webhook、cloudflared 不装） | 要等 5c 接上诊所的号码 |
-| ❌ 不装 Node.js、git、SQL Server | 网页在开发电脑 build 好，用 USB 带过去 |
+| ❌ 不装 Node.js、git、SQL Server | 网页在开发电脑 build 好，zip 经 Google Drive 链接带过去（不用 USB，D64） |
 
 试跑期间员工**照旧手动发**，同时对照系统的名单 1–2 星期（W42）。
 
@@ -41,14 +41,16 @@
    .\deploy\make-package.ps1
    ```
    → 桌面上的 `chatbot-<commit>.zip`：程序 + build 好的网页。**不包含** `.env`、密码、资料库、GPiS 的备份。
-3. 下载这三个安装程序，和 zip 一起放进 USB：
+   记下 hash 的前 8 个字：`(Get-FileHash "$HOME\Desktop\chatbot-*.zip").Hash.Substring(0,8)`。
+   到了诊所才上传 Google Drive、共用设成「知道链接的任何人」（第 3 节第 5 步；不用 USB，D64）。
+3. 这三个安装程序到了在 B 上直接从官网下载（下载后右键 → *内容* → *数位签章* 看发行者）：
    - Python **3.11.9**（python.org，Windows installer 64-bit，档名 `python-3.11.9-amd64.exe`，网址 `https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe`）：和开发电脑一样（演练、测试都是 3.11.9；3.11 最后一个有 Windows 安装程序的版本）。
      **不是** python.org 首页的 *Python install manager*（`.msix`），也不是 Microsoft Store 的 Python
    - PostgreSQL **18**（postgresql.org → Windows → EDB installer）：和开发电脑演练的一样
    - ODBC Driver 18 for SQL Server（Microsoft 网站，x64）
-4. 想好 B 要用的两个密码（PostgreSQL 的 `postgres`、`chatbot`），存在**自己的密码管理器**，不写在纸上、不放 USB。
+4. 想好 B 要用的两个密码（PostgreSQL 的 `postgres`、`chatbot`），存在**自己的密码管理器**，不写在纸上、不上传。
    `postgres` 的密码一定要存好：开发电脑演练时发现没有人记得，要用系统管理员才能重设。
-   `chatbot_reader` 的密码在 B 上产生（第 5 步）。
+   `chatbot_reader` 的密码也先产生好（`sql/README.md`「只读帐号」第二步）。
 
 ## 3. 在 B 上安装程序（只做一次）
 
@@ -89,8 +91,10 @@
    & "C:\Program Files\PostgreSQL\<版本>\bin\psql.exe" -h localhost -U chatbot -d chatbot -w -c "SELECT current_database();"
    ```
    → `chatbot`。`no password supplied` / `authentication failed` = 那一行写错（档名也要是 `pgpass.conf`，不是 `.txt`）。
-5. **本系统**：把 zip 解压到 `C:\Chatbot_Automation`（这个位置以后更新也用一样的），`C:\Chatbot_Automation\backend` 要直接在里面（不要多一层 `chatbot-<commit>`）。
-   zip 是从网络下载的（不是 USB 带的）：解压后先跑 `Get-ChildItem C:\Chatbot_Automation -Recurse -File | Unblock-File`，不然 `deploy\` 的脚本会被挡。
+5. **本系统**：zip 经 Google Drive 链接带过去（D64）：在 B 的 Edge **InPrivate 视窗**照着打链接下载（**B 上不登入 Google**）→
+   `(Get-FileHash "$HOME\Downloads\chatbot-*.zip").Hash.Substring(0,8)` 要和开发电脑的一样 → 马上删掉 Drive 的档案、清空垃圾桶。
+   解压到 `C:\Chatbot_Automation`（这个位置以后更新也用一样的），`C:\Chatbot_Automation\backend` 要直接在里面（不要多一层 `chatbot-<commit>`）；
+   从网络下载的档案要先跑 `Get-ChildItem C:\Chatbot_Automation -Recurse -File | Unblock-File`，不然 `deploy\` 的脚本会被挡。之后删掉「下载」里的 zip。
    ```powershell
    cd C:\Chatbot_Automation\backend      # venv 一定建在 backend 里（start-chatbot.ps1 找 backend\.venv）
    & "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" -m venv .venv   # 完整路径，不靠 PATH
@@ -156,7 +160,7 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 
 - 日志：`%LOCALAPPDATA%\Chatbot\logs\`（`start.log` 每次启动、备份、重开的记录；`uvicorn-日期-时间.log` 每次启动的程序日志，留最新 14 个）。
 - 备份：`%LOCALAPPDATA%\Chatbot\backup\chatbot-日期.dump`，每次开机一份，留最新 14 份。
-  **里面有病人名字和号码**：只留在 B，不复制到 USB、网盘（规则 4）。
+  **里面有病人名字和号码**：只留在 B，不复制到 USB、网盘、Google Drive（规则 4）。
 - uvicorn 停了（当掉、被关掉）：`start-chatbot.ps1` 等 1 分钟自己重开，最多 3 次。
 - 停下本系统（改了 `.env` 要重开、更新之前）：`.\deploy\stop-chatbot.ps1` → `已经停了`；再启动：`Start-ScheduledTask -TaskName Chatbot_Automation`。
   只用 `Stop-ScheduledTask` 不够：uvicorn 可能还在跑。
@@ -223,10 +227,10 @@ Windows PowerShell 5.1、Python 3.11.9、PostgreSQL 18.6、`GPiS_Dev`（`chatbot
 
 ## 9. 以后更新
 
-1. 开发电脑：新的 `chatbot-<commit>.zip`（第 2 节）。
+1. 开发电脑：新的 `chatbot-<commit>.zip`（第 2 节），经 Google Drive 链接下载到 B、对 hash（第 3 节第 5 步，D64）。
 2. B：`C:\Chatbot_Automation\deploy\stop-chatbot.ps1` → `已经停了`；`cd C:\`（PowerShell 在那个文件夹里就改不了名），
    把 `C:\Chatbot_Automation` 改名成 `C:\Chatbot_Automation.old`（要退回时用）。
-3. 解压新的到 `C:\Chatbot_Automation`；把旧的 `backend\.env` 复制过来；重新建 venv、`pip install -r requirements-lock.txt`。
+3. 解压新的到 `C:\Chatbot_Automation`、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
 4. `alembic upgrade head`（最近一次启动时的备份就是改表之前的那一份；要退回见第 10 节）。
 5. `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。没问题再删 `.old`。
 
@@ -249,7 +253,7 @@ $LASTEXITCODE                                                        # → 0
 
 ### 第一天（2026-10-12）
 
-没有带 USB，所以 A 的只读帐号没有建（`.sql` 要带到 A 上跑，A 不开浏览器下载）；B 先用**假资料**（`REMINDER_SOURCE=demo`）装好。安装包是 `main` 的 `chatbot-<commit>.zip`。
+没有带 USB，A 的只读帐号还没建（那时以为 A 上不能开浏览器下载 `.sql`；之后决定不用 USB，A 也用 Drive 链接，D64）；B 先用**假资料**（`REMINDER_SOURCE=demo`）装好。安装包是 `main` 的 `chatbot-<commit>.zip`。
 
 | 步骤 | 结果 |
 |---|---|
@@ -278,4 +282,4 @@ $LASTEXITCODE                                                        # → 0
 - 清理：B 的「下载」（zip、安装程序、`.msix`）；Google Drive 的 zip 和垃圾桶
 - 告诉员工：现在的名单是**假资料**，不能拿来发提醒；试跑等接上 A 才开始
 
-下次带 USB：A 的只读帐号（`sql/README.md` 第二步）→ `.env` 第一行填 A 的 IP 和密码、拿掉 `REMINDER_SOURCE=demo` → `stop-chatbot.ps1`、`Start-ScheduledTask` → `--check-gpis` → 第 7 节第 4、5 项 → 员工开始试跑（W42）。
+下次：A 的只读帐号（`sql/README.md` 第二步，`.sql` 经 Drive 链接在 A 下载，D64）→ `.env` 第一行填 A 的 IP 和密码、拿掉 `REMINDER_SOURCE=demo` → `stop-chatbot.ps1`、`Start-ScheduledTask` → `--check-gpis` → 第 7 节第 4、5 项 → 员工开始试跑（W42）。

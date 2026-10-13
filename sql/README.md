@@ -189,24 +189,31 @@ SQL Server 2025 Express；`IsIntegratedSecurityOnly = 0`；`sqlcmd` 用 `-C -f 6
 
 ### 第二步：在主机 A 执行（装到柜台另一台电脑时，诊所同意后）
 
-1. 密码在 A 上要看着打一次，所以用**手机的密码管理器**产生（不用上面第 2 步那行：它不印出来）：只用英文字母和数字，大写、小写、数字都有（A 的 Windows 密码规则可能要求），20–24 个字，不用容易看错的 `0 O 1 l I`。
+1. 密码在 A 上要看着打一次，所以先在开发电脑产生、存进密码管理器（不用上面第 2 步那行：它不印出来；产生的方法见 [`docs/pc-b-checklist.md`](../docs/pc-b-checklist.md) 第 0 节）：只用英文字母和数字，大写、小写、数字都有（A 的 Windows 密码规则可能要求），20–24 个字，不用容易看错的 `0 O 1 l I`。
    在**柜台另一台电脑**（本系统要装的地方）照着打进那台的 `backend/.env`：
    ```ini
    GPIS_CONNECTION_STRING=DRIVER={ODBC Driver 18 for SQL Server};SERVER=<主机A的IP>\SQLEXPRESS;DATABASE=GPiS;UID=chatbot_reader;PWD=<密码>;TrustServerCertificate=yes;ApplicationIntent=ReadOnly
    GPIS_EXPECTED_DATABASE=GPiS
    ```
    `<主机A的IP>` 照 `GPiS.exe.config` 的 `Database.Server`。
-2. 把 `create_readonly_login.sql` 用 USB 带到**主机 A**（不复制到 A，直接从 USB 跑），在 A 上开 PowerShell（营业时间也可以，不影响 GPiS；最好在病人少的时候）：
+2. 把 `create_readonly_login.sql` 带到**主机 A**：不用 USB，经 Google Drive 链接下载（D64）。
+   - 开发电脑：从最新的 `main` 上传 `sql\create_readonly_login.sql`，共用设成「知道链接的任何人」；记下 hash 的前 8 个字：`(Get-FileHash .\create_readonly_login.sql).Hash.Substring(0,8)`。
+   - A：Edge 的 **InPrivate 视窗**照着打链接 → 下载（**不登入任何帐号**）→ 关掉 InPrivate 视窗。
+   - 下载好就删掉 Drive 里的档案、清空 Drive 的垃圾桶。
+
+   在 A 上开 PowerShell（营业时间也可以，不影响 GPiS；最好在病人少的时候）：
    ```powershell
-   cd E:\A                                         # USB 里放这两个 .sql 的文件夹（磁碟机代号照 A 上看到的）
+   cd $HOME\Downloads
+   (Get-FileHash .\create_readonly_login.sql).Hash.Substring(0,8)   # 要和开发电脑的一样，不一样就不要跑
    $pw = Read-Host "chatbot_reader 的密码"        # 打上一步的密码（不会存进 PowerShell 的历史记录）
    sqlcmd -S .\SQLEXPRESS -E -C -f 65001 -i create_readonly_login.sql -v DatabaseName="GPiS" ReaderPassword="$pw"
    Remove-Variable pw
    cls                                             # Read-Host 打的字会留在画面上
    ```
    印出的权限要和开发电脑一样（`ReadableTablesAndViews = 2`、`OtherDatabasePermissions = 0`）。A 上**不跑别的**（规则 1）。
+   跑完在档案总管删掉「下载」里的 `create_readonly_login.sql`（Shift + Delete，不经过资源回收筒），关掉 PowerShell。
 3. 回到柜台另一台电脑：`python -m app.reminders_cli --check-gpis` → 两个 `[OK]`。
 4. 连不上时：
-   - *Login failed*：密码打错 → 在 A 上跑 `drop_readonly_login.sql`（`-C -f 65001`，`DatabaseName="GPiS"`），再从第 1 步重来。
+   - *Login failed*：密码打错 → 在 A 上跑 `drop_readonly_login.sql`（和第 2 步一样经 Drive 链接下载、对 hash；`-C -f 65001`，`DatabaseName="GPiS"`），再从第 1 步重来。
    - SSL / TLS 的错误：SQL Server 2012 太旧，和 ODBC Driver 18 谈不拢加密。**A 不改任何设定**，只在柜台另一台试：抄下错误讯息 → 连线字符串加 `Encrypt=no`（局域网里传的资料不加密，和 GPiS 现在一样）→ 还不行换 ODBC Driver 17 → 还不行就停，回来问（步骤见 [`docs/pc-b-checklist.md`](../docs/pc-b-checklist.md) 第 4 节「遇到问题」）。
 
