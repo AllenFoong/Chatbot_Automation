@@ -231,7 +231,10 @@ Windows PowerShell 5.1、Python 3.11.9、PostgreSQL 18.6、`GPiS_Dev`（`chatbot
 1. 开发电脑：新的 `chatbot-<commit>.zip`（第 2 节），经 Google Drive 链接下载到 B、对 hash（第 3 节第 5 步，D64）。
 2. B：`C:\Chatbot_Automation\deploy\stop-chatbot.ps1` → `已经停了`；`cd C:\`（PowerShell 在那个文件夹里就改不了名），
    把 `C:\Chatbot_Automation` 改名成 `C:\Chatbot_Automation.old`（要退回时用）。
-3. 解压新的到 `C:\Chatbot_Automation`、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
+   改名前关掉**其他**开在这个文件夹里的东西：别的 PowerShell / Terminal 视窗和分页（例如还在 `(.venv)` 的）、文件总管、从里面打开的记事本。
+   `Access to the path ... is denied` = 还有程序在用它：`resmon` → *CPU* → *Associated Handles* 搜 `Chatbot_Automation` 看是哪个程序；
+   **改名没有成功就停在这里，不要解压**（2026-10-13 在 B 上：改名失败后照样解压，第 11 节「更新到 PR #23」）。
+3. 先确认 `Test-Path C:\Chatbot_Automation` 是 `False`（旧的已经改名），再解压新的到 `C:\Chatbot_Automation`、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
 4. `alembic upgrade head`（最近一次启动时的备份就是改表之前的那一份；要退回见第 10 节）。
 5. `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。没问题再删 `.old`。
 
@@ -298,3 +301,23 @@ $LASTEXITCODE                                                        # → 0
 - `sqlcmd` 那行是**一整行**；`-v` 后面按 Enter 会出 `'-v': Missing argument`（没有建任何东西）。
 
 B 上现在装的（给以后维护、移除时看）：python.org 的 Python 3.11.9（只给员工的帐号、没有加 PATH）、ODBC Driver 18、PostgreSQL 18、Windows Terminal、本系统（`C:\Chatbot_Automation`、工作排程器 `Chatbot_Automation`、`%LOCALAPPDATA%\Chatbot`、`%APPDATA%\postgresql\pgpass.conf`）；开了「允许超过 260 个字的路径」。B 本来就有的 Python 3.11（Store）、3.12.0、Python Launcher 没有动。
+
+### 更新到 PR #23（2026-10-13，画面整理 D66）
+
+开发电脑 `main` 的 `chatbot-16655f6.zip`（D66 的 15 项先在开发电脑通过），经 Google Drive 链接下载到 B（D64）。这次只改了网页：后端、数据库（`0004`）、`requirements-lock.txt` 的版本都没变。
+
+| 步骤 | 结果 |
+|---|---|
+| hash | ✅ 和开发电脑一样 |
+| `stop-chatbot.ps1` | ✅ `已经停了`（停了 0 个 `python.exe`，port 8000 空了）；旧的 PowerShell 视窗中文显示成重复的字，之后改用 Windows Terminal |
+| 旧文件夹改名成 `.old` | ❌ `Access to the path 'C:\Chatbot_Automation' is denied`（还有程序在用这个文件夹，没有查出是哪个） |
+| 解压 | ⚠️ 改名失败后照样 `Expand-Archive` 到原来的文件夹：没有 `-Force`，已经有的档案全部没盖掉（每个都是 *already exists*），只多了新版才有的档；`.env` 复制失败（`.old` 不存在），什么都没改坏。之后新版的档案盖进了原来的文件夹，**没有 `.old`** |
+| 确认 | ✅ `VERSION.txt` = `commit 16655f6`；`backend\.env` 还在；`pip install -r requirements-lock.txt` 全部 *already satisfied*（原来的 `.venv` 照用）；`alembic current` = `0004 (head)`；`--check-gpis` 两个 `[OK]` |
+| 重开 | ✅ `stop-chatbot.ps1` → `Start-ScheduledTask`；登入后直接到 *Reminders*，卡片一排 3 张；明天的名单数目和 GPiS 一样 |
+| 清理 | ✅ 下载的 zip 删了 |
+
+这次找到的：
+
+- 改名前要关掉所有开在 `C:\Chatbot_Automation` 里的视窗；改名失败就停下来，不要解压（第 9 节已经加上，`resmon` 可以查是谁在用）。
+- 这次是「直接盖在原来的文件夹」也没问题，因为只改网页（`.env`、`.venv` 不在 zip 里，不会被盖）。有改表、改套件版本的更新一定要照第 9 节：先改名留 `.old`，重新建 venv。
+
