@@ -29,7 +29,7 @@
 5. **不反编译 GPiS、不解密 `sa` 密码、不读取 `Tbl_User`。**
 6. 仓库里不写入任何密码、连接字符串中的密码、access token（用环境变量 / `.env`，并加入 `.gitignore`）。
 
-## 当前进度（2026-10-13）
+## 当前进度（2026-10-14）
 
 - [x] 确认 GPiS 使用 SQL Server 2012 Express，数据库名 `GPiS`
 - [x] 导出表结构，找到预约表 `Tbl_CAH_Appointment` 及相关设置表
@@ -103,13 +103,13 @@
 - [x] A10 提醒的保留期限（D67）初版：预约日期过了 90 天的 `reminders` 整行删掉、只留每天的数目（`reminder_stats`，migration `0005`）；*NO WA* 的号码一直留，改回照常、没有对话的号码删掉；B 每次登入先备份、**备份成功才清理**（`python -m app.retention`，`--dry-run`、`--stats`），备份超过 30 天的也删；`/api` 加 `Cache-Control: no-store`（headless Chromium：假名字在浏览器快取里 2 个档案 → 0 个）；要问诊所 W60；云端 `pytest` 316 个、Vitest 47 个，PowerShell 只在云端用 PowerShell 7 试过，全部假数据
 - [x] A10：开发电脑测试 10 项全部通过（2026-10-13，Windows PowerShell 5.1；记录见 `backend/README.md`）：`0005 (head)`、`pytest` 316 个、`npm test` 47 个；没有 pgpass 时备份失败、不清理；有了之后先备份再删 1 条、40 天前的假备份删了、`reminder_stats` 累加成 `2 | 1 | 4`；`no-store`；已经清理干净。找到：开发电脑的 `psql` 不在 PATH（用完整路径 `$psql`）、过了半夜 `CURRENT_DATE` 会变 → 清单改了
 - [x] A10（D67）和开发电脑的测试记录合并进 `main`（PR #26）
-- [x] B 的 uvicorn 日志「留最新 14 个」其实没有在删：删的那一行在 uvicorn 停了之后，关机、`stop-chatbot.ps1` 都会连脚本一起停掉、轮不到 → 改成**启动前**删（`deploy/start-chatbot.ps1`）；PowerShell 7 用假档案跑过脚本里的那一段（20 个旧的、启动 4 次 → 剩 14 个）
+- [x] B 的 uvicorn 日志「留最新 14 个」其实没有在删：删的那一行在 uvicorn 停了之后，关机、`stop-chatbot.ps1` 都会连脚本一起停掉、轮不到 → 改成**启动前**删（`deploy/start-chatbot.ps1`）；PowerShell 7 用假档案跑过脚本里的那一段（20 个旧的、启动 4 次 → 剩 14 个）；开发电脑 Windows PowerShell 5.1 试过（2026-10-14：20 个假日志 → 启动一次剩 14 个，最旧的是 `0908`）；合并进 `main`（PR #27）
 
 ## 下一步
 
 1. 员工用 *Open in WhatsApp* 发（D65，2026-10-13 起）：一两个星期后问员工名单有没有漏掉的、*Needs staff* 有没有处理（只问日期、时间、医生，不要截图）；对不上的记下来，回来一起找原因。
 2. 画面整理（D66，PR #23）：B 已经更新（2026-10-13）。和第 1 项一起，一两个星期后问员工新画面（卡片、☰）好不好用。画面还是英文（D24）。
-3. A10（D67）：已经合并（PR #26）→ 开发电脑 `git checkout main`、`git pull`（`alembic current` 是 `0005 (head)`）→ 更新 B（这次**有改表** `0005`：照第 9 节完整做、改名成 `.old`，当天的提醒发完之后才更新）。uvicorn 日志的修正（只改 `deploy/start-chatbot.ps1`）开发电脑试过、合并后，跟下一次更新 B 一起装。问诊所 W60（90 天可以吗）。B 2027-01-13 之前每次都是 `删了 0 条`；那之后看一次 `start.log`，确认第一次真的删了。
+3. A10（D67）：已经合并（PR #26）→ 开发电脑 `git checkout main`、`git pull`（`alembic current` 是 `0005 (head)`）→ 更新 B（这次**有改表** `0005`：照第 9 节完整做、改名成 `.old`，当天的提醒发完之后才更新）。uvicorn 日志的修正（PR #27，只改 `deploy/start-chatbot.ps1`）跟下一次更新 B 一起装。问诊所 W60（90 天可以吗）。B 2027-01-13 之前每次都是 `删了 0 条`；那之后看一次 `start.log`，确认第一次真的删了。
 4. 更新电脑 B：照 `docs/deploy-pc-b.md` 第 9 节（zip 经 Google Drive 链接、对 hash，D64）；更新前先在开发电脑跑过测试。B 上**不跑测试**，读的是主机 A 的正式资料。第一版模板没有按钮（D48）；真的用 Cloud API 发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
 5. 系统用模板自动发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（已经通了，但 B 有时候关机）、病人同意（W40、D46；签名表已经加了那一句，W55）。
 6. A1：B 经局域网用只读帐号读 A，已经通了（2026-10-13）。B 下班有时候关（W54）：Phase 6 之前决定长期放哪里（`docs/architecture.md` 9.4）。
