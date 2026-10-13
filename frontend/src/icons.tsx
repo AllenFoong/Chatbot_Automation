@@ -148,3 +148,15 @@ export const DownloadIcon = ({ size }: P) => (
     <path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" />
   </Icon>
 );
+
+export const MenuIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M4 6.5h16M4 12h16M4 17.5h16" />
+  </Icon>
+);
+
+export const CloseIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </Icon>
+);

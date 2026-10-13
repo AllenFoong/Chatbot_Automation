@@ -288,3 +288,57 @@ describe("replying to the patient", () => {
     expect(screen.getByText("131047: Re-engagement message")).toBeInTheDocument();
   });
 });
+
+describe("menu (hamburger)", () => {
+  const routes = {
+    "GET /api/auth/me": ok(STAFF),
+    ...counts,
+    "GET /api/requests?status=PENDING": ok([]),
+  };
+
+  it("collapses the menu to icons on a computer screen and remembers it", async () => {
+    fakeApi(routes);
+    renderApp("/account");
+    const user = userEvent.setup();
+    const collapse = await screen.findByRole("button", { name: "Collapse menu" });
+    expect(collapse).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(collapse);
+    const expand = screen.getByRole("button", { name: "Expand menu" });
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("link", { name: "Reminders" })).toHaveAttribute("title", "Reminders"); // 只有图示时滑过看得到名字
+    expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument(); // 读屏软件还是念得到
+    expect(localStorage.getItem("clinicAdmin.menuCollapsed")).toBe("1");
+
+    await user.click(expand);
+    expect(screen.getByRole("button", { name: "Collapse menu" })).toHaveAttribute("aria-expanded", "true");
+    expect(localStorage.getItem("clinicAdmin.menuCollapsed")).toBe("0");
+  });
+
+  it("opens the menu on a narrow screen and closes it after choosing a page", async () => {
+    fakeApi(routes);
+    renderApp("/account");
+    const user = userEvent.setup();
+    const open = await screen.findByRole("button", { name: "Open menu" });
+    expect(open).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(open);
+    expect(open).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Close menu" })).toHaveFocus();
+
+    await user.click(screen.getByRole("link", { name: "Requests" }));
+    expect(await screen.findByRole("heading", { name: "Appointment requests" })).toBeInTheDocument();
+    expect(open).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("closes the narrow-screen menu with Escape", async () => {
+    fakeApi(routes);
+    renderApp("/account");
+    const user = userEvent.setup();
+    const open = await screen.findByRole("button", { name: "Open menu" });
+    await user.click(open);
+    await user.keyboard("{Escape}");
+    expect(open).toHaveAttribute("aria-expanded", "false");
+    expect(open).toHaveFocus();
+  });
+});

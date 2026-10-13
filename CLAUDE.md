@@ -92,7 +92,7 @@
 - [x] 电脑 B 安装第一天（2026-10-12，记录在 `docs/deploy-pc-b.md` 第 11 节）：没带 USB → zip 经 Google Drive 链接下载；ODBC 18、PostgreSQL 18、python.org 的 Python 3.11.9（B 本来有 Store 的 3.11 和 3.12.0，不动、不加 PATH）、`0004`、共用帐号 `admin` / `staff`、假资料（`REMINDER_SOURCE=demo`）、自动启动都好了；A 的只读帐号还没建。找到：`requirements-lock.txt` 的中文说明让英文 Windows 的 pip 读不了 → 改成只有 ASCII、加测试；Store 的 Python、*Python install manager* 不能用
 - [x] 电脑 B 第二天（2026-10-13，记录在 `docs/deploy-pc-b.md` 第 11 节）：第一天剩下的都通过（重开机、假期 2026 / 2027 各 11 天、`staff` 登入、清理）；主机 A 建好 `chatbot_reader`（`.sql` 经 Drive 链接在 A 下载，D64；第三次才成功，前两次没有建任何东西）；B 接 A：`--check-gpis` 两个 `[OK]`（ODBC 18 连 SQL Server 2012 没有 TLS 问题）；10-14 的名单 13 个和 GPiS 一样；*Open in WhatsApp* 试过、按回 *Not sent*；A 上的 `COPY_ONLY` 备份删了、私人网盘已登出；B 装了 Windows Terminal（中文显示）；记录合并进 `main`（PR #22）
 - [x] 不做 1–2 星期的对照试跑（W42）：2026-10-13 起员工直接按 *Open in WhatsApp* 发（D65）；头一两个星期发之前在 GPiS 扫一眼明天的预约，对不上的记下日期、时间、医生（不记名字、号码）
-- [x] Admin Platform 画面整理初版（D66）：左边选单、登录后先到 Reminders、提醒名单一个号码一张卡片、一排 3 张 + 「Opened in WhatsApp: x of y」、每页统一的标题和说明、表格 / 表单 / 提醒框统一样式（还是不用 UI 套件，D30）；云端 `npm test` 44 个，headless Chromium 截图每一页（1920 / 1366 / 1024 / 400 宽），全部假资料
+- [x] Admin Platform 画面整理初版（D66）：左边选单（☰ 收成只有图示；窄的萤幕 ☰ 打开）、登录后先到 Reminders、提醒名单一个号码一张卡片、一排 3 张 + 「Opened in WhatsApp: x of y」、每页统一的标题和说明、表格 / 表单 / 提醒框统一样式（还是不用 UI 套件，D30）；云端 `npm test` 47 个，headless Chromium 截图每一页（1920 / 1366 / 1024 / 400 宽），全部假资料
 - [ ] 画面整理：开发电脑照 `frontend/README.md`「画面整理（D66）」测试，通过后合并、更新 B
 - [x] 不用 USB（D64）：zip 和 A 的 `create_readonly_login.sql` 都经 Google Drive 链接，在 B / A 的 InPrivate 视窗下载（不登入）、对 hash、用完就删；文件照着改；第一天的记录、`requirements-lock.txt` 的修正和 D64 合并进 `main`（PR #21）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
@@ -102,7 +102,7 @@
 ## 下一步
 
 1. 员工用 *Open in WhatsApp* 发（D65，2026-10-13 起）：一两个星期后问员工名单有没有漏掉的、*Needs staff* 有没有处理（只问日期、时间、医生，不要截图）；对不上的记下来，回来一起找原因。
-2. 画面整理（D66）：开发电脑照 `frontend/README.md`「画面整理（D66）」的 13 项测（Windows 的 Segoe UI、1366 宽）；通过后合并，再照第 3 项更新 B。画面还是英文（D24）。
+2. 画面整理（D66）：开发电脑照 `frontend/README.md`「画面整理（D66）」的 15 项测（Windows 的 Segoe UI、1366 宽）；通过后合并，再照第 3 项更新 B。画面还是英文（D24）。
 3. 更新电脑 B：照 `docs/deploy-pc-b.md` 第 9 节（zip 经 Google Drive 链接、对 hash，D64）；更新前先在开发电脑跑过测试。B 上**不跑测试**，读的是主机 A 的正式资料。第一版模板没有按钮（D48）；真的用 Cloud API 发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
 4. 系统用模板自动发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（已经通了，但 B 有时候关机）、病人同意（W40、D46；签名表已经加了那一句，W55）。
 5. A1：B 经局域网用只读帐号读 A，已经通了（2026-10-13）。B 下班有时候关（W54）：Phase 6 之前决定长期放哪里（`docs/architecture.md` 9.4）。

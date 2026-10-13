@@ -28,6 +28,7 @@ React 19 + TypeScript + Vite。只多用了一个套件 React Router（网址 �
 
 左边是选单（*Daily work*：Reminders、Conversations、Requests；*Clinic setup*：Settings、Staff accounts），下面是自己的名字（*My account*）和 *Log out*。
 **登录后先到 `/reminders`**（D66）。每页上面是标题、一句说明和那一页的按钮；浏览器分页显示「页名 · Clinic Admin」。
+☰（hamburger）：电脑萤幕在选单左上角，按了选单收成只有图示（内容比较宽），再按一次展开，这台电脑的浏览器会记住；窄的萤幕（平板、手机）在上面一排，按了选单从左边滑出来，按旁边、按 `Esc`、选了页面就关。
 
 | 网址 | 谁能用 | 做什么 |
 |---|---|---|
@@ -83,7 +84,7 @@ npm run dev
 ## 测试
 
 ```powershell
-npm test            # Vitest：44 个测试，假后端、假资料，不需要开 uvicorn
+npm test            # Vitest：47 个测试，假后端、假资料，不需要开 uvicorn
 npm run build       # TypeScript 检查 + 打包到 dist\（不进仓库）
 ```
 
@@ -129,7 +130,7 @@ CREATE DATABASE chatbot_dev OWNER chatbot;
 
 ## 画面整理（D66）：在开发电脑上测试
 
-1. `npm ci` → `found 0 vulnerabilities`；`npm test` → **44 passed**；`npm run build` → `✓ built`，没有错误。
+1. `npm ci` → `found 0 vulnerabilities`；`npm test` → **47 passed**；`npm run build` → `✓ built`，没有错误。
 2. 后端 `pytest` 还是全部通过（这一次没有改后端）。
 3. `backend\.env` 暂时加 `REMINDER_SOURCE=demo`、`WHATSAPP_ALLOWED_RECIPIENTS=<自己的号码>`（只有第一组会是自己的号码，D54），开两个视窗，照下面的清单点一次。测完把 `.env` 改回来。
 
@@ -146,8 +147,10 @@ CREATE DATABASE chatbot_dev OWNER chatbot;
 | 9 | 选别的日期 → *Show* → *Back to today's reminders* | 换日期、再回来；上面的说明写读的是哪一天、几点读的 |
 | 10 | *Settings* 的 5 个分页、*Staff accounts*、*My account* | 表格有灰色表头、按钮在右边；新增的表单在下面的白色卡片里；*Deactivate*、*Delete* 是红字 |
 | 11 | *Conversations*、*Requests* | 没有资料时中间显示图示和一句话（*No conversations.* 等） |
-| 12 | 浏览器视窗拉到 1366 宽、再拉窄（像手机） | 1366：左边选单、卡片一排 3 张、内容不用左右捲；再窄一点一排 2 张；很窄（像手机）：选单变到上面一排，卡片一排 1 张 |
+| 12 | 浏览器视窗拉到 1366 宽、再拉窄（像手机） | 1366：左边选单、卡片一排 3 张、内容不用左右捲；再窄一点一排 2 张；很窄（像手机）：上面一排 ☰，卡片一排 1 张 |
 | 13 | 用 STAFF 账号登录 | 选单没有 *Staff accounts*；*Settings* 上面蓝色框 *Only an admin can change them*，没有 Edit 按钮 |
+| 14 | 电脑萤幕：选单左上角的 ☰ | 选单收成只有图示（红色数字还在图示右上角），卡片变宽；滑过图示显示名字；按 `F5` 重新整理还是收起的；再按 ☰ 展开 |
+| 15 | 视窗拉窄（像手机）：上面一排的 ☰ | 选单从左边滑出来、后面变灰；按灰色的地方、按 `Esc` 都会关；选一个页面会到那一页、选单自己关 |
 
 测完把结果记在下面「测试记录」。B 要等开发电脑测过，再照 [`docs/deploy-pc-b.md`](../docs/deploy-pc-b.md) 第 9 节更新。
 
@@ -180,9 +183,10 @@ CREATE DATABASE chatbot_dev OWNER chatbot;
 ### 画面整理（D66，2026-10-13，云端容器）
 
 - PostgreSQL 16、Python 3.11、Node 22.22，只用假资料（`REMINDER_SOURCE=demo`、假的员工帐号和对话）。
-- `npm test` → 44 passed（*Ready* 等分页的名字改成「Ready 1」，加了「按了 Open in WhatsApp 之后进度马上更新」的检查）；`npm run typecheck`、`npm run build` 成功。
+- `npm test` → 44 passed（*Ready* 等分页的名字改成「Ready 1」，加了「按了 Open in WhatsApp 之后进度马上更新」的检查）；加了 ☰ 之后 47 passed（收起 / 展开、记住；窄萤幕打开、选了页面就关、`Esc` 关）；`npm run typecheck`、`npm run build` 成功。
 - 后端 `pytest` → 303 passed（后端没有改）。
 - 提醒名单先做成一个号码一行，看过截图后改成卡片、一排 3 张（1024 宽 2 张、400 宽 1 张）；打开一张卡片的 *Message*，同一排其他卡片不跟着拉长。
+- ☰：1366 宽收起后选单 72px、只有图示，重新整理还是收起；400 宽按 ☰ 选单滑出来，选了 *Settings* 就关；1366、1024、400 宽都不会左右捲。
 - headless Chromium（1366×768）截图每一页：登录、Reminders（Ready / Opened / Needs staff / Not appointments）、Conversations、Requests（Confirm 表单）、Settings 5 页、Staff accounts、My account；浏览器 console 没有错误。
 - 1920、1024、400 宽：页面都不会左右捲（`scrollWidth` 和视窗一样宽）。
 - 还没有在开发电脑（Windows、Segoe UI）上测：照上面「画面整理（D66）」的清单。

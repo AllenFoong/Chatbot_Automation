@@ -344,17 +344,32 @@ input[type="checkbox"]:focus {
 
 /* ---------- 外框：左边选单 + 内容 ---------- */
 
+/* 选单的宽度：收起（只有图示）时变窄，宽度会慢慢变（@property 让变数可以有动画） */
+@property --menu-w {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 236px;
+}
+
 .app {
+  --menu-w: var(--sidebar-w);
   display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-columns: var(--menu-w) minmax(0, 1fr);
   min-height: 100vh;
   /* 选单那一栏一直是白色（页面很长、往下捲的时候也一样） */
   background: linear-gradient(
     to right,
-    var(--surface) calc(var(--sidebar-w) - 1px),
-    var(--border) calc(var(--sidebar-w) - 1px) var(--sidebar-w),
-    var(--bg) var(--sidebar-w)
+    var(--surface) calc(var(--menu-w) - 1px),
+    var(--border) calc(var(--menu-w) - 1px) var(--menu-w),
+    var(--bg) var(--menu-w)
   );
+  transition: --menu-w 0.2s ease;
+}
+
+/* 窄的萤幕才有：上面一排的 ☰、选单打开时后面的灰色 */
+.topbar,
+.close-button {
+  display: none;
 }
 
 .sidebar {
@@ -365,9 +380,35 @@ input[type="checkbox"]:focus {
   flex-direction: column;
   gap: 8px;
   padding: 18px 12px 14px;
+  overflow-x: hidden;
   overflow-y: auto;
   background: var(--surface);
   border-right: 1px solid var(--border);
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 0 12px;
+}
+
+.sidebar-head .icon-button {
+  flex: none;
+  color: var(--muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .brand,
@@ -378,7 +419,14 @@ input[type="checkbox"]:focus {
 }
 
 .brand {
-  padding: 2px 8px 12px;
+  min-width: 0;
+  padding: 2px 0 0 8px;
+}
+
+.brand-mark.small {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
 }
 
 .brand-mark {
@@ -1701,52 +1749,124 @@ ul.error {
   }
 }
 
-@media (max-width: 860px) {
-  .app {
-    grid-template-columns: 1fr;
-    background: var(--bg);
+/* 电脑萤幕：选单收起时只有图示（名字还在，给读屏软件；滑过显示 title） */
+@media (min-width: 861px) {
+  .app.menu-collapsed {
+    --menu-w: 72px;
   }
 
-  .sidebar {
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    height: auto;
-    padding: 10px 12px;
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
+  .menu-collapsed .sidebar {
+    padding-inline: 10px;
   }
 
-  .brand {
-    padding: 0 8px 0 0;
+  .menu-collapsed .sidebar-head {
+    justify-content: center;
   }
 
-  .brand-sub,
-  .nav-label,
-  .user-role {
+  .menu-collapsed .brand {
     display: none;
   }
 
-  .nav {
-    order: 3;
-    flex: 1 1 100%;
-    flex-direction: row;
-    overflow-x: auto;
+  .menu-collapsed .nav-label {
+    height: 1px;
+    margin: 12px 8px;
+    padding: 0;
+    overflow: hidden;
+    background: var(--border);
+    color: transparent;
   }
 
-  .nav a {
-    height: 34px;
+  .menu-collapsed .nav a,
+  .menu-collapsed .user-chip,
+  .menu-collapsed button.logout {
+    position: relative;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .menu-collapsed .user-chip {
+    padding: 6px 0;
+  }
+
+  .menu-collapsed .nav-text,
+  .menu-collapsed .user-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
     white-space: nowrap;
   }
 
-  .sidebar-footer {
-    flex-direction: row;
+  .menu-collapsed .count {
+    position: absolute;
+    top: 3px;
+    right: 6px;
+    min-width: 17px;
+    height: 17px;
+    margin: 0;
+    padding: 0 4px;
+    font-size: 10.5px;
+  }
+}
+
+/* 窄的萤幕（平板、手机）：上面一排 ☰，选单从左边滑出来 */
+@media (max-width: 860px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    background: var(--bg);
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
     align-items: center;
-    margin: 0 0 0 auto;
-    padding: 0;
-    border: 0;
+    gap: 10px;
+    height: 56px;
+    padding: 0 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .collapse-button {
+    display: none;
+  }
+
+  .close-button {
+    display: inline-flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(280px, 85vw);
+    height: 100%;
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform 0.22s ease,
+      visibility 0s linear 0.22s;
+  }
+
+  .menu-open .sidebar {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.22s ease;
+  }
+
+  .menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(16, 24, 32, 0.38);
   }
 
   main {
@@ -1763,7 +1883,6 @@ ul.error {
   .split:not(.has-detail) .detail-pane {
     display: none;
   }
-
 }
 
 @media (max-width: 640px) {
