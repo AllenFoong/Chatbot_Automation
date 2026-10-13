@@ -95,7 +95,7 @@
 - [x] Admin Platform 画面整理初版（D66）：左边选单（☰ 收成只有图示；窄的萤幕 ☰ 打开）、登录后先到 Reminders、提醒名单一个号码一张卡片、一排 3 张 + 「Opened in WhatsApp: x of y」、每页统一的标题和说明、表格 / 表单 / 提醒框统一样式（还是不用 UI 套件，D30）；云端 `npm test` 47 个，headless Chromium 截图每一页（1920 / 1366 / 1024 / 400 宽），全部假资料
 - [x] D65 和画面整理（D66）合并进 `main`（PR #23）
 - [x] 画面整理：开发电脑照 `frontend/README.md`「画面整理（D66）」的 15 项全部通过（2026-10-13）
-- [ ] 电脑 B 更新到 PR #23 的版本（`docs/deploy-pc-b.md` 第 9 节）
+- [x] 电脑 B 更新到 PR #23 的版本（2026-10-13，`16655f6`；记录在 `docs/deploy-pc-b.md` 第 11 节）：`--check-gpis` 两个 `[OK]`、明天的名单数目和 GPiS 一样、登入后到 Reminders；旧文件夹改名失败（Access denied），新版直接盖在原来的文件夹（只改网页，所以可以），第 9 节加了「改名失败就停下来」
 - [x] 不用 USB（D64）：zip 和 A 的 `create_readonly_login.sql` 都经 Google Drive 链接，在 B / A 的 InPrivate 视窗下载（不登入）、对 hash、用完就删；文件照着改；第一天的记录、`requirements-lock.txt` 的修正和 D64 合并进 `main`（PR #21）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
@@ -104,7 +104,7 @@
 ## 下一步
 
 1. 员工用 *Open in WhatsApp* 发（D65，2026-10-13 起）：一两个星期后问员工名单有没有漏掉的、*Needs staff* 有没有处理（只问日期、时间、医生，不要截图）；对不上的记下来，回来一起找原因。
-2. 画面整理（D66，PR #23）：开发电脑 15 项通过（2026-10-13）→ 照第 3 项更新 B；更新完把结果记在 `docs/deploy-pc-b.md` 第 11 节。画面还是英文（D24）。
+2. 画面整理（D66，PR #23）：B 已经更新（2026-10-13）。和第 1 项一起，一两个星期后问员工新画面（卡片、☰）好不好用。画面还是英文（D24）。
 3. 更新电脑 B：照 `docs/deploy-pc-b.md` 第 9 节（zip 经 Google Drive 链接、对 hash，D64）；更新前先在开发电脑跑过测试。B 上**不跑测试**，读的是主机 A 的正式资料。第一版模板没有按钮（D48）；真的用 Cloud API 发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
 4. 系统用模板自动发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（已经通了，但 B 有时候关机）、病人同意（W40、D46；签名表已经加了那一句，W55）。
 5. A1：B 经局域网用只读帐号读 A，已经通了（2026-10-13）。B 下班有时候关（W54）：Phase 6 之前决定长期放哪里（`docs/architecture.md` 9.4）。
