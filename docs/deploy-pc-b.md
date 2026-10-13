@@ -16,7 +16,7 @@
 | ❌ 不收 WhatsApp 消息（5a 的 webhook、cloudflared 不装） | 要等 5c 接上诊所的号码 |
 | ❌ 不装 Node.js、git、SQL Server | 网页在开发电脑 build 好，zip 经 Google Drive 链接带过去（不用 USB，D64） |
 
-试跑期间员工**照旧手动发**，同时对照系统的名单 1–2 星期（W42）。
+员工**直接按 *Open in WhatsApp* 发**（D65，2026-10-13 起；原本的「照旧手动发、对照 1–2 星期」W42 不做了）。头一两个星期，发之前在 GPiS 扫一眼明天的预约，有人既不在 *Ready* 也不在 *Needs staff* 就记下日期、时间、医生。
 
 ## 2. 去诊所之前
 
@@ -175,7 +175,7 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 | 2 | `start.log` | `备份：…dump`、`uvicorn 启动` |
 | 3 | 用 ADMIN 登入 → *Settings → Clinic closures* → *Import public holidays for 2026*，再换 2027 | 各 *Added 11 day(s)*；和 `clinic-workflow.md` 第 1 节的表对照；核对 Hari Raya 的日期 |
 | 4 | *Reminders* → 明天 | 名单的人数和 GPiS 一样；家人合并、`*C` 的规则对 |
-| 5 | 请员工挑一行按 *Open in WhatsApp* | WhatsApp Desktop 打开**那位病人**的对话、消息已经填好。**不要按 Enter**（试跑期间员工照旧手动发）→ 关掉 → 那一行按 *Mark as not sent*（按过就记成已打开，D58，不改回来员工会以为发过了） |
+| 5 | 请员工挑一行按 *Open in WhatsApp* | WhatsApp Desktop 打开**那位病人**的对话、消息已经填好。**不要按 Enter**（这是安装检查，不是真的要发）→ 关掉 → 那一行按 *Mark as not sent*（按过就记成已打开，D58，不改回来员工会以为发过了） |
 | 6 | 在 B 上：`Test-NetConnection <B的IP> -Port 8000`、`Test-NetConnection 127.0.0.1 -Port 8000` | 第一个 `False`、第二个 `True`（只听 `127.0.0.1`，D62）。不用 A 的浏览器试：A 上只跑只读帐号的脚本（规则 1） |
 | 7 | 用 STAFF 帐号登入 | 看得到名单；*Settings* 不能改 |
 
@@ -288,6 +288,8 @@ $LASTEXITCODE                                                        # → 0
 | 第 7 节第 5 项 | ✅ 员工挑一行按 *Open in WhatsApp*：WhatsApp Desktop 打开那位病人的对话、消息填好；没有按 Enter；之后按 *Mark as not sent* |
 | Windows Terminal | 装在 B（Microsoft Store，Microsoft Corporation），中文看得到了 |
 | 教员工 | ✅ 试跑开始（W42）：员工照旧用手机手动发提醒，同时看系统的名单对照 1–2 星期；试跑期间不用 *Open in WhatsApp* 发 |
+
+同一天稍后决定**不做对照试跑**，员工直接按 *Open in WhatsApp* 发（D65）。上面「教员工」那一行是当时的安排。
 
 第二天找到的：
 

@@ -1,7 +1,7 @@
 # 决定记录
 
 > 每条决定写明原因。推翻某条决定时，不删除原记录，新增一条并注明取代哪一条。
-> 最后更新：2026-10-08
+> 最后更新：2026-10-13
 
 | # | 决定 | 原因 |
 |---|---|---|
@@ -75,6 +75,7 @@ D48–D50 是按诊所第一轮问卷、D51–D53 是按第二轮问卷（都是
 | D62 | 5b 试跑装在电脑 B 的做法（`docs/deploy-pc-b.md`）：**FastAPI 同时提供 build 好的网页**（`frontend/dist`），B 只跑一个 uvicorn、不装 Node.js；**只听 `127.0.0.1`**，只有 B 自己的浏览器打得开（`http://localhost:8000`），所以不用 https、`COOKIE_SECURE=false`；工作排程器在**登入 Windows 时**启动，停了自动重开；每次开机先 `pg_dump` 备份本系统的数据库到 B 的硬盘（留 14 份）；程序用 USB 带 zip（`deploy/make-package.ps1`，只有 commit 过的程序 + 网页），B 上不装 git、不登入 GitHub；不收 WhatsApp（webhook、cloudflared 不装）；不印每个网址（`--no-access-log`） | W53：员工在诊所里用就够；*Open in WhatsApp* 要在装 WhatsApp Desktop 的那台按，所以先只给 B 用。开放给局域网就要 https 和更多保护，网页里有病人名字和号码。W54：B 下班会关，所以跟着登入启动、不用 Windows 服务。备份里有病人资料，只留在 B（规则 4）。诊所的电脑不登入私人帐号（数据安全规则） |
 | D63 | 电脑 B 的安装照开发电脑演练（2026-10-12，`deploy-pc-b.md` 第 8 节）改：① **Python 3.11.9**、套件装 **`backend/requirements-lock.txt`**（演练通过的那个 venv 的 `pip freeze`），不装当天最新的；② uvicorn 停了由 **`start-chatbot.ps1` 自己 1 分钟后重开**（最多 3 次），每次启动一个日志档；③ 停下本系统用 **`stop-chatbot.ps1`**（先停工作排程器、再停 uvicorn、等 port 8000 空出来），`install-autostart.ps1 -Remove` 也先停；④ 更新失败、数据库坏了用开机的备份还原：`pg_restore --clean`（第 10 节，用 `chatbot` 帐号，不用 `postgres`） | 测过的版本才知道能用：`holidays` 的假期名字一变，D61 的过滤就会漏，FastAPI、Starlette 也常有不相容的改版；开发电脑和所有测试都是 3.11.9，文件原来写的「3.12 以上」从来没在 Windows 跑过。演练实测：`Stop-ScheduledTask` 只停掉 PowerShell，跑 uvicorn 的 Python 还在、port 8000 还被占着（更新时改不了文件夹名、删不掉数据库）。工作排程器的「失败时重新启动」不一定会因为程序停了而重开，所以自己重开；演练关掉 uvicorn，1 分钟后自己回来。备份要真的还原过才算有：演练用开机那份还原，之后导入的假期不见了、帐号和名单都在 |
 | D64 | **不用 USB**（修改 D62 的「用 USB 带 zip」）：要带去诊所的档案（B 的 `chatbot-<commit>.zip`、A 的 `create_readonly_login.sql`）上传自己的 Google Drive、共用设成「知道链接的任何人」，在 B / A 的 **Edge InPrivate 视窗照着打链接下载，不登入任何帐号**；下载后和开发电脑对 hash（`Get-FileHash` 的前 8 个字）；用完马上删掉 Drive 的档案、清空垃圾桶，A 上下载的 `.sql` 跑完就删（Shift + Delete）。安装程序在 B 上直接从官网下载（看数位签章）。只传这两种档案：**不传** `.env`、密码、GPiS 的备份、`.dump`、截图 | 2026-10-12 在诊所没有 USB，zip 经 Drive 链接下载到 B，装得起来；诊所的电脑不一定能插 USB，USB 也可能留着以前的资料。zip 和 `.sql` 里只有 commit 过的程序和网页（`make-package.ps1` 用 `git archive`），没有病人资料和密码（规则 4、6），链接只开着几分钟；hash 确认下载到的就是开发电脑做的那个。A 上多做的只是下载一个文字档，跑的还是 D52、D60 的同一个脚本 |
+| D65 | **不做 1–2 星期的对照试跑，员工直接用 *Open in WhatsApp* 发提醒**（2026-10-13 决定；修改 W42 的「先只列名单、员工照旧手动发并对照」，也就是跳过 `architecture.md` 8.1 的第 1 步，直接第 2 步）。从 B 的 WhatsApp Desktop 发（诊所号码的连结装置，W58）。员工要知道：按了还要**按 Enter** 才发出，没发出去就按 *Mark as not sent*；***Needs staff* 的系统不处理**，照以前的方法提醒；签名表写了 `NO WA` 的按 *NO WA*；B 打不开那天照旧用手机发。**代替对照**：头一两个星期，发之前在 GPiS 扫一眼明天的预约，有人既不在 *Ready* 也不在 *Needs staff* → 只记日期、时间、医生回报（不记名字、号码，不截图） | 第二天 B 读 A 的名单（10-14，13 个预约）和 GPiS 一样，只读帐号、`--check-gpis` 都通过（`deploy-pc-b.md` 第 11 节）。*Open in WhatsApp* 还是员工自己按 Enter、从诊所自己的号码发，不经 Cloud API、不收钱，同意的情况和现在用手机发一样（D54）；名单、`*C` 检查、家人合并由系统做，马上省时间。风险是系统漏掉的预约病人收不到提醒、*Needs staff* 没人处理 → 用「扫一眼」代替对照，*Needs staff* 写明原因；GPiS 照常是正本 |
 
 ## 数据安全规则（病人资料，受马来西亚 PDPA 保护）
 
