@@ -8,6 +8,7 @@
    staff（员工账号）
 3. 预约提醒（Phase 5b）
    reminders（一个号码、一个预约日期的提醒）；wa_contacts 上记这个号码要不要提醒（opt-out）
+   reminder_stats（提醒删掉之后留下的每天数目，A10）
 
 第 2、3 部分会存病人资料（名字、电话、消息内容）：开发和测试只用假数据（CLAUDE.md 规则 4）。
 """
@@ -394,4 +395,22 @@ class Reminder(Base):
         # 同一个号码、同一个预约日期只有一条（D45）：再按一次是更新这一条
         UniqueConstraint("appointment_date", "wa_phone"),
         CheckConstraint("wa_phone ~ '^[0-9]{8,15}$'", name="wa_phone_digits"),
+    )
+
+
+class ReminderStats(Base):
+    """提醒删掉之后留下的数目（A10、D67）：一个预约日期一行，没有号码、名字、员工。
+
+    预约日期过了 90 天，reminders 那几行整行删掉，删之前把数目加到这里（app/db/retention.py）。
+    """
+
+    __tablename__ = "reminder_stats"
+
+    appointment_date: Mapped[date] = mapped_column(primary_key=True)
+    opened: Mapped[int] = mapped_column(server_default=text("0"))                # 几个号码按过 Open in WhatsApp
+    not_sent: Mapped[int] = mapped_column(server_default=text("0"))              # 几个号码改回 Not sent
+    opened_appointments: Mapped[int] = mapped_column(server_default=text("0"))   # 按过的那些号码一共几个 GPiS 预约
+
+    __table_args__ = (
+        CheckConstraint("opened >= 0 AND not_sent >= 0 AND opened_appointments >= 0", name="counts"),
     )

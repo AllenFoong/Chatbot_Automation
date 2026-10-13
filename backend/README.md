@@ -7,6 +7,7 @@
 - **Phase 4a**：员工登录 + Admin Platform 要用的 API（`/api/...`）。网页（4b）在 [`frontend/`](../frontend/README.md)。
 - **Phase 5a**：接上 WhatsApp Cloud API：收病人的消息（webhook）、员工在 Admin Platform 回复、显示送达状态。开发时只用 Meta 的测试号码。
 - **Phase 5b**（第一步）：预约提醒的名单（只看名单）+ *Open in WhatsApp*，见下面「Phase 5b」。
+- **资料保留（A10）**：提醒过了预约日期 90 天就删掉、只留每天的数目，见最后的「资料保留（A10）」。
 
 | 文件 | 内容 |
 |---|---|
@@ -23,12 +24,13 @@
 | `app/db/reminders.py` | `reminders` 表、号码的 opt-out：员工对提醒做过的事（名单本身不存） |
 | `app/reminders_cli.py` | 在终端印出名单的摘要（没有名字、号码）；`--check-gpis` 检查 GPiS 的栏位 |
 | `app/reminder_demo.py` | 提醒的假资料（`REMINDER_SOURCE=demo`），不连 GPiS 也能试画面 |
+| `app/db/retention.py`、`app/retention.py` | 资料保留（A10、D67）：删掉预约日期过了 90 天的提醒、只留每天的数目（`python -m app.retention`） |
 | `app/webhook.py`、`app/webhook_main.py` | 收 WhatsApp webhook 的小程序（port 8001），开发时只有它经 tunnel 放上网 |
 | `app/db/create_staff.py` | 建员工账号（第一个 ADMIN 用这个建） |
 | `app/db/demo.py` | 放假资料到 `chatbot_dev`，方便看画面（只能用在 `_dev` 数据库） |
 | `app/cli.py` | 在终端印出和 SQL 7a / 7b / 7c 一样格式的结果，方便对照 |
 | `app/phone.py` | 手机号转成国际格式（例 `60123456789`），WhatsApp 的号码和员工输入的号码才能比对 |
-| `app/db/models.py` | 本系统的 14 张表（表结构以这里为准；Phase 4 加了 `staff_sessions`，Phase 5 加了消息的送达状态、`reminders`） |
+| `app/db/models.py` | 本系统的 15 张表（表结构以这里为准；Phase 4 加了 `staff_sessions`，Phase 5 加了消息的送达状态、`reminders`，A10 加了 `reminder_stats`） |
 | `app/db/seed.py` | 设置的初始值（= SQL 第 2 节 + 疗程代码）；`python -m app.db.seed` 写入 |
 | `app/db/rules.py` | 从 PostgreSQL 读设置 → `ClinicRules` |
 | `app/db/conversations.py` | 收 / 发 WhatsApp 消息、转人工、WhatsApp 24 小时规则 |
@@ -648,3 +650,106 @@ pytest                        # 应该 272 passed，没有 skipped
 ### 开发电脑的测试记录（2026-10-09）
 
 - 第 1–8 项全部通过：`0004 (head)`、`pytest` 272 passed、`npm test` 44 passed、`npm run build` 成功；假资料的 *Opened*、重新整理和另一个帐号、*Mark as not sent*、*NO WA*、`reminders_cli`、*Allow reminders again* 都正常；日志没有名字和号码。
+
+## 资料保留（A10）：提醒过了 90 天就删掉
+
+设计见 `docs/decisions.md` D67、`docs/architecture.md` A10。
+
+- `reminders`：预约日期早于「今天 − 90 天」的**整行删掉**（号码、填好的消息、预约 ID、员工都不留）。
+  删之前每天的数目加进 `reminder_stats`（一个预约日期一行：`opened`、`not_sent`、`opened_appointments`；没有号码、名字、员工）。
+  例：今天是 2026-10-13 → 删掉 2026-07-15 之前的预约（7-15 的留着）。
+- `wa_contacts`：按过 *NO WA* 的号码**一直留**；改回照常提醒、又没有对话的号码删掉。
+- 全部在一个交易里：中间出错就一条都不删。
+- 电脑 B：每次登入 Windows 时，`deploy/start-chatbot.ps1` **先备份、备份成功才清理**，`start.log` 记一行日期和数目；
+  开机备份除了留最新 14 份，超过 30 天的也删（`docs/deploy-pc-b.md` 第 6 节）。
+- `/api` 的回应都有 `Cache-Control: no-store`：浏览器不把名单（名字、号码）存进硬盘的快取。
+- 保留天数是 `app/db/retention.py` 的 `RETENTION_DAYS`（最少 30）。画面没有改。
+
+```powershell
+python -m app.retention              # 删掉过了 90 天的提醒（数目留在 reminder_stats）、不用再留的号码
+python -m app.retention --dry-run    # 只印会删几条，什么都不删
+python -m app.retention --stats      # 每个月的数目（还在的提醒 + 已经删掉只留数目的）
+```
+
+输出只有日期和数目，没有名字、号码，可以贴回来。
+
+### 更新（Phase 5b 第二步已经装好的电脑）
+
+在 `backend` 里（先启用 venv）：
+
+```powershell
+git pull
+alembic upgrade head          # 0004 -> 0005：reminder_stats 表
+alembic current               # 应该是 0005 (head)
+pytest                        # 应该 316 passed，没有 skipped
+```
+
+在 `frontend` 里：`npm test` → **47 passed**；`npm run build` 成功（网页没有改）。
+
+### 资料保留完成的条件（在开发电脑上测试）
+
+只用 `chatbot_dev` 和假资料（号码 `601000000xx`、消息 `DEMO`）。psql：`psql -h localhost -U chatbot -d chatbot_dev`。
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的「更新」 | `0005 (head)`；316 passed、没有 skipped；47 passed；`✓ built` |
+| 2 | psql 加 3 条假的提醒（下面的 SQL 1） | `INSERT 0 3` |
+| 3 | `python -m app.retention --dry-run` | `只看、不删：…之前的提醒有 2 条（1 天）`（日期是今天 − 90 天）；不用再留的号码可能不是 0（以前读 `GPiS_Dev` 试过 *NO WA* 又改回来的） |
+| 4 | `python -m app.retention`，再跑一次 | 第一次 `删了 2 条（1 天…）`；第二次 `删了 0 条` |
+| 5 | psql（下面的 SQL 2） | `reminders` 只剩 10 天前的那条；`reminder_stats` 有 100 天前那天：`opened` 1、`not_sent` 1、`opened_appointments` 2 |
+| 6 | `python -m app.retention --stats` | 每个月一行 + `Total`；没有名字、号码 |
+| 7 | 开机的脚本（下面的「试 `start-chatbot.ps1`」） | `start.log`：`备份：…dump` → `清理：…删了 1 条…` → `uvicorn 启动`，中文正常；40 天前的假备份不见了，今天的在 |
+| 8 | 同上，拿掉 pgpass 那一行再跑一次 | `start.log`：`备份失败…` → `清理：这次不清理（备份没有成功）` → `uvicorn 启动` |
+| 9 | 浏览器 `http://localhost:8000` 登入 → Reminders → `F12` → *Network* → 点 `reminders?…` → *Response Headers* | `Cache-Control: no-store` |
+| 10 | 清理（下面的 SQL 3、删掉 `%LOCALAPPDATA%\Chatbot`） | 假资料、测试的备份都没了 |
+
+SQL 1（加假资料）：
+
+```sql
+INSERT INTO reminders (appointment_date, wa_phone, status, body, gpis_appointment_ids) VALUES
+  (CURRENT_DATE - 100, '60100000001', 'OPENED',   'DEMO', ARRAY[1, 2]),
+  (CURRENT_DATE - 100, '60100000002', 'NOT_SENT', 'DEMO', ARRAY[3]),
+  (CURRENT_DATE - 10,  '60100000001', 'OPENED',   'DEMO', ARRAY[4]);
+```
+
+SQL 2（看结果）：
+
+```sql
+SELECT appointment_date, status FROM reminders WHERE body = 'DEMO';
+SELECT * FROM reminder_stats WHERE appointment_date = CURRENT_DATE - 100;
+```
+
+**试 `start-chatbot.ps1`**（第 7、8 项；用 **Windows PowerShell 5.1**，和电脑 B 一样，不用 PowerShell 7）：
+
+1. 关掉平常开发用的 uvicorn（port 8000 要空出来）；`frontend` 已经 `npm run build`（第 1 项）。
+2. `%APPDATA%\postgresql\pgpass.conf` 暂时加一行 `localhost:5432:chatbot_dev:chatbot:<chatbot 的密码>`（没有这个档就新建；测完拿掉）。
+3. 再加一条要删的假提醒（SQL 1 的第一行），放一个 40 天前的假备份：
+   ```powershell
+   $bk = "$env:LOCALAPPDATA\Chatbot\backup"; New-Item -ItemType Directory -Force $bk | Out-Null
+   Set-Content "$bk\chatbot_dev-20260801-0900.dump" "fake"
+   (Get-Item "$bk\chatbot_dev-20260801-0900.dump").LastWriteTime = (Get-Date).AddDays(-40)
+   ```
+4. 在仓库根目录：`powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\start-chatbot.ps1`（视窗会停在那里，uvicorn 在跑）。
+5. 另开一个视窗：`notepad "$env:LOCALAPPDATA\Chatbot\logs\start.log"`；`Get-ChildItem "$env:LOCALAPPDATA\Chatbot\backup"`。
+   第 9 项也在这时候做。
+6. 关掉第 4 步的视窗，再跑 `.\deploy\stop-chatbot.ps1` → `已经停了`。
+7. 第 8 项：pgpass 拿掉那一行，重做第 4–6 步。
+
+SQL 3（清理）：
+
+```sql
+DELETE FROM reminders WHERE body = 'DEMO';
+DELETE FROM reminder_stats WHERE appointment_date = CURRENT_DATE - 100;
+```
+
+然后 `Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Chatbot"`（里面的备份是 `chatbot_dev` 的）；pgpass 那一行已经拿掉（第 7 步）。
+
+### 云端容器的测试记录（2026-10-13，PostgreSQL 16、Python 3.11、只用假资料）
+
+- `pytest` → 316 passed（新增 13 个：90 天的界线、每一种状态都有算进统计、删掉和数目、再跑一次不会多算 / 之后再删会累加、`--dry-run` 不删、*NO WA* 的号码留着 / 有对话的留着 / 改回来的删掉、
+  统计写不进去就一条都不删、终端输出没有名字和号码、`--stats`、`/api` 有 `no-store`）。
+- `npm test` → 47 passed；`npm run build` 成功（网页没有改）。
+- 真的跑 `python -m app.retention`（假资料，`0005`）：`--dry-run` 2 条、删了 2 条、再跑 0 条、`--stats` 对；`reminder_stats` 一行 `1 | 1 | 2`；改回照常提醒的假号码删了。
+- PowerShell 7（Linux）：`deploy/` 的 4 个脚本语法都没有错误；备份的规则用假档案试 4 种情况（16 份都在 30 天内 → 留 14；有超过 30 天的 → 删掉；最新的一份一定留）；`retention.log` 的中文写进 `start.log` 正常。
+  **Windows PowerShell 5.1 没有试**（云端没有）：开发电脑第 7、8 项。
+- headless Chromium 登入、读假资料的 `/api/reminders`、关掉浏览器后在设定档里找假名字：改之前 **2 个档案**有，加了 `no-store` 之后 **0 个**。

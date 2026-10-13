@@ -36,6 +36,15 @@ def test_everything_needs_login(session, client_for):
         assert client.get(path).status_code == 401, path
 
 
+def test_api_responses_are_not_cached(session, client_for):
+    """/api 的回应有病人名字、号码：浏览器不能存进硬盘的快取（A10、D67）。"""
+    add_staff(session, "amy", password=PASSWORD)
+    client = client_for("amy")
+    assert client.get("/api/auth/me").headers["cache-control"] == "no-store"
+    assert client_for().get("/api/conversations").headers["cache-control"] == "no-store"   # 401 也一样
+    assert "cache-control" not in client.get("/health").headers
+
+
 def test_logout_ends_the_session(session, client_for):
     add_staff(session, "amy", password=PASSWORD)
     client = client_for("amy")
