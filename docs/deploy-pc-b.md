@@ -231,7 +231,10 @@ Windows PowerShell 5.1、Python 3.11.9、PostgreSQL 18.6、`GPiS_Dev`（`chatbot
 1. 开发电脑：新的 `chatbot-<commit>.zip`（第 2 节），经 Google Drive 链接下载到 B、对 hash（第 3 节第 5 步，D64）。
 2. B：`C:\Chatbot_Automation\deploy\stop-chatbot.ps1` → `已经停了`；`cd C:\`（PowerShell 在那个文件夹里就改不了名），
    把 `C:\Chatbot_Automation` 改名成 `C:\Chatbot_Automation.old`（要退回时用）。
-3. 解压新的到 `C:\Chatbot_Automation`、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
+   改名前关掉**其他**开在这个文件夹里的东西：别的 PowerShell / Terminal 视窗和分页（例如还在 `(.venv)` 的）、文件总管、从里面打开的记事本。
+   `Access to the path ... is denied` = 还有程序在用它：`resmon` → *CPU* → *Associated Handles* 搜 `Chatbot_Automation` 看是哪个程序；
+   **改名没有成功就停在这里，不要解压**（2026-10-13 在 B 上：改名失败后照样解压，已经有的档案都没盖掉、多了几个新档，旧版还能用）。
+3. 先确认 `Test-Path C:\Chatbot_Automation` 是 `False`（旧的已经改名），再解压新的到 `C:\Chatbot_Automation`、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
 4. `alembic upgrade head`（最近一次启动时的备份就是改表之前的那一份；要退回见第 10 节）。
 5. `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。没问题再删 `.old`。
 
