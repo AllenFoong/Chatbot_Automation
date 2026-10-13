@@ -95,7 +95,7 @@
 - [x] Admin Platform 画面整理初版（D66）：左边选单（☰ 收成只有图示；窄的萤幕 ☰ 打开）、登录后先到 Reminders、提醒名单一个号码一张卡片、一排 3 张 + 「Opened in WhatsApp: x of y」、每页统一的标题和说明、表格 / 表单 / 提醒框统一样式（还是不用 UI 套件，D30）；云端 `npm test` 47 个，headless Chromium 截图每一页（1920 / 1366 / 1024 / 400 宽），全部假资料
 - [x] D65 和画面整理（D66）合并进 `main`（PR #23）
 - [x] 画面整理：开发电脑照 `frontend/README.md`「画面整理（D66）」的 15 项全部通过（2026-10-13）
-- [x] 电脑 B 更新到 PR #23 的版本（2026-10-13，`16655f6`；记录在 `docs/deploy-pc-b.md` 第 11 节）：`--check-gpis` 两个 `[OK]`、明天的名单数目和 GPiS 一样、登入后到 Reminders；旧文件夹改名失败（Access denied），新版直接盖在原来的文件夹（只改网页，所以可以），第 9 节加了「改名失败就停下来」
+- [x] 电脑 B 更新到 PR #23 的版本（2026-10-13，`16655f6`；记录在 `docs/deploy-pc-b.md` 第 11 节）：`--check-gpis` 两个 `[OK]`、明天的名单数目和 GPiS 一样、登入后到 Reminders；旧文件夹改名失败（Access denied），新版直接盖在原来的文件夹（只改网页，所以可以），第 9 节加了「改名失败就停下来」；记录合并进 `main`（PR #24）
 - [x] 不用 USB（D64）：zip 和 A 的 `create_readonly_login.sql` 都经 Google Drive 链接，在 B / A 的 InPrivate 视窗下载（不登入）、对 hash、用完就删；文件照着改；第一天的记录、`requirements-lock.txt` 的修正和 D64 合并进 `main`（PR #21）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
