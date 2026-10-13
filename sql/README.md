@@ -214,6 +214,20 @@ SQL Server 2025 Express；`IsIntegratedSecurityOnly = 0`；`sqlcmd` 用 `-C -f 6
    跑完在档案总管删掉「下载」里的 `create_readonly_login.sql`（Shift + Delete，不经过资源回收筒），关掉 PowerShell。
 3. 回到柜台另一台电脑：`python -m app.reminders_cli --check-gpis` → 两个 `[OK]`。
 4. 连不上时：
+   - `'-v': Missing argument`：`sqlcmd` 那行在 `-v` 后面按了 Enter（被拆成两行）。什么都没建，整行重打一次。
+   - `Msg 50000 … Line 25`：脚本的密码检查（要 16 个字以上、只有英文字母和数字）。什么都没建：`$pw.Length`、`$pw -match '[^A-Za-z0-9]'` 看是太短还是有符号（不会印出密码），换一个，B 的 `.env` 也改。
    - *Login failed*：密码打错 → 在 A 上跑 `drop_readonly_login.sql`（和第 2 步一样经 Drive 链接下载、对 hash；`-C -f 65001`，`DatabaseName="GPiS"`），再从第 1 步重来。
    - SSL / TLS 的错误：SQL Server 2012 太旧，和 ODBC Driver 18 谈不拢加密。**A 不改任何设定**，只在柜台另一台试：抄下错误讯息 → 连线字符串加 `Encrypt=no`（局域网里传的资料不加密，和 GPiS 现在一样）→ 还不行换 ODBC Driver 17 → 还不行就停，回来问（步骤见 [`docs/pc-b-checklist.md`](../docs/pc-b-checklist.md) 第 4 节「遇到问题」）。
 
+### 第二步的记录（2026-10-13，主机 A）
+
+SQL Server 2012 Express。`.sql` 经 Google Drive 链接在 A 的 InPrivate 视窗下载、hash 和开发电脑一样（D64）。
+
+| | 结果 |
+|---|---|
+| 建帐号 | ✅ 第三次成功：`ReadableTablesAndViews = 2`、`OtherDatabasePermissions = 0`（`DeniedTablesAndViews` 没有记下）。前两次什么都没建：`sqlcmd` 在 `-v` 后面换了行；密码有 `-`（`Msg 50000 … Line 25`） |
+| `--check-gpis`（电脑 B） | ✅ 两个 `[OK]`。ODBC Driver 18 连 SQL Server 2012 没有 SSL / TLS 的问题（`TrustServerCertificate=yes`，不用 `Encrypt=no`） |
+| 名单 | ✅ 2026-10-14：13 个预约，和 GPiS 的 Appointment 画面一样 |
+| 收尾 | ✅ A 上下载的 `.sql` 删了；Drive 的档案删了 |
+
+记录在 `docs/deploy-pc-b.md` 第 11 节。
