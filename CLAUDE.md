@@ -92,7 +92,7 @@
 - [x] 电脑 B 安装第一天（2026-10-12，记录在 `docs/deploy-pc-b.md` 第 11 节）：没带 USB → zip 经 Google Drive 链接下载；ODBC 18、PostgreSQL 18、python.org 的 Python 3.11.9（B 本来有 Store 的 3.11 和 3.12.0，不动、不加 PATH）、`0004`、共用帐号 `admin` / `staff`、假资料（`REMINDER_SOURCE=demo`）、自动启动都好了；A 的只读帐号还没建。找到：`requirements-lock.txt` 的中文说明让英文 Windows 的 pip 读不了 → 改成只有 ASCII、加测试；Store 的 Python、*Python install manager* 不能用
 - [x] 电脑 B 第二天（2026-10-13，记录在 `docs/deploy-pc-b.md` 第 11 节）：第一天剩下的都通过（重开机、假期 2026 / 2027 各 11 天、`staff` 登入、清理）；主机 A 建好 `chatbot_reader`（`.sql` 经 Drive 链接在 A 下载，D64；第三次才成功，前两次没有建任何东西）；B 接 A：`--check-gpis` 两个 `[OK]`（ODBC 18 连 SQL Server 2012 没有 TLS 问题）；10-14 的名单 13 个和 GPiS 一样；*Open in WhatsApp* 试过、按回 *Not sent*；A 上的 `COPY_ONLY` 备份删了、私人网盘已登出；B 装了 Windows Terminal（中文显示）；记录合并进 `main`（PR #22）
 - [x] 不做 1–2 星期的对照试跑（W42）：2026-10-13 起员工直接按 *Open in WhatsApp* 发（D65）；头一两个星期发之前在 GPiS 扫一眼明天的预约，对不上的记下日期、时间、医生（不记名字、号码）
-- [x] Admin Platform 画面整理初版（D66）：左边选单、登录后先到 Reminders、提醒名单一个号码一行 + 「Opened in WhatsApp: x of y」、每页统一的标题和说明、表格 / 表单 / 提醒框统一样式（还是不用 UI 套件，D30）；云端 `npm test` 44 个，headless Chromium 截图每一页（1920 / 1366 / 1024 / 400 宽），全部假资料
+- [x] Admin Platform 画面整理初版（D66）：左边选单、登录后先到 Reminders、提醒名单一个号码一张卡片、一排 3 张 + 「Opened in WhatsApp: x of y」、每页统一的标题和说明、表格 / 表单 / 提醒框统一样式（还是不用 UI 套件，D30）；云端 `npm test` 44 个，headless Chromium 截图每一页（1920 / 1366 / 1024 / 400 宽），全部假资料
 - [ ] 画面整理：开发电脑照 `frontend/README.md`「画面整理（D66）」测试，通过后合并、更新 B
 - [x] 不用 USB（D64）：zip 和 A 的 `create_readonly_login.sql` 都经 Google Drive 链接，在 B / A 的 InPrivate 视窗下载（不登入）、对 hash、用完就删；文件照着改；第一天的记录、`requirements-lock.txt` 的修正和 D64 合并进 `main`（PR #21）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）

@@ -175,7 +175,7 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 | 2 | `start.log` | `备份：…dump`、`uvicorn 启动` |
 | 3 | 用 ADMIN 登入 → *Settings → Clinic closures* → *Import public holidays for 2026*，再换 2027 | 各 *Added 11 day(s)*；和 `clinic-workflow.md` 第 1 节的表对照；核对 Hari Raya 的日期 |
 | 4 | *Reminders* → 明天 | 名单的人数和 GPiS 一样；家人合并、`*C` 的规则对 |
-| 5 | 请员工挑一行按 *Open in WhatsApp* | WhatsApp Desktop 打开**那位病人**的对话、消息已经填好。**不要按 Enter**（这是安装检查，不是真的要发）→ 关掉 → 那一行按 *Mark as not sent*（按过就记成已打开，D58，不改回来员工会以为发过了） |
+| 5 | 请员工挑一张卡片按 *Open in WhatsApp* | WhatsApp Desktop 打开**那位病人**的对话、消息已经填好。**不要按 Enter**（这是安装检查，不是真的要发）→ 关掉 → 那张卡片按 *Mark as not sent*（按过就记成已打开，D58，不改回来员工会以为发过了） |
 | 6 | 在 B 上：`Test-NetConnection <B的IP> -Port 8000`、`Test-NetConnection 127.0.0.1 -Port 8000` | 第一个 `False`、第二个 `True`（只听 `127.0.0.1`，D62）。不用 A 的浏览器试：A 上只跑只读帐号的脚本（规则 1） |
 | 7 | 用 STAFF 帐号登入 | 看得到名单；*Settings* 不能改 |
 

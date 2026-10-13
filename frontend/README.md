@@ -34,7 +34,7 @@ React 19 + TypeScript + Vite。只多用了一个套件 React Router（网址 �
 | `/conversations` | 所有员工 | 对话列表（Open / Needs staff / AI replying / Closed），每 15 秒更新 |
 | `/conversations/12` | 所有员工 | 完整对话；**Take over**（AI 停止回复）、**Hand back to AI**、**Close**、经 WhatsApp 回复（Phase 5a） |
 | `/requests` | 所有员工 | 预约请求；**Confirm**（先在 GPiS 录入，可以填 GPiS AppointmentID）、**Reject**、**Patient cancelled** |
-| `/reminders` | 所有员工 | 预约提醒的名单（Phase 5b）：*Ready* / *Needs staff* / *Not appointments*（分页名字后面是数目）；每个号码一行：左边名字和号码、中间时间和医生、右边状态（*To send* / *Opened* / *Not sent*），按钮在下面一排；上面有「Opened in WhatsApp: x of y」；**Open in WhatsApp**（消息已经填好，员工按 Enter，D54；按过会记下来，别的员工也看得到，D58）；*Mark as not sent*；*Copy message*；**NO WA**（这个号码不要提醒，D55）。每次 *Refresh* 都重新读 GPiS |
+| `/reminders` | 所有员工 | 预约提醒的名单（Phase 5b）：*Ready* / *Needs staff* / *Not appointments*（分页名字后面是数目）；每个号码一张卡片，一排 3 张（视窗窄的时候 2 张、手机 1 张）：上面名字、号码和状态（*To send* / *Opened* / *Not sent*），中间时间和医生，下面按钮，最下面 *Message* 和 *NO WA*；上面有「Opened in WhatsApp: x of y」；**Open in WhatsApp**（消息已经填好，员工按 Enter，D54；按过会记下来，别的员工也看得到，D58）；*Mark as not sent*；*Copy message*；**NO WA**（这个号码不要提醒，D55）。每次 *Refresh* 都重新读 GPiS |
 | `/settings/...` | 看：所有员工；改：**ADMIN** | 医生和排班、疗程、假期（一键导入公共假期）、医生请假、每格上限 |
 | `/staff` | **ADMIN** | 员工账号：新增、改权限、停用、重设密码 |
 | `/account` | 所有员工 | 改自己的密码 |
@@ -137,16 +137,16 @@ CREATE DATABASE chatbot_dev OWNER chatbot;
 |---|---|---|
 | 1 | 打开 <http://localhost:5173>，密码故意打错 | 中间一张登录卡片（牙齿图示、*Clinic Admin*）；红框 *Wrong username or password*，密码栏清空 |
 | 2 | 用 ADMIN 账号登录 | **直接到 Reminders**；左边选单 *Reminders* 是绿色底；浏览器分页名字 *Reminders · Clinic Admin* |
-| 3 | 看 *Ready* | 每个号码一行：名字和号码、时间和医生、右边 *To send*；按钮在下面一排，*NO WA: stop reminders* 在右边（红字）；分页 *Ready* 后面有数目 |
-| 4 | 自己号码那一行按 **Open in WhatsApp** → WhatsApp Desktop 打开（**不要按 Enter**）→ 回到网页 | 那一行变成 *Opened*、绿色框；上面「Opened in WhatsApp: 1 of …」和绿色进度条马上变；下面一行写谁、几点按的 |
-| 5 | 那一行按 *Mark as not sent* | 变成 *Not sent*，按钮变回 *Open in WhatsApp*；进度条退回去 |
-| 6 | *Message* | 打开填好的消息（和 WhatsApp 里的一样） |
-| 7 | *Needs staff* 分页 | 每一行右边是黄色的原因（例 *Lab work not marked as arrived (\*C)*）；没有 *Open in WhatsApp* |
+| 3 | 看 *Ready* | 一个号码一张卡片、一排 3 张；卡片右上角 *To send*；同一排的卡片一样高、按钮对齐；*NO WA: stop reminders* 在右下角（红字）；分页 *Ready* 后面有数目 |
+| 4 | 自己号码那张卡片按 **Open in WhatsApp** → WhatsApp Desktop 打开（**不要按 Enter**）→ 回到网页 | 那张卡片变成 *Opened*、绿色框；上面「Opened in WhatsApp: 1 of …」和绿色进度条马上变；按钮下面写谁、几点按的 |
+| 5 | 那张卡片按 *Mark as not sent* | 变成 *Not sent*，按钮变回 *Open in WhatsApp*；进度条退回去 |
+| 6 | *Message* | 打开填好的消息（和 WhatsApp 里的一样）；同一排其他卡片不会跟着拉长 |
+| 7 | *Needs staff* 分页 | 也是一排 3 张卡片，时间下面是黄色的原因（例 *Lab work not marked as arrived (\*C)*）；没有 *Open in WhatsApp* |
 | 8 | *Not appointments* 分页 | 一张小表：原因和数目 |
 | 9 | 选别的日期 → *Show* → *Back to today's reminders* | 换日期、再回来；上面的说明写读的是哪一天、几点读的 |
 | 10 | *Settings* 的 5 个分页、*Staff accounts*、*My account* | 表格有灰色表头、按钮在右边；新增的表单在下面的白色卡片里；*Deactivate*、*Delete* 是红字 |
 | 11 | *Conversations*、*Requests* | 没有资料时中间显示图示和一句话（*No conversations.* 等） |
-| 12 | 浏览器视窗拉到 1366 宽、再拉窄（像手机） | 1366：左边选单、内容不用左右捲；很窄：选单变到上面一排，名单一行变成上下排 |
+| 12 | 浏览器视窗拉到 1366 宽、再拉窄（像手机） | 1366：左边选单、卡片一排 3 张、内容不用左右捲；再窄一点一排 2 张；很窄（像手机）：选单变到上面一排，卡片一排 1 张 |
 | 13 | 用 STAFF 账号登录 | 选单没有 *Staff accounts*；*Settings* 上面蓝色框 *Only an admin can change them*，没有 Edit 按钮 |
 
 测完把结果记在下面「测试记录」。B 要等开发电脑测过，再照 [`docs/deploy-pc-b.md`](../docs/deploy-pc-b.md) 第 9 节更新。
@@ -182,6 +182,7 @@ CREATE DATABASE chatbot_dev OWNER chatbot;
 - PostgreSQL 16、Python 3.11、Node 22.22，只用假资料（`REMINDER_SOURCE=demo`、假的员工帐号和对话）。
 - `npm test` → 44 passed（*Ready* 等分页的名字改成「Ready 1」，加了「按了 Open in WhatsApp 之后进度马上更新」的检查）；`npm run typecheck`、`npm run build` 成功。
 - 后端 `pytest` → 303 passed（后端没有改）。
+- 提醒名单先做成一个号码一行，看过截图后改成卡片、一排 3 张（1024 宽 2 张、400 宽 1 张）；打开一张卡片的 *Message*，同一排其他卡片不跟着拉长。
 - headless Chromium（1366×768）截图每一页：登录、Reminders（Ready / Opened / Needs staff / Not appointments）、Conversations、Requests（Confirm 表单）、Settings 5 页、Staff accounts、My account；浏览器 console 没有错误。
 - 1920、1024、400 宽：页面都不会左右捲（`scrollWidth` 和视窗一样宽）。
 - 还没有在开发电脑（Windows、Segoe UI）上测：照上面「画面整理（D66）」的清单。

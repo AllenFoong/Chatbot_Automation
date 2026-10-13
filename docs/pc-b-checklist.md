@@ -202,7 +202,7 @@ Python、PostgreSQL、ODBC 留着不影响 GPiS；诊所要移除的话在 *设�
 - [ ] `postgres` 要密码：`& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U postgres -w -c "SELECT 1"` → `no password supplied`（开发电脑演练时发现一开始不用密码，D63 的记录）
 - [ ] `--check-gpis` 两个 `[OK]`；明天的名单和 GPiS 对过
 - [ ] *Settings → Clinic closures*：2026、2027 各 *Added 11 day(s)*，和 `clinic-workflow.md` 第 1 节一样；Hari Raya 的日期核对过（第 7 节第 3 项）
-- [ ] 第 7 节第 5 项按过 *Open in WhatsApp* 的那一行已经按 *Mark as not sent*（不然员工会以为发过了，D58）
+- [ ] 第 7 节第 5 项按过 *Open in WhatsApp* 的那张卡片已经按 *Mark as not sent*（不然员工会以为发过了，D58）
 - [ ] 第 7 节第 6 项在 B 上做（`Test-NetConnection`），不用 A 的浏览器
 - [ ] 第 7 节第 7 项：STAFF 帐号看得到名单、*Settings* 不能改
 - [ ] B 的 GPiS 照样打得开、看得到预约（员工确认）；WhatsApp Desktop 照常

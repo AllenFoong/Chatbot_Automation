@@ -1,5 +1,5 @@
 // 预约提醒（Phase 5b 第一步，docs/architecture.md 第 8 节）：系统从 GPiS 排好名单，员工看过再发。
-// - Ready：可以发的，每个号码一行；家人合成一条（D49）。
+// - Ready：可以发的，每个号码一张卡片（一排 3 张）；家人合成一条（D49）。
 // - Needs staff：不确定的，写明原因，员工自己处理（例：没有 *C、没有手机号码）。
 // - Open in WhatsApp（D54）：打开 WhatsApp Desktop 里那位病人的对话、消息已经填好，员工按 Enter 发出。
 //   用 whatsapp:// 而不是 wa.me 网址：网址会留在浏览器的历史记录（有号码和名字，D31）。
@@ -110,7 +110,7 @@ function OptOutButton({ group, onChanged }: { group: ReminderGroup; onChanged: (
   );
 }
 
-function ReadyRow({
+function ReadyCard({
   group,
   showDate,
   production,
@@ -154,18 +154,17 @@ function ReadyRow({
 
   return (
     <li className={opened ? "reminder opened" : "reminder"}>
-      <div className="reminder-main">
+      <div className="reminder-head">
         <div className="reminder-who">
           <strong>{names(group)}</strong>
           <PhoneLine group={group} />
         </div>
-        <Lines group={group} showDate={showDate} />
-        <div className="reminder-state">
-          {opened && <Badge kind="ok">Opened</Badge>}
-          {record?.status === "NOT_SENT" && <Badge kind="pending">Not sent</Badge>}
-          {!record && <Badge kind="idle">To send</Badge>}
-        </div>
+        {opened && <Badge kind="ok">Opened</Badge>}
+        {record?.status === "NOT_SENT" && <Badge kind="pending">Not sent</Badge>}
+        {!record && <Badge kind="idle">To send</Badge>}
       </div>
+
+      <Lines group={group} showDate={showDate} />
 
       {opened && record?.changed && (
         <Notice tone="warning">
@@ -175,69 +174,69 @@ function ReadyRow({
       )}
 
       <div className="reminder-actions">
-        <div className="actions">
-          {group.whatsapp_allowed && group.phone && group.message ? (
-            <a className="button primary" href={whatsappLink(group.phone, group.message)} onClick={recordOpened}>
-              <WhatsAppIcon />
-              {opened ? "Open in WhatsApp again" : "Open in WhatsApp"}
-            </a>
-          ) : (
-            <span className="muted small">
-              {production ? "Open in WhatsApp is not available for this number." : "Open in WhatsApp is off for this list."}
-            </span>
-          )}
-          {canCopy && group.message && (
-            <button type="button" onClick={() => void copy()}>
-              <CopyIcon />
-              {copied ? "Copied" : "Copy message"}
-            </button>
-          )}
-          {opened && (
-            <button type="button" disabled={action.busy} onClick={markNotSent}>
-              Mark as not sent
-            </button>
-          )}
-        </div>
-        <OptOutButton group={group} onChanged={onChanged} />
+        {group.whatsapp_allowed && group.phone && group.message ? (
+          <a className="button primary" href={whatsappLink(group.phone, group.message)} onClick={recordOpened}>
+            <WhatsAppIcon />
+            {opened ? "Open in WhatsApp again" : "Open in WhatsApp"}
+          </a>
+        ) : (
+          <span className="muted small">
+            {production ? "Open in WhatsApp is not available for this number." : "Open in WhatsApp is off for this list."}
+          </span>
+        )}
+        {((canCopy && group.message) || opened) && (
+          <div className="secondary-actions">
+            {canCopy && group.message && (
+              <button type="button" className="small" onClick={() => void copy()}>
+                <CopyIcon />
+                {copied ? "Copied" : "Copy message"}
+              </button>
+            )}
+            {opened && (
+              <button type="button" className="small" disabled={action.busy} onClick={markNotSent}>
+                Mark as not sent
+              </button>
+            )}
+          </div>
+        )}
+        {record && <RecordLine record={record} />}
+        <ErrorBox message={action.error} />
       </div>
 
-      {(group.message || record) && (
-        <div className="reminder-meta">
-          {group.message && (
-            <details>
-              <summary>Message</summary>
-              <pre className="message-preview">{group.message}</pre>
-            </details>
-          )}
-          {record && <RecordLine record={record} />}
-        </div>
-      )}
-      <ErrorBox message={action.error} />
+      <div className="reminder-foot">
+        {group.message && (
+          <details>
+            <summary>Message</summary>
+            <pre className="message-preview">{group.message}</pre>
+          </details>
+        )}
+        <OptOutButton group={group} onChanged={onChanged} />
+      </div>
     </li>
   );
 }
 
-function StaffRow({ group, showDate, onChanged }: { group: ReminderGroup; showDate: boolean; onChanged: () => void }) {
+function StaffCard({ group, showDate, onChanged }: { group: ReminderGroup; showDate: boolean; onChanged: () => void }) {
   return (
     <li className="reminder needs-staff">
-      <div className="reminder-main">
+      <div className="reminder-head">
         <div className="reminder-who">
           <strong>{names(group)}</strong>
           <PhoneLine group={group} />
         </div>
-        <Lines group={group} showDate={showDate} />
-        <ul className="problems">
-          {group.problems.map((p) => (
-            <li key={p}>
-              <AlertIcon size={16} />
-              {p}
-            </li>
-          ))}
-        </ul>
       </div>
+      <Lines group={group} showDate={showDate} />
+      <ul className="problems">
+        {group.problems.map((p) => (
+          <li key={p}>
+            <AlertIcon size={16} />
+            {p}
+          </li>
+        ))}
+      </ul>
       {(group.phone || group.record) && (
-        <div className="reminder-actions">
-          {group.record ? <RecordLine record={group.record} /> : <span />}
+        <div className="reminder-foot">
+          {group.record && <RecordLine record={group.record} />}
           <OptOutButton group={group} onChanged={onChanged} />
         </div>
       )}
@@ -356,7 +355,7 @@ export default function RemindersPage() {
             ) : (
               <ul className="reminder-list">
                 {data.ready.map((g) => (
-                  <ReadyRow
+                  <ReadyCard
                     key={g.key}
                     group={g}
                     showDate={showDate}
@@ -377,7 +376,7 @@ export default function RemindersPage() {
                 </p>
                 <ul className="reminder-list">
                   {data.needs_staff.map((g) => (
-                    <StaffRow key={g.key} group={g} showDate={showDate} onChanged={list.reload} />
+                    <StaffCard key={g.key} group={g} showDate={showDate} onChanged={list.reload} />
                   ))}
                 </ul>
               </>
