@@ -39,7 +39,7 @@ describe("reminders", () => {
     renderApp("/reminders");
     expect(await screen.findByRole("heading", { name: "Reminders" })).toBeInTheDocument();
     expect(await screen.findByText(/Preview only: this list is read from GPiS_Dev/)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Ready (1)" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Ready 1" })).toHaveAttribute("aria-selected", "true");
 
     const card = screen.getByText("DEMO PATIENT A & DEMO PATIENT B").closest("li")!;
     expect(within(card).getByText("+60120000001")).toBeInTheDocument();
@@ -49,8 +49,10 @@ describe("reminders", () => {
       "whatsapp://send?phone=60120000001&text=NAME%3A%20DEMO%20PATIENT%20A%20%26%20DEMO%20PATIENT%20B%0ATIME%3A%2010%3A00%20AM%20%26%2010%3A30%20AM",
     );
 
+    expect(screen.getByText("Opened in WhatsApp: 0 of 1")).toBeInTheDocument();
     await userEvent.setup().click(open);
     expect(await within(card).findByText("Opened")).toBeInTheDocument();
+    expect(screen.getByText("Opened in WhatsApp: 1 of 1")).toBeInTheDocument(); // 不用重新读名单就更新
     expect(within(card).getByRole("link", { name: "Open in WhatsApp again" })).toBeInTheDocument();
     expect(within(card).getByText(/Opened in WhatsApp by Amy Tan/)).toBeInTheDocument();
     expect(calls.find((c) => c.method === "POST")).toEqual({
@@ -115,12 +117,12 @@ describe("reminders", () => {
     const card = (await screen.findByText("DEMO PATIENT A & DEMO PATIENT B")).closest("li")!;
     await user.click(within(card).getByRole("button", { name: "NO WA: stop reminders" }));
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Stop reminders for +60120000001?"));
-    expect(await screen.findByRole("tab", { name: "Ready (0)" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Ready 0" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "Needs staff (2)" }));
+    await user.click(screen.getByRole("tab", { name: "Needs staff 2" }));
     expect(screen.getByText("Opted out of reminders")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Allow reminders again" }));
-    expect(await screen.findByRole("tab", { name: "Ready (1)" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Ready 1" })).toBeInTheDocument();
     expect(calls.filter((c) => c.method === "PUT").map((c) => c.body)).toEqual([
       { phone: "60120000001", opted_out: true },
       { phone: "60120000001", opted_out: false },
@@ -140,13 +142,13 @@ describe("reminders", () => {
     fakeApi({ ...base, "GET /api/reminders": ok(fakeReminderList()) });
     renderApp("/reminders");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "Needs staff (1)" }));
+    await user.click(await screen.findByRole("tab", { name: "Needs staff 1" }));
     expect(screen.getByText("DEMO PATIENT C", { selector: "strong" })).toBeInTheDocument();
     expect(screen.getByText("Singapore")).toBeInTheDocument();
     expect(screen.getAllByText("Lab work not marked as arrived (*C)")).toHaveLength(1);
     expect(screen.queryByRole("link", { name: /Open in WhatsApp/ })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "Not appointments (3)" }));
+    await user.click(screen.getByRole("tab", { name: "Not appointments 3" }));
     expect(screen.getByText(/Cancelled or postponed/)).toHaveTextContent("Cancelled or postponed: 2");
   });
 

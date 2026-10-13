@@ -6,9 +6,10 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import * as api from "../api";
-import { Badge, Empty, ErrorBox, Loading, Tabs } from "../components";
+import { Badge, Empty, ErrorBox, Loading, PageHeader, Tabs } from "../components";
 import { formatDate, formatDateTime, formatPhone, formatTime } from "../format";
 import { useAction, useLoad } from "../hooks";
+import { RefreshIcon } from "../icons";
 import type { AppointmentRequest, RequestStatus } from "../types";
 
 const STATUSES: { value: RequestStatus; label: string }[] = [
@@ -17,6 +18,13 @@ const STATUSES: { value: RequestStatus; label: string }[] = [
   { value: "REJECTED", label: "Rejected" },
   { value: "CANCELLED", label: "Cancelled" },
 ];
+
+const STATUS_LABEL: Record<RequestStatus, string> = {
+  PENDING: "Pending",
+  CONFIRMED: "Confirmed",
+  REJECTED: "Rejected",
+  CANCELLED: "Cancelled",
+};
 
 /** 同一组（一起来）的其他病人名字 */
 function groupMates(r: AppointmentRequest, all: AppointmentRequest[]): string[] {
@@ -35,8 +43,8 @@ function ConfirmForm({ request, onDone, onCancel }: { request: AppointmentReques
   }
 
   return (
-    <form className="inline-form" onSubmit={submit}>
-      <p>Only confirm after you have entered this appointment in GPiS.</p>
+    <form className="inline-form confirm-form" onSubmit={submit}>
+      <p className="small">Only confirm after you have entered this appointment in GPiS.</p>
       <label>
         GPiS AppointmentID (optional)
         <input
@@ -71,15 +79,15 @@ function RequestCard({ request: r, all, onChanged }: { request: AppointmentReque
 
   return (
     <li className="card request">
-      <div className="row-between">
+      <div className="card-head">
         <div>
           <strong>{r.customer_name}</strong>
-          {r.customer_phone && <span className="muted"> · {formatPhone(r.customer_phone)}</span>}
+          {r.customer_phone && <div className="phone muted">{formatPhone(r.customer_phone)}</div>}
           <div className="muted small">
             {r.gpis_contact_id ? `GPiS ContactID ${r.gpis_contact_id}` : "Not linked to a GPiS contact"}
           </div>
         </div>
-        <Badge kind={r.status}>{r.status}</Badge>
+        <Badge kind={r.status}>{STATUS_LABEL[r.status]}</Badge>
       </div>
 
       <dl className="facts">
@@ -116,7 +124,7 @@ function RequestCard({ request: r, all, onChanged }: { request: AppointmentReque
         )}
       </dl>
 
-      <div className="muted small">
+      <div className="card-meta muted small">
         Requested {formatDateTime(r.created_at)}
         {r.handled_at && ` · updated ${formatDateTime(r.handled_at)}`}
         {r.conversation_id !== null && (
@@ -139,24 +147,25 @@ function RequestCard({ request: r, all, onChanged }: { request: AppointmentReque
           onCancel={() => setConfirming(false)}
         />
       ) : (
-        <div className="actions">
-          {r.status === "PENDING" && (
-            <>
-              <button type="button" className="primary" disabled={action.busy} onClick={() => setConfirming(true)}>
-                Confirm
-              </button>
-              <button
-                type="button"
-                disabled={action.busy}
-                onClick={() => change(`Reject the request for ${r.customer_name}?`, api.requests.reject)}
-              >
-                Reject
-              </button>
-            </>
-          )}
-          {(r.status === "PENDING" || r.status === "CONFIRMED") && (
+        (r.status === "PENDING" || r.status === "CONFIRMED") && (
+          <div className="card-actions actions">
+            {r.status === "PENDING" && (
+              <>
+                <button type="button" className="primary" disabled={action.busy} onClick={() => setConfirming(true)}>
+                  Confirm
+                </button>
+                <button
+                  type="button"
+                  disabled={action.busy}
+                  onClick={() => change(`Reject the request for ${r.customer_name}?`, api.requests.reject)}
+                >
+                  Reject
+                </button>
+              </>
+            )}
             <button
               type="button"
+              className="ghost"
               disabled={action.busy}
               onClick={() =>
                 change(
@@ -169,8 +178,8 @@ function RequestCard({ request: r, all, onChanged }: { request: AppointmentReque
             >
               Patient cancelled
             </button>
-          )}
-        </div>
+          </div>
+        )
       )}
     </li>
   );
@@ -182,12 +191,16 @@ export default function RequestsPage() {
 
   return (
     <div className="page">
-      <div className="row-between">
-        <h1>Appointment requests</h1>
-        <button type="button" onClick={list.reload}>
-          Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Appointment requests"
+        description="Booking requests waiting for GPiS. Enter each one in GPiS first, then confirm it here."
+        actions={
+          <button type="button" onClick={list.reload}>
+            <RefreshIcon />
+            Refresh
+          </button>
+        }
+      />
       <Tabs label="Request status" value={status} options={STATUSES} onChange={setStatus} />
       <ErrorBox message={list.error} onRetry={list.reload} />
       {list.data === undefined ? (

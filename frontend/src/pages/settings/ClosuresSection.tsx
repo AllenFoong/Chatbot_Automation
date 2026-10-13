@@ -5,9 +5,10 @@
 
 import { useState, type FormEvent } from "react";
 import * as api from "../../api";
-import { Empty, ErrorBox, Loading } from "../../components";
+import { Empty, ErrorBox, Loading, Notice } from "../../components";
 import { clinicToday, formatDate } from "../../format";
 import { useAction, useLoad } from "../../hooks";
+import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon } from "../../icons";
 
 function AddClosureForm({ year, onAdded }: { year: number; onAdded: () => void }) {
   const [date, setDate] = useState("");
@@ -28,11 +29,13 @@ function AddClosureForm({ year, onAdded }: { year: number; onAdded: () => void }
 
   return (
     <form className="card inline-form" onSubmit={submit}>
-      <h3>Add a closure day</h3>
-      <p className="muted small">
-        For example a day the clinic decides to close. No new bookings on that day; appointments
-        already there show under <em>Needs staff</em> on the Reminders page, so you can tell the patients.
-      </p>
+      <div className="card-title">
+        <h3>Add a closure day</h3>
+        <p>
+          For example a day the clinic decides to close. No new bookings on that day; appointments
+          already there show under <em>Needs staff</em> on the Reminders page, so you can tell the patients.
+        </p>
+      </div>
       <div className="fields">
         <label>
           Date
@@ -84,19 +87,24 @@ export default function ClosuresSection({ canEdit }: { canEdit: boolean }) {
 
   return (
     <section>
-      <div className="row-between">
-        <div className="actions">
-          <button type="button" onClick={() => setYear((y) => y - 1)} aria-label="Previous year">‹</button>
+      <div className="section-toolbar">
+        <div className="year-switch">
+          <button type="button" className="icon-button" onClick={() => setYear((y) => y - 1)} aria-label="Previous year">
+            <ChevronLeftIcon />
+          </button>
           <h2 className="year">{year}</h2>
-          <button type="button" onClick={() => setYear((y) => y + 1)} aria-label="Next year">›</button>
+          <button type="button" className="icon-button" onClick={() => setYear((y) => y + 1)} aria-label="Next year">
+            <ChevronRightIcon />
+          </button>
         </div>
         {canEdit && (
           <button type="button" disabled={action.busy} onClick={importHolidays}>
+            <DownloadIcon />
             Import public holidays for {year}
           </button>
         )}
       </div>
-      {imported && <p className="ok">{imported}</p>}
+      {imported && <Notice tone="success">{imported}</Notice>}
       <ErrorBox message={action.error} />
       <ErrorBox message={closures.error} onRetry={closures.reload} />
       {closures.data === undefined ? (
@@ -104,30 +112,32 @@ export default function ClosuresSection({ canEdit }: { canEdit: boolean }) {
       ) : closures.data.length === 0 ? (
         <Empty>No closure days in {year}. The clinic is treated as open every day.</Empty>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Reason</th>
-              {canEdit && <th></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {closures.data.map((c) => (
-              <tr key={c.closure_date}>
-                <td className="nowrap">{formatDate(c.closure_date)}</td>
-                <td>{c.reason}</td>
-                {canEdit && (
-                  <td>
-                    <button type="button" className="link" disabled={action.busy} onClick={() => remove(c.closure_date, c.reason)}>
-                      Delete
-                    </button>
-                  </td>
-                )}
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Reason</th>
+                {canEdit && <th aria-label="Actions"></th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {closures.data.map((c) => (
+                <tr key={c.closure_date}>
+                  <td className="nowrap">{formatDate(c.closure_date)}</td>
+                  <td>{c.reason}</td>
+                  {canEdit && (
+                    <td className="cell-actions">
+                      <button type="button" className="small danger-text" disabled={action.busy} onClick={() => remove(c.closure_date, c.reason)}>
+                        Delete
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {canEdit && <AddClosureForm year={year} onAdded={closures.reload} />}
     </section>

@@ -31,7 +31,10 @@ function AddLeaveForm({ doctors, onAdded }: { doctors: Doctor[]; onAdded: () => 
 
   return (
     <form className="card inline-form" onSubmit={submit}>
-      <h3>Add doctor leave</h3>
+      <div className="card-title">
+        <h3>Add doctor leave</h3>
+        <p>Only for leave that is not written in GPiS as an OFF DAY.</p>
+      </div>
       <div className="fields">
         <label>
           Doctor
@@ -71,7 +74,7 @@ export default function LeavesSection({ canEdit }: { canEdit: boolean }) {
 
   return (
     <section>
-      <p className="muted small">
+      <p className="muted section-intro">
         Leave from today onwards. A doctor on leave has no free slots that day. "OFF DAY" records in GPiS are
         also respected, so this list is only for leave that is not in GPiS.
       </p>
@@ -82,32 +85,34 @@ export default function LeavesSection({ canEdit }: { canEdit: boolean }) {
       ) : leaves.data.length === 0 ? (
         <Empty>No upcoming doctor leave.</Empty>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Doctor</th>
-              <th>Reason</th>
-              {canEdit && <th></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {leaves.data.map((l) => (
-              <tr key={`${l.doctor_id}-${l.leave_date}`}>
-                <td className="nowrap">{formatDate(l.leave_date)}</td>
-                <td>{names.get(l.doctor_id) ?? l.doctor_id}</td>
-                <td>{l.reason}</td>
-                {canEdit && (
-                  <td>
-                    <button type="button" className="link" disabled={action.busy} onClick={() => remove(l.doctor_id, l.leave_date)}>
-                      Delete
-                    </button>
-                  </td>
-                )}
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Doctor</th>
+                <th>Reason</th>
+                {canEdit && <th aria-label="Actions"></th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {leaves.data.map((l) => (
+                <tr key={`${l.doctor_id}-${l.leave_date}`}>
+                  <td className="nowrap">{formatDate(l.leave_date)}</td>
+                  <td>{names.get(l.doctor_id) ?? l.doctor_id}</td>
+                  <td>{l.reason}</td>
+                  {canEdit && (
+                    <td className="cell-actions">
+                      <button type="button" className="small danger-text" disabled={action.busy} onClick={() => remove(l.doctor_id, l.leave_date)}>
+                        Delete
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {canEdit && doctors.data && <AddLeaveForm doctors={doctors.data} onAdded={leaves.reload} />}
     </section>

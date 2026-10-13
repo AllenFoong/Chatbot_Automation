@@ -4,6 +4,7 @@
 
 import { NavLink, Navigate, useParams } from "react-router";
 import { useAuth } from "../auth";
+import { Notice, PageHeader } from "../components";
 import ClinicSection from "./settings/ClinicSection";
 import ClosuresSection from "./settings/ClosuresSection";
 import DoctorsSection from "./settings/DoctorsSection";
@@ -28,7 +29,10 @@ export default function SettingsPage() {
 
   return (
     <div className="page">
-      <h1>Settings</h1>
+      <PageHeader
+        title="Settings"
+        description="Doctors, treatments and closure days. Free slots and the reminder list use these settings."
+      />
       <nav className="tabs" aria-label="Settings sections">
         {Object.entries(SECTIONS).map(([key, s]) => (
           <NavLink key={key} to={`/settings/${key}`} className={({ isActive }) => (isActive ? "tab active" : "tab")}>
@@ -36,7 +40,7 @@ export default function SettingsPage() {
           </NavLink>
         ))}
       </nav>
-      {!isAdmin && <p className="note">You can view the settings. Only an admin can change them.</p>}
+      {!isAdmin && <Notice tone="info">You can view the settings. Only an admin can change them.</Notice>}
       <Component canEdit={isAdmin} />
     </div>
   );

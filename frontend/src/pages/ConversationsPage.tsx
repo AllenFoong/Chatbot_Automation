@@ -6,7 +6,7 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import * as api from "../api";
-import { Badge, Empty, ErrorBox, Loading, Tabs } from "../components";
+import { Avatar, Badge, Empty, ErrorBox, Loading, Notice, Tabs, usePageTitle } from "../components";
 import { formatDateTime, formatPhone } from "../format";
 import { useAction, useLoad } from "../hooks";
 import type { Conversation, ConversationDetail, ConversationMode, Sender, WaStatus } from "../types";
@@ -52,7 +52,10 @@ function ConversationList({ selectedId }: { selectedId: number | null }) {
 
   return (
     <section className="list-pane">
-      <Tabs label="Conversation filter" value={filter} options={FILTERS} onChange={setFilter} />
+      <div className="pane-head">
+        <h1>Conversations</h1>
+        <Tabs label="Conversation filter" value={filter} options={FILTERS} onChange={setFilter} />
+      </div>
       <ErrorBox message={list.error} onRetry={list.reload} />
       {list.data === undefined ? (
         list.loading && <Loading />
@@ -67,19 +70,22 @@ function ConversationList({ selectedId }: { selectedId: number | null }) {
                 className={c.id === selectedId ? "selected" : undefined}
                 aria-current={c.id === selectedId ? "page" : undefined}
               >
-                <div className="row-between">
-                  <strong>{displayName(c)}</strong>
-                  <Badge kind={c.mode}>{MODE_LABEL[c.mode]}</Badge>
-                </div>
-                {c.last_message_preview && (
-                  <div className="preview">
-                    {c.last_message_sender && <span className="muted">{SENDER_LABEL[c.last_message_sender]}: </span>}
-                    {c.last_message_preview}
+                <Avatar name={displayName(c)} />
+                <div className="conversation-item">
+                  <div className="row-between">
+                    <strong>{displayName(c)}</strong>
+                    <Badge kind={c.mode}>{MODE_LABEL[c.mode]}</Badge>
                   </div>
-                )}
-                <div className="muted small">
-                  {formatDateTime(c.last_message_at ?? c.created_at)}
-                  {c.assigned_staff_name && ` · ${c.assigned_staff_name}`}
+                  {c.last_message_preview && (
+                    <div className="preview">
+                      {c.last_message_sender && <span className="muted">{SENDER_LABEL[c.last_message_sender]}: </span>}
+                      {c.last_message_preview}
+                    </div>
+                  )}
+                  <div className="muted small">
+                    {formatDateTime(c.last_message_at ?? c.created_at)}
+                    {c.assigned_staff_name && ` · ${c.assigned_staff_name}`}
+                  </div>
                 </div>
               </Link>
             </li>
@@ -100,12 +106,12 @@ function ReplyForm({ conversation: c, onSent }: { conversation: ConversationDeta
   const ends = c.reply_window_ends_at;
   if (!ends || new Date(ends).getTime() <= Date.now()) {
     return (
-      <p className="note">
+      <Notice tone="neutral">
         {ends
           ? "More than 24 hours since the patient's last message. "
           : "The patient has not sent a message yet. "}
         WhatsApp only allows approved template messages now, which are not available yet.
-      </p>
+      </Notice>
     );
   }
 
@@ -171,11 +177,14 @@ function ConversationView({ id }: { id: number }) {
   return (
     <section className="detail-pane">
       <header className="detail-header">
-        <div>
-          <h2>{displayName(c)}</h2>
-          <div className="muted">
-            {formatPhone(c.wa_phone)} · started {formatDateTime(c.created_at)}
-            {c.closed_at && ` · closed ${formatDateTime(c.closed_at)}`}
+        <div className="detail-title">
+          <Avatar name={displayName(c)} />
+          <div>
+            <h2>{displayName(c)}</h2>
+            <div className="muted small">
+              {formatPhone(c.wa_phone)} · started {formatDateTime(c.created_at)}
+              {c.closed_at && ` · closed ${formatDateTime(c.closed_at)}`}
+            </div>
           </div>
         </div>
         <div className="actions">
@@ -202,19 +211,19 @@ function ConversationView({ id }: { id: number }) {
               Close
             </button>
           )}
-          <button type="button" className="link" onClick={() => navigate("/conversations")}>
+          <button type="button" className="ghost" onClick={() => navigate("/conversations")}>
             Back to list
           </button>
         </div>
       </header>
 
-      <div className={`mode-banner mode-${c.mode.toLowerCase()}`}>
+      <Notice tone={c.mode === "BOT" ? "info" : c.mode === "HUMAN" ? "warning" : "neutral"}>
         {c.mode === "BOT" && "The AI is replying to this conversation."}
         {c.mode === "HUMAN" &&
           `Staff is handling this conversation${c.assigned_staff_name ? ` (${c.assigned_staff_name})` : ""}. The AI will not reply.`}
         {c.mode === "CLOSED" && "This conversation is closed."}
         {c.handover_reason && <div>Handover reason: {c.handover_reason}</div>}
-      </div>
+      </Notice>
 
       <ErrorBox message={action.error ?? conversation.error} />
 
@@ -239,6 +248,7 @@ function ConversationView({ id }: { id: number }) {
 }
 
 export default function ConversationsPage() {
+  usePageTitle("Conversations");
   const { id } = useParams();
   const selectedId = id !== undefined && /^\d+$/.test(id) ? Number(id) : null;
 

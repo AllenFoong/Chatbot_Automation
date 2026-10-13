@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import * as api from "../api";
 import { useUser } from "../auth";
-import { ErrorBox } from "../components";
+import { Avatar, Badge, ErrorBox, Notice, PageHeader } from "../components";
 import { useAction } from "../hooks";
 
 const MIN_PASSWORD = 8; // = backend/app/auth.py MIN_PASSWORD_LENGTH
@@ -32,12 +32,20 @@ export default function AccountPage() {
 
   return (
     <div className="page narrow">
-      <h1>My account</h1>
-      <p>
-        {me.name} · <span className="muted">{me.username} ({me.role})</span>
-      </p>
+      <PageHeader title="My account" />
+      <div className="card profile">
+        <Avatar name={me.name} />
+        <div>
+          <strong>{me.name}</strong>
+          <div className="muted small">Username: {me.username}</div>
+        </div>
+        <Badge kind={me.role}>{me.role === "ADMIN" ? "Admin" : "Staff"}</Badge>
+      </div>
       <form className="card inline-form" onSubmit={submit}>
-        <h3>Change password</h3>
+        <div className="card-title">
+          <h3>Change password</h3>
+          <p>After the change, other computers where you are logged in need to log in again.</p>
+        </div>
         <label>
           Current password
           <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" required />
@@ -52,7 +60,7 @@ export default function AccountPage() {
         </label>
         {mismatch && <div className="error" role="alert">The new passwords are not the same.</div>}
         <ErrorBox message={action.error} />
-        {done && <p className="ok">Password changed. Other computers where you were logged in need to log in again.</p>}
+        {done && <Notice tone="success">Password changed. Other computers where you were logged in need to log in again.</Notice>}
         <button type="submit" className="primary" disabled={action.busy || mismatch}>Change password</button>
       </form>
     </div>

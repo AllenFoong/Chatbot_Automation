@@ -4,6 +4,7 @@
 import { useState, type FormEvent } from "react";
 import * as api from "../../api";
 import { Badge, ErrorBox, Loading } from "../../components";
+import { CheckIcon } from "../../icons";
 import { useAction, useLoad } from "../../hooks";
 import type { Service, ServiceIn } from "../../types";
 
@@ -49,7 +50,7 @@ function ServiceRow({ service, canEdit, onChanged }: { service: Service; canEdit
     return (
       <tr className="editing">
         <td><strong>{service.code}</strong></td>
-        <td colSpan={6}>
+        <td colSpan={7}>
           <form className="inline" onSubmit={save}>
             <input aria-label="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required maxLength={100} />
             {FLAGS.map((f) => (
@@ -63,8 +64,8 @@ function ServiceRow({ service, canEdit, onChanged }: { service: Service; canEdit
               <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />
               Active
             </label>
-            <button type="submit" className="primary" disabled={action.busy}>Save</button>
-            <button type="button" onClick={() => setDraft(null)}>Cancel</button>
+            <button type="submit" className="primary small" disabled={action.busy}>Save</button>
+            <button type="button" className="small" onClick={() => setDraft(null)}>Cancel</button>
           </form>
           <ErrorBox message={action.error} />
         </td>
@@ -77,13 +78,19 @@ function ServiceRow({ service, canEdit, onChanged }: { service: Service; canEdit
       <td><strong>{service.code}</strong></td>
       <td>{service.name}</td>
       {FLAGS.map((f) => (
-        <td key={f.key} className="center-cell">{service[f.key] ? "✔" : ""}</td>
+        <td key={f.key} className="center-cell">
+          {service[f.key] && (
+            <span className="yes" title="Yes">
+              <CheckIcon size={16} />
+            </span>
+          )}
+        </td>
       ))}
-      <td>{service.treatment_group}</td>
-      <td>
-        {service.active ? <Badge kind="ok">Active</Badge> : <Badge kind="closed">Inactive</Badge>}
+      <td>{service.treatment_group && <span className="tag">{service.treatment_group}</span>}</td>
+      <td>{service.active ? <Badge kind="ok">Active</Badge> : <Badge kind="closed">Inactive</Badge>}</td>
+      <td className="cell-actions">
         {canEdit && (
-          <button type="button" className="link" onClick={() => setDraft({ ...service })}>Edit</button>
+          <button type="button" className="small" onClick={() => setDraft({ ...service })}>Edit</button>
         )}
       </td>
     </tr>
@@ -110,8 +117,10 @@ function AddServiceForm({ onAdded }: { onAdded: () => void }) {
 
   return (
     <form className="card inline-form" onSubmit={submit}>
-      <h3>Add a treatment</h3>
-      <p className="muted small">Use the same code staff write in GPiS Remarks.</p>
+      <div className="card-title">
+        <h3>Add a treatment</h3>
+        <p>Use the same code staff write in GPiS Remarks.</p>
+      </div>
       <div className="fields">
         <label>
           Code
@@ -121,13 +130,18 @@ function AddServiceForm({ onAdded }: { onAdded: () => void }) {
           Name
           <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required maxLength={100} />
         </label>
+        <label>
+          Group
+          <GroupSelect value={form.treatment_group} onChange={(v) => setForm({ ...form, treatment_group: v })} />
+        </label>
+      </div>
+      <div className="checks">
         {FLAGS.map((f) => (
           <label key={f.key} className="check" title={f.help}>
             <input type="checkbox" checked={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />
             {f.label}
           </label>
         ))}
-        <GroupSelect value={form.treatment_group} onChange={(v) => setForm({ ...form, treatment_group: v })} />
       </div>
       <ErrorBox message={action.error} />
       <button type="submit" className="primary" disabled={action.busy}>Add treatment</button>
@@ -140,7 +154,7 @@ export default function ServicesSection({ canEdit }: { canEdit: boolean }) {
 
   return (
     <section>
-      <ul className="muted small legend">
+      <ul className="legend">
         {FLAGS.map((f) => (
           <li key={f.key}><strong>{f.label}</strong>: {f.help}</li>
         ))}
@@ -150,24 +164,27 @@ export default function ServicesSection({ canEdit }: { canEdit: boolean }) {
       {services.data === undefined ? (
         services.loading && <Loading />
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Name</th>
-              {FLAGS.map((f) => (
-                <th key={f.key}>{f.label}</th>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Name</th>
+                {FLAGS.map((f) => (
+                  <th key={f.key}>{f.label}</th>
+                ))}
+                <th>Group</th>
+                <th>Status</th>
+                <th aria-label="Actions"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {services.data.map((s) => (
+                <ServiceRow key={`${JSON.stringify(s)}`} service={s} canEdit={canEdit} onChanged={services.reload} />
               ))}
-              <th>Group</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {services.data.map((s) => (
-              <ServiceRow key={`${JSON.stringify(s)}`} service={s} canEdit={canEdit} onChanged={services.reload} />
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
       {canEdit && <AddServiceForm onAdded={services.reload} />}
     </section>

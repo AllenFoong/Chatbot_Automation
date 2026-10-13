@@ -1,5 +1,5 @@
 // 预约提醒（Phase 5b 第一步，docs/architecture.md 第 8 节）：系统从 GPiS 排好名单，员工看过再发。
-// - Ready：可以发的，每个号码一张卡；家人合成一条（D49）。
+// - Ready：可以发的，每个号码一张卡片（一排 3 张）；家人合成一条（D49）。
 // - Needs staff：不确定的，写明原因，员工自己处理（例：没有 *C、没有手机号码）。
 // - Open in WhatsApp（D54）：打开 WhatsApp Desktop 里那位病人的对话、消息已经填好，员工按 Enter 发出。
 //   用 whatsapp:// 而不是 wa.me 网址：网址会留在浏览器的历史记录（有号码和名字，D31）。
@@ -11,10 +11,11 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import * as api from "../api";
-import { Badge, Empty, ErrorBox, Loading, Tabs } from "../components";
+import { Badge, Empty, ErrorBox, Loading, Notice, PageHeader, Tabs } from "../components";
 import { formatDate, formatDateTime, formatPhone } from "../format";
 import { useAction, useLoad } from "../hooks";
-import type { PhoneKind, ReminderGroup, ReminderList, ReminderRecord } from "../types";
+import { AlertIcon, CopyIcon, RefreshIcon, WhatsAppIcon } from "../icons";
+import type { PhoneKind, ReminderGroup, ReminderList, ReminderRecord, ReminderStatus } from "../types";
 
 type View = "READY" | "STAFF" | "OTHER";
 
@@ -40,9 +41,12 @@ function Lines({ group, showDate }: { group: ReminderGroup; showDate: boolean })
     <ul className="reminder-lines">
       {group.lines.map((l) => (
         <li key={l.appointment_ids.join(",")}>
-          <strong>{l.time ?? "?"}</strong> {l.patient_name} <span className="muted">· Dr {l.doctor_name}</span>
-          {showDate && <span className="muted"> · {formatDate(group.date)}</span>}
-          {l.status && l.status !== "Confirmed" && <span className="muted"> · {l.status}</span>}
+          <span className="time">{l.time ?? "?"}</span>
+          <span className="who">
+            {l.patient_name} <span className="muted">· Dr {l.doctor_name}</span>
+            {showDate && <span className="muted"> · {formatDate(group.date)}</span>}
+            {l.status && l.status !== "Confirmed" && <span className="muted"> · {l.status}</span>}
+          </span>
         </li>
       ))}
     </ul>
@@ -54,7 +58,7 @@ function PhoneLine({ group }: { group: ReminderGroup }) {
   if (!group.phone) return null;
   const kind = KIND_LABEL[group.phone_kind];
   return (
-    <div className="muted small">
+    <div className="phone muted">
       {formatPhone(group.phone)}
       {kind && (
         <>
@@ -71,7 +75,7 @@ function RecordLine({ record }: { record: ReminderRecord }) {
   const who = record.staff_name ? ` by ${record.staff_name}` : "";
   const what = record.status === "OPENED" ? "Opened in WhatsApp" : "Marked as not sent";
   return (
-    <p className="muted small">
+    <p className="record muted small">
       {what}
       {who} at {formatDateTime(record.updated_at)}.
       {record.status === "OPENED" && " Check the message in WhatsApp, then press Enter to send it."}
@@ -92,12 +96,17 @@ function OptOutButton({ group, onChanged }: { group: ReminderGroup; onChanged: (
     if (window.confirm(question) && (await action.run(() => api.reminders.optOut(group.phone!, stop)))) onChanged();
   }
   return (
-    <>
-      <button type="button" className="link" disabled={action.busy} onClick={() => void toggle()}>
+    <div className="opt-out">
+      <button
+        type="button"
+        className={stop ? "ghost small danger-text" : "ghost small"}
+        disabled={action.busy}
+        onClick={() => void toggle()}
+      >
         {stop ? "NO WA: stop reminders" : "Allow reminders again"}
       </button>
       <ErrorBox message={action.error} />
-    </>
+    </div>
   );
 }
 
@@ -106,11 +115,13 @@ function ReadyCard({
   showDate,
   production,
   onChanged,
+  onRecorded,
 }: {
   group: ReminderGroup;
   showDate: boolean;
   production: boolean;
   onChanged: () => void;
+  onRecorded: (key: string, status: ReminderStatus) => void;
 }) {
   // 后端回来的最新状态；名单重新读了就用名单上的
   const [saved, setSaved] = useState<ReminderRecord | null>(null);
@@ -127,44 +138,45 @@ function ReadyCard({
     setCopied(true);
   }
 
+  function keep(r: ReminderRecord) {
+    setSaved(r);
+    onRecorded(group.key, r.status); // 上面的「Opened in WhatsApp: x of y」马上更新
+  }
+
   // 连结照常打开 WhatsApp；同时记在后端（失败的话显示错误，WhatsApp 那边还是打开了）
   function recordOpened() {
-    void action.run(async () => setSaved(await api.reminders.opened(group.date, group.phone!)));
+    void action.run(async () => keep(await api.reminders.opened(group.date, group.phone!)));
   }
 
   function markNotSent() {
-    void action.run(async () => setSaved(await api.reminders.notSent(group.date, group.phone!)));
+    void action.run(async () => keep(await api.reminders.notSent(group.date, group.phone!)));
   }
 
   return (
-    <li className={opened ? "card reminder opened" : "card reminder"}>
-      <div className="row-between">
-        <div>
+    <li className={opened ? "reminder opened" : "reminder"}>
+      <div className="reminder-head">
+        <div className="reminder-who">
           <strong>{names(group)}</strong>
           <PhoneLine group={group} />
         </div>
         {opened && <Badge kind="ok">Opened</Badge>}
         {record?.status === "NOT_SENT" && <Badge kind="pending">Not sent</Badge>}
+        {!record && <Badge kind="idle">To send</Badge>}
       </div>
+
       <Lines group={group} showDate={showDate} />
 
-      {group.message && (
-        <details>
-          <summary>Message</summary>
-          <pre className="message-preview">{group.message}</pre>
-        </details>
-      )}
-
       {opened && record?.changed && (
-        <p className="note">
+        <Notice tone="warning">
           GPiS changed after this was opened (an appointment was added or removed). Check the list, then open it
           again if the patient needs the new message.
-        </p>
+        </Notice>
       )}
 
-      <div className="actions">
+      <div className="reminder-actions">
         {group.whatsapp_allowed && group.phone && group.message ? (
           <a className="button primary" href={whatsappLink(group.phone, group.message)} onClick={recordOpened}>
+            <WhatsAppIcon />
             {opened ? "Open in WhatsApp again" : "Open in WhatsApp"}
           </a>
         ) : (
@@ -172,41 +184,62 @@ function ReadyCard({
             {production ? "Open in WhatsApp is not available for this number." : "Open in WhatsApp is off for this list."}
           </span>
         )}
-        {canCopy && group.message && (
-          <button type="button" onClick={() => void copy()}>
-            {copied ? "Copied" : "Copy message"}
-          </button>
+        {((canCopy && group.message) || opened) && (
+          <div className="secondary-actions">
+            {canCopy && group.message && (
+              <button type="button" className="small" onClick={() => void copy()}>
+                <CopyIcon />
+                {copied ? "Copied" : "Copy message"}
+              </button>
+            )}
+            {opened && (
+              <button type="button" className="small" disabled={action.busy} onClick={markNotSent}>
+                Mark as not sent
+              </button>
+            )}
+          </div>
         )}
-        {opened && (
-          <button type="button" disabled={action.busy} onClick={markNotSent}>
-            Mark as not sent
-          </button>
+        {record && <RecordLine record={record} />}
+        <ErrorBox message={action.error} />
+      </div>
+
+      <div className="reminder-foot">
+        {group.message && (
+          <details>
+            <summary>Message</summary>
+            <pre className="message-preview">{group.message}</pre>
+          </details>
         )}
         <OptOutButton group={group} onChanged={onChanged} />
       </div>
-      {record && <RecordLine record={record} />}
-      <ErrorBox message={action.error} />
     </li>
   );
 }
 
 function StaffCard({ group, showDate, onChanged }: { group: ReminderGroup; showDate: boolean; onChanged: () => void }) {
   return (
-    <li className="card reminder">
-      <strong>{names(group)}</strong>
-      <PhoneLine group={group} />
+    <li className="reminder needs-staff">
+      <div className="reminder-head">
+        <div className="reminder-who">
+          <strong>{names(group)}</strong>
+          <PhoneLine group={group} />
+        </div>
+      </div>
+      <Lines group={group} showDate={showDate} />
       <ul className="problems">
         {group.problems.map((p) => (
-          <li key={p}>{p}</li>
+          <li key={p}>
+            <AlertIcon size={16} />
+            {p}
+          </li>
         ))}
       </ul>
-      <Lines group={group} showDate={showDate} />
-      {group.phone && (
-        <div className="actions">
+      {(group.phone || group.record) && (
+        <div className="reminder-foot">
+          {group.record && <RecordLine record={group.record} />}
           <OptOutButton group={group} onChanged={onChanged} />
         </div>
       )}
-      {group.record && <RecordLine record={group.record} />}
     </li>
   );
 }
@@ -214,9 +247,24 @@ function StaffCard({ group, showDate, onChanged }: { group: ReminderGroup; showD
 function Summary({ data }: { data: ReminderList }) {
   const custom = data.dates.join() !== data.suggested_dates.join();
   return (
-    <div className="muted small">
+    <p>
       {custom ? "Appointments on " : "Today's reminders: appointments on "}
       {data.dates.map(formatDate).join(", ")} · read from {data.source} at {formatDateTime(data.read_at)}
+    </p>
+  );
+}
+
+function Progress({ data, recorded }: { data: ReminderList; recorded: Record<string, ReminderStatus> }) {
+  const opened = data.ready.filter((g) => (recorded[g.key] ?? g.record?.status) === "OPENED").length;
+  const total = data.ready.length;
+  return (
+    <div className="progress">
+      <span className="small">
+        Opened in WhatsApp: {opened} of {total}
+      </span>
+      <span className="progress-bar" aria-hidden="true">
+        <span style={{ width: `${total ? (opened / total) * 100 : 0}%` }} />
+      </span>
     </div>
   );
 }
@@ -227,6 +275,9 @@ export default function RemindersPage() {
   const [view, setView] = useState<View>("READY");
   const list = useLoad(() => api.reminders.list(date || undefined), [date]);
   const data = list.data;
+  // 这一页按过的（还没重新读名单之前）；重新读了就用名单上的
+  const [recorded, setRecorded] = useState<Record<string, ReminderStatus>>({});
+  useEffect(() => setRecorded({}), [data]);
   const showDate = (data?.dates.length ?? 0) > 1;
   const otherCount = data?.not_appointments.reduce((n, r) => n + r.count, 0) ?? 0;
 
@@ -237,22 +288,30 @@ export default function RemindersPage() {
 
   return (
     <div className="page">
-      <div className="row-between">
-        <h1>Reminders</h1>
-        <button type="button" onClick={list.reload}>
-          Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Reminders"
+        description={data ? <Summary data={data} /> : "Appointments from GPiS, ready to send on WhatsApp."}
+        actions={
+          <>
+            <form className="date-picker" onSubmit={pick}>
+              <label>
+                Appointment date{" "}
+                <input type="date" value={draft} onChange={(e) => setDraft(e.target.value)} />
+              </label>
+              <button type="submit" disabled={!draft}>
+                Show
+              </button>
+            </form>
+            <button type="button" onClick={list.reload}>
+              <RefreshIcon />
+              Refresh
+            </button>
+          </>
+        }
+      />
 
-      <form className="inline" onSubmit={pick}>
-        <label>
-          Appointment date{" "}
-          <input type="date" value={draft} onChange={(e) => setDraft(e.target.value)} />
-        </label>
-        <button type="submit" disabled={!draft}>
-          Show
-        </button>
-        {date && (
+      {date && (
+        <p className="back-link">
           <button
             type="button"
             className="link"
@@ -263,42 +322,38 @@ export default function RemindersPage() {
           >
             Back to today's reminders
           </button>
-        )}
-      </form>
+        </p>
+      )}
 
       <ErrorBox message={list.error} onRetry={list.reload} />
       {data === undefined ? (
         list.loading && <Loading />
       ) : (
         <>
-          <Summary data={data} />
           {!data.production && (
-            <p className="note">
+            <Notice tone="warning">
               Preview only: this list is read from {data.source}, not the clinic's live GPiS. Open in WhatsApp only
               appears for numbers in WHATSAPP_ALLOWED_RECIPIENTS.
-            </p>
+            </Notice>
           )}
-          <Tabs
-            label="Reminder lists"
-            value={view}
-            onChange={setView}
-            options={[
-              { value: "READY", label: `Ready (${data.ready.length})` },
-              { value: "STAFF", label: `Needs staff (${data.needs_staff.length})` },
-              { value: "OTHER", label: `Not appointments (${otherCount})` },
-            ]}
-          />
-          {view === "READY" && data.ready.length > 0 && (
-            <p className="muted small">
-              Opened in WhatsApp: {data.ready.filter((g) => g.record?.status === "OPENED").length} of{" "}
-              {data.ready.length}
-            </p>
-          )}
+          <div className="list-toolbar">
+            <Tabs
+              label="Reminder lists"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: "READY", label: "Ready", count: data.ready.length },
+                { value: "STAFF", label: "Needs staff", count: data.needs_staff.length },
+                { value: "OTHER", label: "Not appointments", count: otherCount },
+              ]}
+            />
+            {view === "READY" && data.ready.length > 0 && <Progress data={data} recorded={recorded} />}
+          </div>
           {view === "READY" &&
             (data.ready.length === 0 ? (
               <Empty>No reminders to send.</Empty>
             ) : (
-              <ul className="cards">
+              <ul className="reminder-list">
                 {data.ready.map((g) => (
                   <ReadyCard
                     key={g.key}
@@ -306,6 +361,7 @@ export default function RemindersPage() {
                     showDate={showDate}
                     production={data.production}
                     onChanged={list.reload}
+                    onRecorded={(key, status) => setRecorded((r) => ({ ...r, [key]: status }))}
                   />
                 ))}
               </ul>
@@ -314,23 +370,31 @@ export default function RemindersPage() {
             (data.needs_staff.length === 0 ? (
               <Empty>Nothing needs checking.</Empty>
             ) : (
-              <ul className="cards">
-                {data.needs_staff.map((g) => (
-                  <StaffCard key={g.key} group={g} showDate={showDate} onChanged={list.reload} />
-                ))}
-              </ul>
+              <>
+                <p className="muted small">
+                  These are not sent from here. Check each one and remind the patient the usual way if needed.
+                </p>
+                <ul className="reminder-list">
+                  {data.needs_staff.map((g) => (
+                    <StaffCard key={g.key} group={g} showDate={showDate} onChanged={list.reload} />
+                  ))}
+                </ul>
+              </>
             ))}
           {view === "OTHER" &&
             (otherCount === 0 ? (
               <Empty>No cancelled appointments, OFF DAY records or 00:00 to-dos.</Empty>
             ) : (
-              <ul className="counts">
-                {data.not_appointments.map((r) => (
-                  <li key={r.reason}>
-                    {r.reason}: <strong>{r.count}</strong>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <p className="muted small">Shown as numbers only. No reminder is needed for these.</p>
+                <ul className="counts">
+                  {data.not_appointments.map((r) => (
+                    <li key={r.reason}>
+                      {r.reason}: <strong>{r.count}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </>
             ))}
         </>
       )}
