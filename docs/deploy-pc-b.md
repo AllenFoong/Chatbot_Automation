@@ -159,7 +159,7 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 
 等 10 秒，浏览器打开 <http://localhost:8000> → 登入画面。把这个网址加进书签 / 桌面捷径。
 
-- 日志：`%LOCALAPPDATA%\Chatbot\logs\`（`start.log` 每次启动、备份、清理、重开的记录；`uvicorn-日期-时间.log` 每次启动的程序日志，留最新 14 个；`retention.log`、`retention-error.log` 是最近一次清理的）。
+- 日志：`%LOCALAPPDATA%\Chatbot\logs\`（`start.log` 每次启动、备份、清理、重开的记录；`uvicorn-日期-时间.log` 每次启动的程序日志，**启动前**删旧的、留最新 14 个（2026-10-13 之前的版本放在 uvicorn 停了之后才删，关机、`stop-chatbot.ps1` 都轮不到，所以 B 上可能已经多出好几个：装了新版，第一次启动就删到 14 个）；`start.log` 一直加在后面、不删（每次开机 4 行左右，没有病人资料）；`retention.log`、`retention-error.log` 是最近一次清理的）。
 - 备份：`%LOCALAPPDATA%\Chatbot\backup\chatbot-日期.dump`，每次开机一份，留最新 14 份，**超过 30 天的也删**（今天的一定留，A10、D67）。
 - 清理（A10、D67）：**备份成功之后**跑 `python -m app.retention`：预约日期过了 90 天的提醒整行删掉、只留每天的数目；`start.log` 记一行 `清理：预约日期在 … 之前的提醒删了 N 条…`（只有日期和数目）。备份失败就不清理（`清理：这次不清理`）；清理失败照样启动（看 `retention-error.log`）。B 从 2026-10-13 才开始记，**2027-01-13 之前每次都是 `删了 0 条`**。
   **里面有病人名字和号码**：只留在 B，不复制到 USB、网盘、Google Drive（规则 4）。
