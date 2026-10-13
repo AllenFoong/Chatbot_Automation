@@ -91,7 +91,7 @@
 - [x] 去诊所装电脑 B 的清单（`docs/pc-b-checklist.md`）；顺便改：B 装 PostgreSQL 18、第 7 节第 5 项按过要 *Mark as not sent*、第 6 项在 B 上测（不用 A 的浏览器）、`chatbot_reader` 的密码用密码管理器产生（A 上要看着打）、连 A 有 SSL / TLS 错误时只改 B（`Encrypt=no` → ODBC Driver 17）；合并进 `main`（PR #20）
 - [x] 电脑 B 安装第一天（2026-10-12，记录在 `docs/deploy-pc-b.md` 第 11 节）：没带 USB → zip 经 Google Drive 链接下载；ODBC 18、PostgreSQL 18、python.org 的 Python 3.11.9（B 本来有 Store 的 3.11 和 3.12.0，不动、不加 PATH）、`0004`、共用帐号 `admin` / `staff`、假资料（`REMINDER_SOURCE=demo`）、自动启动都好了；A 的只读帐号还没建。找到：`requirements-lock.txt` 的中文说明让英文 Windows 的 pip 读不了 → 改成只有 ASCII、加测试；Store 的 Python、*Python install manager* 不能用
 - [ ] 电脑 B 第二天：第 11 节「还没做」（重开机、假期、`staff` 登入、清理、告诉员工是假资料）
-- [x] 不用 USB（D64）：zip 和 A 的 `create_readonly_login.sql` 都经 Google Drive 链接，在 B / A 的 InPrivate 视窗下载（不登入）、对 hash、用完就删；文件照着改
+- [x] 不用 USB（D64）：zip 和 A 的 `create_readonly_login.sql` 都经 Google Drive 链接，在 B / A 的 InPrivate 视窗下载（不登入）、对 hash、用完就删；文件照着改；第一天的记录、`requirements-lock.txt` 的修正和 D64 合并进 `main`（PR #21）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
 - [ ] 清理网盘中转文件（删除 + 清空回收站）
