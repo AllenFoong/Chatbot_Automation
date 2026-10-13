@@ -688,7 +688,14 @@ pytest                        # 应该 316 passed，没有 skipped
 
 ### 资料保留完成的条件（在开发电脑上测试）
 
-只用 `chatbot_dev` 和假资料（号码 `601000000xx`、消息 `DEMO`）。psql：`psql -h localhost -U chatbot -d chatbot_dev`。
+只用 `chatbot_dev` 和假资料（号码 `601000000xx`、消息 `DEMO`）。
+开发电脑的 `psql` 不在 PATH：每个视窗先设一次 `$psql`，SQL 用 `& $psql -h localhost -U chatbot -d chatbot_dev -c "<SQL>"` 跑（有 pgpass 那一行之后可以加 `-w`，不问密码）：
+
+```powershell
+$psql = (Get-ChildItem "C:\Program Files\PostgreSQL\*\bin\psql.exe" | Sort-Object FullName -Descending | Select-Object -First 1).FullName
+```
+
+下面的 SQL 用 `CURRENT_DATE`：**过了半夜 12 点**会差一天，跨日的话把 `CURRENT_DATE - 100` 换成那一天的日期（例 `'2026-07-05'`）。
 
 | # | 做什么 | 应该看到 |
 |---|---|---|
@@ -722,7 +729,7 @@ SELECT * FROM reminder_stats WHERE appointment_date = CURRENT_DATE - 100;
 **试 `start-chatbot.ps1`**（第 7、8 项；用 **Windows PowerShell 5.1**，和电脑 B 一样，不用 PowerShell 7）：
 
 1. 关掉平常开发用的 uvicorn（port 8000 要空出来）；`frontend` 已经 `npm run build`（第 1 项）。
-2. `%APPDATA%\postgresql\pgpass.conf` 暂时加一行 `localhost:5432:chatbot_dev:chatbot:<chatbot 的密码>`（没有这个档就新建；测完拿掉）。
+2. `%APPDATA%\postgresql\pgpass.conf` 暂时加一行 `localhost:5432:chatbot_dev:chatbot:<chatbot 的密码>`（没有这个档就新建；测完拿掉）。`& $psql -h localhost -U chatbot -d chatbot_dev -w -c "SELECT 1"` 印出 `1` 才对（`no password supplied` = pgpass 没读到，脚本的备份也会失败）。
 3. 再加一条要删的假提醒（SQL 1 的第一行），放一个 40 天前的假备份：
    ```powershell
    $bk = "$env:LOCALAPPDATA\Chatbot\backup"; New-Item -ItemType Directory -Force $bk | Out-Null
@@ -732,6 +739,7 @@ SELECT * FROM reminder_stats WHERE appointment_date = CURRENT_DATE - 100;
 4. 在仓库根目录：`powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\start-chatbot.ps1`（视窗会停在那里，uvicorn 在跑）。
 5. 另开一个视窗：`notepad "$env:LOCALAPPDATA\Chatbot\logs\start.log"`；`Get-ChildItem "$env:LOCALAPPDATA\Chatbot\backup"`。
    第 9 项也在这时候做。
+   还有 SQL 2：`reminders` 只剩 10 天前那条；`reminder_stats` 那天变成 `2 | 1 | 4`（第 4 项的 `1 | 1 | 2` 加上这次的 `1 | 0 | 2`）。
 6. 关掉第 4 步的视窗，再跑 `.\deploy\stop-chatbot.ps1` → `已经停了`。
 7. 第 8 项：pgpass 拿掉那一行，重做第 4–6 步。
 
@@ -753,3 +761,20 @@ DELETE FROM reminder_stats WHERE appointment_date = CURRENT_DATE - 100;
 - PowerShell 7（Linux）：`deploy/` 的 4 个脚本语法都没有错误；备份的规则用假档案试 4 种情况（16 份都在 30 天内 → 留 14；有超过 30 天的 → 删掉；最新的一份一定留）；`retention.log` 的中文写进 `start.log` 正常。
   **Windows PowerShell 5.1 没有试**（云端没有）：开发电脑第 7、8 项。
 - headless Chromium 登入、读假资料的 `/api/reminders`、关掉浏览器后在设定档里找假名字：改之前 **2 个档案**有，加了 `no-store` 之后 **0 个**。
+
+### 开发电脑的测试记录（2026-10-13，Windows PowerShell 5.1、PostgreSQL 18、`chatbot_dev` + 假资料）
+
+| # | 结果 |
+|---|---|
+| 1 | ✅ `0005 (head)`；`pytest` 316 passed；`npm test` 47 passed |
+| 2–6 | ✅ 删了 100 天前的 2 条、10 天前的留着；`reminder_stats` 那天 `1 | 1 | 2` |
+| 8 | ✅ 第一次跑的时候还没有 pgpass 那一行：`备份失败（看 backup-error.log）` → `清理：这次不清理（备份没有成功）` → `uvicorn 启动` |
+| 7 | ✅ 加了 pgpass 那一行后：`备份：…chatbot_dev-20261013-2317.dump` → `清理：预约日期在 2026-07-15 之前的提醒删了 1 条（1 天…）；不用再留的号码删了 0 个` → `uvicorn 启动`，中文正常；备份资料夹只剩 `20261013-2317`（40 天前的假档案删了）；`reminders` 只剩 10 天前那条；`reminder_stats` `2 | 1 | 4`（累加） |
+| 9 | ✅ `Cache-Control: no-store` |
+| 10 | ✅ 假资料、`%LOCALAPPDATA%\Chatbot`、pgpass 那一行都清掉了 |
+
+这次找到的（已经改进上面的清单）：
+
+- 开发电脑的 `psql` 不在 PATH（`The term 'psql' is not recognized`）→ 用 `$psql` 完整路径（`start-chatbot.ps1` 自己找 `pg_dump.exe`，不受影响）。
+- 先确认 `psql -w` 连得上，再跑脚本：pgpass 没设好时备份会失败，清理也不会做（第 8 项的情况）。
+- 测到半夜 12 点前后：`CURRENT_DATE` 会变，改用写出来的日期。
