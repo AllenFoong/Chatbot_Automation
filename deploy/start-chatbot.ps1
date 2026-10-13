@@ -81,15 +81,17 @@ if (-not $backedUp) {
 
 # ---------- 3. 启动 ----------
 for ($run = 1; $run -le 4; $run++) {
-    # 每次启动一个新的日志档：重开时不会盖掉上一次停下来的原因；留最新的 14 个
+    # 每次启动一个新的日志档：重开时不会盖掉上一次停下来的原因。
+    # 启动之前先删旧的：留最新的 13 个 + 这次的 = 14 个。不能放在 uvicorn 停了之后：
+    # 关机、stop-chatbot.ps1 都会连这个脚本一起停掉，轮不到那里（2026-10-13 找到）
+    Get-ChildItem $logs -Filter "uvicorn-*.log" | Where-Object Name -match '^uvicorn-\d{8}-\d{6}\.log$' |
+        Sort-Object Name -Descending | Select-Object -Skip 13 | Remove-Item
     $uvicornLog = Join-Path $logs "uvicorn-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
     Note "uvicorn 启动：http://127.0.0.1:8000（日志 $(Split-Path $uvicornLog -Leaf)）"
     $server = Start-Process $python -Wait -PassThru -NoNewWindow `
         -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000", "--no-access-log" `
         -RedirectStandardError $uvicornLog -RedirectStandardOutput (Join-Path $logs "uvicorn-stdout.log")
     Note "uvicorn 停了（exit code $($server.ExitCode)）"
-    Get-ChildItem $logs -Filter "uvicorn-*.log" | Where-Object Name -match '^uvicorn-\d{8}-\d{6}\.log$' |
-        Sort-Object Name -Descending | Select-Object -Skip 14 | Remove-Item
     if ($run -lt 4) { Start-Sleep -Seconds 60 }
 }
 Note "uvicorn 停了 4 次，不再重开：看 uvicorn-*.log。重新登入 Windows（或 Start-ScheduledTask -TaskName Chatbot_Automation）会再启动"
