@@ -17,6 +17,7 @@
 | [`frontend/README.md`](frontend/README.md) | Phase 4b：Admin Platform 网页（React + TypeScript）：安装、启动、测试清单；画面整理（D66）的测试清单 |
 | [`docs/deploy-pc-b.md`](docs/deploy-pc-b.md) | 5b 试跑：装到柜台电脑 B（要准备什么、安装、自动启动、备份、检查、先在开发电脑演练和记录、更新、还原备份）；脚本在 `deploy/` |
 | [`docs/pc-b-checklist.md`](docs/pc-b-checklist.md) | 去诊所装电脑 B 的打勾清单：出发前、传档案（Google Drive，不用 USB）、到了先看先问、B 和 A 的步骤和时间、B 不合要求 / 连不上 A 怎么办、离开前 |
+| [`.claude/skills/project-quiz/SKILL.md`](.claude/skills/project-quiz/SKILL.md) | 项目测验的提示词：Claude Code 输入 `/project-quiz`（可加题数、主题，例 `/project-quiz 5 安全`），读上面的文件出单选题考「为什么这样设计」，选了马上显示对错，最后给成绩单 |
 
 开始新 session 时先读这四个文件。
 
