@@ -1,6 +1,6 @@
 # 系统架构与技术选型
 
-> 最后更新：2026-10-08（第 8、9 节按诊所两轮问卷更新；第 10 节 5c 和 Plan B）
+> 最后更新：2026-10-13（A10：提醒的保留期限，D67）；2026-10-08（第 8、9 节按诊所两轮问卷更新；第 10 节 5c 和 Plan B）
 
 ## 1. 需求
 
@@ -177,7 +177,7 @@ Phase 3 已经有对应的函数：`create_appointment_request`、`hand_over_to_
 | A7 | 病人已经习惯用诊所现有的 WhatsApp 号码，诊所用的是 **WhatsApp Business App**（W18）。候选：Meta 的 **Coexistence**，同一个号码同时用 Business App 和 Cloud API，保留聊天记录，员工仍可在手机上回复（第三方资料显示马来西亚已支持）。已知限制：每秒最多 20 条消息；不支持群组、广播列表、语音 / 视频通话、目录（catalog）、限时消息等。2026-10-06 再查（第三方资料：BSP 文件、搜索结果；Meta 官方网站在云端容器打不开）：① 员工在手机 App 发的消息会经 **`smb_message_echoes`** webhook 送来 → 本系统看得到（存成 `STAFF`、`staff_id` 空；Phase 3 的 `record_outgoing_message` 已经支持）；② 连上时同步过去 180 天的聊天（`history` webhook）和联系人（`smb_app_state_sync`）；③ Business App **每 14 天至少要打开一次**，否则连接会失效；④ 连上后 App 的撤回、限时消息、view once、即时位置、广播列表、编辑消息不能用；⑤ 要经 **Embedded Signup** 连接：找 BSP，或自己的 Meta App 成为 Tech Provider（要商家验证）。**待决定（5c，上线前）**：用 BSP 还是自己做 Embedded Signup；180 天的历史要不要导入（是病人资料）；以上各点上线前再对照 Meta 官方文件。**Coexistence 行不通时的 Plan B、第三方平台、费用见第 10 节** |
 | A9 | **病人传的照片、语音、文件**：5a 先不下载，只显示 `[Image]` 等（D38）。要不要存？存在哪里、保留多久、谁能看（可能是伤口照片，比文字更敏感）？Phase 6 的 AI 要不要看照片？ |
 | A8 | **还没录入 GPiS 的预约请求要不要算进空档**：空档现在只看 GPiS。AI 把 10:00 推荐给病人 A（`PENDING`）之后、员工录入 GPiS 之前，病人 B 来问，10:00 仍然显示有空。建议在 Phase 6（AI 推荐时段）之前：`PENDING` 和刚 `CONFIRMED`、GPiS 里还看不到的请求都算占用（宁可少推荐）。难处：要把请求和 GPiS 的预约对上（日期、时段、医生、病人），否则员工录入后会算两次；GPiS 画面不显示 `AppointmentID`，`gpis_appointment_id` 也要靠系统自动对上。改规则时 SQL 和 `availability.py` 要一起改 |
-| A10 | **病人资料在本系统保留多久**（PDPA 的保留原则）：`messages`、5b 的 `reminders` 都有病人名字、号码和预约。建议：提醒的内容 90 天后删掉、只留统计；对话的保留期限和 A9 一起决定。要诊所同意 |
+| A10 | **病人资料在本系统保留多久**（PDPA 的保留原则）：`messages`、5b 的 `reminders` 都有病人名字、号码和预约。**提醒的部分决定了（D67，2026-10-13）**：预约日期过了 90 天整行删掉、只留每天的数目（`reminder_stats`）；*NO WA* 的号码一直留；电脑 B 每次登入先备份、再清理，备份最多留 30 天；`/api` 不让浏览器快取。要诊所同意 90 天（W60；第一次真的删是 2027-01-13）。**还没决定**：对话（`messages`、`conversations`）留多久，和 A9 一起在 5c 之前决定（B 现在不收 WhatsApp，是空的） |
 
 ## 8. Phase 5b 设计：预约前一天的 WhatsApp 提醒（草稿）
 
@@ -411,7 +411,7 @@ Footer（建议加，D46）：Reply STOP to stop reminders
   号码代号（`#1`、`#2` …：同一个号码同一个代号）和号码种类（`MY` / `SG` / 其他 / 空 / 固网），**不印名字、号码、Remarks**（像 `app.cli` 的 7c 只有 ID）。
 - **日志**：只记数量、提醒编号、wamid；不记名字、号码、消息内容（D38）。Meta 的错误原因存在 `reminders` 给员工看，不写进日志。
 - **送审的模板范例只用假名字**；pytest、Vitest 只用假资料。
-- `reminders` 表有病人名字和号码（和 `messages` 一样）：开发时只在自己电脑的 `chatbot_dev`；保留多久见 A10。
+- `reminders` 表有病人名字和号码（和 `messages` 一样）：开发时只在自己电脑的 `chatbot_dev`；预约日期过了 90 天整行删掉、只留每天的数目（A10、D67）。
 
 ### 8.7 和 A1 的关系（第 5 点）
 
@@ -502,6 +502,13 @@ reminders    id, appointment_date, wa_phone, status (OPENED / NOT_SENT), body, g
              UNIQUE (appointment_date, wa_phone)
              reminder_appointments 表没有做：GPiS 预约 ID 直接存成一个 int[]，用来看「按过之后 GPiS 改了」
 wa_contacts  + reminders_opt_out_at, reminders_opt_out_by (PATIENT / STAFF), reminders_opt_out_staff_id
+```
+
+**保留期限（A10、D67，migration `0005`）**：
+
+```
+reminder_stats  appointment_date (PK), opened, not_sent, opened_appointments
+                reminders 预约日期过了 90 天整行删掉，删之前把数目加到这里（没有号码、名字、员工）
 ```
 
 ### 8.10 下一个 session 的测试（草稿）

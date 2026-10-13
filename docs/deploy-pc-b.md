@@ -11,7 +11,7 @@
 |---|---|
 | ✅ 员工在 **B 的浏览器**打开 `http://localhost:8000` | Admin Platform：Reminders 名单（读 A 的实时预约）、*Open in WhatsApp*、*NO WA*、Settings |
 | ✅ 按 *Open in WhatsApp* → **B 上的 WhatsApp Desktop** 打开那位病人的对话，消息已经填好，员工按 Enter | 和现在员工一条条发一样，只是名单、`*C`、家人合并由系统做（D54） |
-| ✅ 登入 Windows 就自动启动、停了自己重开；每次开机备份本系统的数据库 | `deploy/install-autostart.ps1`、`deploy/start-chatbot.ps1`（停下用 `deploy/stop-chatbot.ps1`） |
+| ✅ 登入 Windows 就自动启动、停了自己重开；每次开机备份本系统的数据库，再删掉过了 90 天的提醒（A10、D67） | `deploy/install-autostart.ps1`、`deploy/start-chatbot.ps1`（停下用 `deploy/stop-chatbot.ps1`） |
 | ❌ **只有 B 自己打得开**（`127.0.0.1`），A 或别的电脑、手机都打不开 | 网页里有病人名字和号码；不开放给局域网，就不用 https（D62） |
 | ❌ 不收 WhatsApp 消息（5a 的 webhook、cloudflared 不装） | 要等 5c 接上诊所的号码 |
 | ❌ 不装 Node.js、git、SQL Server | 网页在开发电脑 build 好，zip 经 Google Drive 链接带过去（不用 USB，D64） |
@@ -159,8 +159,9 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 
 等 10 秒，浏览器打开 <http://localhost:8000> → 登入画面。把这个网址加进书签 / 桌面捷径。
 
-- 日志：`%LOCALAPPDATA%\Chatbot\logs\`（`start.log` 每次启动、备份、重开的记录；`uvicorn-日期-时间.log` 每次启动的程序日志，留最新 14 个）。
-- 备份：`%LOCALAPPDATA%\Chatbot\backup\chatbot-日期.dump`，每次开机一份，留最新 14 份。
+- 日志：`%LOCALAPPDATA%\Chatbot\logs\`（`start.log` 每次启动、备份、清理、重开的记录；`uvicorn-日期-时间.log` 每次启动的程序日志，留最新 14 个；`retention.log`、`retention-error.log` 是最近一次清理的）。
+- 备份：`%LOCALAPPDATA%\Chatbot\backup\chatbot-日期.dump`，每次开机一份，留最新 14 份，**超过 30 天的也删**（今天的一定留，A10、D67）。
+- 清理（A10、D67）：**备份成功之后**跑 `python -m app.retention`：预约日期过了 90 天的提醒整行删掉、只留每天的数目；`start.log` 记一行 `清理：预约日期在 … 之前的提醒删了 N 条…`（只有日期和数目）。备份失败就不清理（`清理：这次不清理`）；清理失败照样启动（看 `retention-error.log`）。B 从 2026-10-13 才开始记，**2027-01-13 之前每次都是 `删了 0 条`**。
   **里面有病人名字和号码**：只留在 B，不复制到 USB、网盘、Google Drive（规则 4）。
 - uvicorn 停了（当掉、被关掉）：`start-chatbot.ps1` 等 1 分钟自己重开，最多 3 次。
 - 停下本系统（改了 `.env` 要重开、更新之前）：`.\deploy\stop-chatbot.ps1` → `已经停了`；再启动：`Start-ScheduledTask -TaskName Chatbot_Automation`。
@@ -172,7 +173,7 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 | # | 做什么 | 应该看到 |
 |---|---|---|
 | 1 | 重新开机，登入 Windows，打开 <http://localhost:8000> | 登入画面（不用开任何视窗） |
-| 2 | `start.log` | `备份：…dump`、`uvicorn 启动` |
+| 2 | `start.log` | `备份：…dump`、`清理：…删了 N 条…`、`uvicorn 启动` |
 | 3 | 用 ADMIN 登入 → *Settings → Clinic closures* → *Import public holidays for 2026*，再换 2027 | 各 *Added 11 day(s)*；和 `clinic-workflow.md` 第 1 节的表对照；核对 Hari Raya 的日期 |
 | 4 | *Reminders* → 明天 | 名单的人数和 GPiS 一样；家人合并、`*C` 的规则对 |
 | 5 | 请员工挑一张卡片按 *Open in WhatsApp* | WhatsApp Desktop 打开**那位病人**的对话、消息已经填好。**不要按 Enter**（这是安装检查，不是真的要发）→ 关掉 → 那张卡片按 *Mark as not sent*（按过就记成已打开，D58，不改回来员工会以为发过了） |
@@ -235,7 +236,8 @@ Windows PowerShell 5.1、Python 3.11.9、PostgreSQL 18.6、`GPiS_Dev`（`chatbot
    `Access to the path ... is denied` = 还有程序在用它：`resmon` → *CPU* → *Associated Handles* 搜 `Chatbot_Automation` 看是哪个程序；
    **改名没有成功就停在这里，不要解压**（2026-10-13 在 B 上：改名失败后照样解压，第 11 节「更新到 PR #23」）。
 3. 先确认 `Test-Path C:\Chatbot_Automation` 是 `False`（旧的已经改名），再解压新的到 `C:\Chatbot_Automation`、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
-4. `alembic upgrade head`（最近一次启动时的备份就是改表之前的那一份；要退回见第 10 节）。
+4. `alembic upgrade head`（最近一次启动时的备份就是改表之前的那一份；要退回见第 10 节）；`python -m app.retention --dry-run` 看会删几条（只看、不删）。
+   有改表的更新（例：A10 的 `0005`）在**当天的提醒发完之后**才做：还原用的是开机那份备份，之后按的 *Open in WhatsApp* 还原后会不见。
 5. `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。没问题再删 `.old`。
 
 ## 10. 还原备份（更新失败、数据库坏了）
@@ -250,7 +252,7 @@ $dump = "$env:LOCALAPPDATA\Chatbot\backup\<上面选的档名>"
 $LASTEXITCODE                                                        # → 0
 ```
 
-`--clean` = 先拿掉现在的表，再从备份建回来。更新失败要退回的话，程序也要换回旧的（`C:\Chatbot_Automation.old`，第 9 节）：备份是旧版本的表结构。
+`--clean` = 先拿掉现在的表，再从备份建回来。备份里可能还有已经清理掉的旧提醒（A10）：下一次启动（`Start-ScheduledTask` 或登入）时会再被删掉。更新失败要退回的话，程序也要换回旧的（`C:\Chatbot_Automation.old`，第 9 节）：备份是旧版本的表结构。
 然后 `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。
 
 ## 11. 安装记录（电脑 B）

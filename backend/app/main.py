@@ -29,6 +29,15 @@ for module in (auth_api, conversations, reminders, requests, settings, staff):
     app.include_router(module.router)
 
 
+@app.middleware("http")
+async def api_not_cached(request: Request, call_next):
+    """/api 的回应有病人名字、号码：浏览器不要存进硬盘的快取（A10、D67）。网页本身（frontend/dist）照常快取。"""
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.exception_handler(IntegrityError)
 def database_rule_violated(request: Request, exc: IntegrityError) -> JSONResponse:
     """数据库约束挡下的资料（重复、违反 CHECK、找不到对应的医生 …）：回 409 / 422，告诉是哪一条规则。"""

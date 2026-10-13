@@ -188,7 +188,7 @@ $p
 | 10 | *Login failed for user 'chatbot_reader'* | `.env` 和 A 上打的不一样：A 上跑 `drop_readonly_login.sql`，从第 8 步重来（`sql/README.md` 第二步 4） |
 | 10 | SSL / TLS 的错误（`SSL Provider`、`certificate`、`TLS`、`encryption` 之类） | A 是 SQL Server 2012，和 ODBC Driver 18 可能谈不拢加密。**A 什么都不改**，只在 B 试：① 抄下完整的错误讯息（没有密码）；② `.env` 的连线字符串加 `Encrypt=no;`，再 `--check-gpis`（局域网里不加密，和 B 上的 GPiS 现在一样）；③ 还不行：在 B 从 Microsoft 网站下载 ODBC Driver 17 装，`DRIVER={ODBC Driver 17 for SQL Server}`，再试；④ 还不行：停在这里，`.env` 加回 `REMINDER_SOURCE=demo`，告诉员工先不用，回来问。A 的帐号可以留着（只读得到那两个），诊所不想留就跑 `drop_readonly_login.sql`。②、③ 有用的话记下来（回来要写进文件） |
 | 10 | 名单的人数和 GPiS 不一样 | 先看是不是 `00:00`、取消的、*Needs staff* 里的（D50、D51、D57）。还是不一样：记下日期、时间、医生、`AppointmentID`（**不记名字、号码**），回来对照 |
-| 11 | 重开机后网页打不开 | 看 `%LOCALAPPDATA%\Chatbot\logs\` 的 `start.log`、最新的 `uvicorn-*.log` 最后几行（`backup-error.log` 是备份的）；改了什么就 `stop-chatbot.ps1` → `Start-ScheduledTask -TaskName Chatbot_Automation` |
+| 11 | 重开机后网页打不开 | 看 `%LOCALAPPDATA%\Chatbot\logs\` 的 `start.log`、最新的 `uvicorn-*.log` 最后几行（`backup-error.log` 是备份的、`retention-error.log` 是清理的）；改了什么就 `stop-chatbot.ps1` → `Start-ScheduledTask -TaskName Chatbot_Automation` |
 
 **中途要放弃时**（B 恢复原样）：`C:\Chatbot_Automation\deploy\install-autostart.ps1 -Remove`（装了的话；会先停下本系统）→ 删掉 `C:\Chatbot_Automation`、`%LOCALAPPDATA%\Chatbot`、`%APPDATA%\postgresql\pgpass.conf`。
 Python、PostgreSQL、ODBC 留着不影响 GPiS；诊所要移除的话在 *设定 → 应用程式* 移除。A 的帐号照诊所的意思留着或 `drop_readonly_login.sql`。
@@ -198,7 +198,7 @@ Python、PostgreSQL、ODBC 留着不影响 GPiS；诊所要移除的话在 *设�
 **电脑 B**
 
 - [ ] 重开机、登入 Windows，不用开任何视窗，<http://localhost:8000> 是登入画面（第 7 节第 1 项）
-- [ ] `start.log` 有今天的 `备份：…dump`、`uvicorn 启动`（第 7 节第 2 项）
+- [ ] `start.log` 有今天的 `备份：…dump`、`清理：…`、`uvicorn 启动`（第 7 节第 2 项）
 - [ ] `postgres` 要密码：`& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U postgres -w -c "SELECT 1"` → `no password supplied`（开发电脑演练时发现一开始不用密码，D63 的记录）
 - [ ] `--check-gpis` 两个 `[OK]`；明天的名单和 GPiS 对过
 - [ ] *Settings → Clinic closures*：2026、2027 各 *Added 11 day(s)*，和 `clinic-workflow.md` 第 1 节一样；Hari Raya 的日期核对过（第 7 节第 3 项）
