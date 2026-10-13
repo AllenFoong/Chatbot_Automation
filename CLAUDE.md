@@ -9,7 +9,7 @@
 | 文件 | 内容 |
 |---|---|
 | [`docs/gpis-database.md`](docs/gpis-database.md) | GPiS 数据库：表、字段、跑过的 SQL、结果、待验证的问题 |
-| [`docs/architecture.md`](docs/architecture.md) | 系统架构、技术选型、开发路线、人工介入设计；第 8 节：Phase 5b 预约提醒的设计（草稿）；第 9 节：A1 怎么读主机的方案比较；第 10 节：5c 接上诊所号码、第三方平台、费用和 Plan B（草稿） |
+| [`docs/architecture.md`](docs/architecture.md) | 系统架构、技术选型、开发路线、人工介入设计；第 8 节：Phase 5b 预约提醒的设计（草稿）；第 9 节：A1 怎么读主机的方案比较；第 10 节：5c 接上诊所号码、第三方平台、费用和 Plan B（草稿）；第 11 节：Phase 6 AI Agent 的设计（草稿） |
 | [`docs/decisions.md`](docs/decisions.md) | 做过的决定和原因、数据安全规则 |
 | [`docs/clinic-workflow.md`](docs/clinic-workflow.md) | 营业时间、医生排班、staff 如何使用 GPiS 预约、Remarks 治疗代码、待确认问题 |
 | [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
@@ -104,6 +104,8 @@
 - [x] A10：开发电脑测试 10 项全部通过（2026-10-13，Windows PowerShell 5.1；记录见 `backend/README.md`）：`0005 (head)`、`pytest` 316 个、`npm test` 47 个；没有 pgpass 时备份失败、不清理；有了之后先备份再删 1 条、40 天前的假备份删了、`reminder_stats` 累加成 `2 | 1 | 4`；`no-store`；已经清理干净。找到：开发电脑的 `psql` 不在 PATH（用完整路径 `$psql`）、过了半夜 `CURRENT_DATE` 会变 → 清单改了
 - [x] A10（D67）和开发电脑的测试记录合并进 `main`（PR #26）
 - [x] B 的 uvicorn 日志「留最新 14 个」其实没有在删：删的那一行在 uvicorn 停了之后，关机、`stop-chatbot.ps1` 都会连脚本一起停掉、轮不到 → 改成**启动前**删（`deploy/start-chatbot.ps1`）；PowerShell 7 用假档案跑过脚本里的那一段（20 个旧的、启动 4 次 → 剩 14 个）；开发电脑 Windows PowerShell 5.1 试过（2026-10-14：20 个假日志 → 启动一次剩 14 个，最旧的是 `0908`）；合并进 `main`（PR #27）
+- [x] 5c 的比较（2026-10-14，D68）：**提醒继续手动**，不为提醒接 5c（省的时间不够付费用）；5c 等 Phase 6 的 AI 才接，选只给 API、支持 Coexistence 的 BSP；不自己当 Tech Provider（要验证自己的公司）；全部用诊所的名义，开发者当管理员；刚开始不做商家验证（要的时候用 SSM + 水电费单 / 银行月结单）；Coexistence 之后 B 的 WhatsApp for Windows 不支持
+- [x] Phase 6 设计草稿（只有文件，没有程序）：`docs/architecture.md` 第 11 节（AI 推荐时段、员工先输入 GPiS 再按 *Confirm*；A8 的做法；工具只回最少资料；转员工的情况；病人资料和 AI 公司 A11；默认 Claude Opus 5.5 和费用粗估；分 6a–6d）；要问诊所 W61–W71
 
 ## 下一步
 
@@ -111,10 +113,10 @@
 2. 画面整理（D66，PR #23）：B 已经更新（2026-10-13）。和第 1 项一起，一两个星期后问员工新画面（卡片、☰）好不好用。画面还是英文（D24）。
 3. A10（D67）：已经合并（PR #26）→ 开发电脑 `git checkout main`、`git pull`（`alembic current` 是 `0005 (head)`）→ 更新 B（这次**有改表** `0005`：照第 9 节完整做、改名成 `.old`，当天的提醒发完之后才更新）。uvicorn 日志的修正（PR #27，只改 `deploy/start-chatbot.ps1`）跟下一次更新 B 一起装。问诊所 W60（90 天可以吗）。B 2027-01-13 之前每次都是 `删了 0 条`；那之后看一次 `start.log`，确认第一次真的删了。
 4. 更新电脑 B：照 `docs/deploy-pc-b.md` 第 9 节（zip 经 Google Drive 链接、对 hash，D64）；更新前先在开发电脑跑过测试。B 上**不跑测试**，读的是主机 A 的正式资料。第一版模板没有按钮（D48）；真的用 Cloud API 发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
-5. 系统用模板自动发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（已经通了，但 B 有时候关机）、病人同意（W40、D46；签名表已经加了那一句，W55）。
+5. Phase 6（AI）：先看设计草稿（`docs/architecture.md` 第 11 节），整理 W61–W71 的中英问卷请老板回答，照回答改设计，再从 6a（A8 + 工具，不接 AI）开始写程序。提醒继续手动（D68）；5c 等 AI 要上线才接（BSP + Coexistence，老板签约）。
 6. A1：B 经局域网用只读帐号读 A，已经通了（2026-10-13）。B 下班有时候关（W54）：Phase 6 之前决定长期放哪里（`docs/architecture.md` 9.4）。
 7. 假期：B 已经导入 2026、2027 年（2026-10-13）。2028 年的在 2027 年底前导入、核对回教节日的日期（D61）；诊所临时休息的日子 `admin` 自己加。
-8. Phase 6（AI 推荐时段）之前要解决 A8：还没录入 GPiS 的预约请求要算进空档。
+8. A8（还没录入 GPiS 的请求要算占用）是 Phase 6 的第一步（6a），建议的做法在 `docs/architecture.md` 11.6。
 
 改空档规则时，`sql/check_available_slots.sql` 和 `backend/app/availability.py` 要一起改，再用上面的测试日期对照一次；提醒名单沿用同一套判断（D41），也要再看一次。
 改表结构时：改 `backend/app/db/models.py` → 加 Alembic migration → `pytest`（步骤见 `backend/README.md`「改表结构的步骤」）。
