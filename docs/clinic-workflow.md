@@ -320,13 +320,12 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 | W56 | 公共假期遇到星期日，政府放的替代假诊所休吗？ | **不休**。之后诊所决定哪一天休息、那天已经有预约的话，员工手动通知病人休息、改期；系统只要把那天当作假期，**不能再约**（2026-10-12）→ D61 |
 | W57 | 2027 年的假期？农历新年会多休吗？ | 名单：New Year's Day、Chinese New Year 2 天（2 月 6、7 日）、Hari Raya Aidilfitri 2 天（3 月 10、11 日）、Sultan of Johor's Birthday、Labour Day、Merdeka Day、Malaysia Day、Christmas Day（2026-10-12）。农历新年**不多休** |
 | W59 | 2027 年的名单没有 Deepavali（10 月 28 日）：照常营业还是漏写了？ | **漏写了**，照样休（2026-10-12） |
+| W54 | 柜台另一台电脑（B）：试跑之后可以一直装着本系统吗？下班可以不关机吗？ | B 下班**有时候关、有时候不关**（2026-10-13）。本系统跟着登入 Windows 启动（D62），关机不影响试跑；B 关着的时候收不到病人的回复、Phase 6 的 AI 晚上不能回 → 长期放哪里 Phase 6 之前再决定（`architecture.md` 9.4、D53） |
+| W55 | 签名表的声明下面加一句 WhatsApp 的同意（马来文 + 英文，例句见 `architecture.md` 8.8），不同意的病人在 Remark 写 `NO WA`：可以吗？ | **加了**（2026-10-13）→ D55。不同意的病人员工在名单按 *NO WA* |
+| W58 | 电脑 B 有没有装 WhatsApp Desktop、登入的是诊所的号码吗？员工现在用哪台电脑 / 手机发提醒？ | B **有** WhatsApp Desktop，登入的是**诊所的号码**（2026-10-12 在 B 上看）；员工现在用**手机**发提醒（2026-10-13）。试跑期间照旧用手机发；以后按 *Open in WhatsApp* 是从 B 的 WhatsApp Desktop 发（同一个诊所号码的连结装置，D54） |
 
 ### 待确认：预约提醒（Phase 5b）和 A1
 
 设计草稿见 [`architecture.md`](architecture.md) 第 8、9 节。两轮问卷（W31–W53，中英对照，在 claude.ai 上，不在仓库）已回答；下面是还没有答案的。请诊所回答；需要给我们看的文字、表格，先把病人名字、电话、NRIC 换成 `XXX`。
 
-| # | 问题 | 为什么要问 |
-|---|---|---|
-| W58 | 电脑 B 有没有装 WhatsApp Desktop、登入的是诊所的号码吗？员工现在用哪台电脑 / 手机发提醒？ | *Open in WhatsApp* 会打开**按的那台电脑**上的 WhatsApp Desktop（D54、D62）；B 上没有的话要装、用诊所的号码连结（linked device）。**已知**（2026-10-12 在 B 上看）：有 WhatsApp Desktop，登入的是诊所的号码；还没问员工现在用哪台发 |
-| W55 | 签名表的声明下面加一句 WhatsApp 的同意（马来文 + 英文，例句见 `architecture.md` 8.8），不同意的病人在 Remark 写 `NO WA`：可以吗？签名表是谁印的、多久印一次？ | 病人每次来都签这张表，新、旧病人都会签到（D55） |
-| W54 | 柜台另一台电脑：试跑之后可以一直装着本系统吗？下班可以不关机吗？ | 那台下班会关：关机时收不到病人的回复，Phase 6 的 AI 晚上也不能回（`architecture.md` 9.4） |
+目前没有（W54、W55、W58 已回答，在上面的表）。

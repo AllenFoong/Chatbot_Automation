@@ -29,7 +29,7 @@
 5. **不反编译 GPiS、不解密 `sa` 密码、不读取 `Tbl_User`。**
 6. 仓库里不写入任何密码、连接字符串中的密码、access token（用环境变量 / `.env`，并加入 `.gitignore`）。
 
-## 当前进度（2026-10-12）
+## 当前进度（2026-10-13）
 
 - [x] 确认 GPiS 使用 SQL Server 2012 Express，数据库名 `GPiS`
 - [x] 导出表结构，找到预约表 `Tbl_CAH_Appointment` 及相关设置表
@@ -66,7 +66,7 @@
 - [x] 第二轮问卷整理好（中英对照，在 claude.ai 上）：W40a–d（病人同意，附登记表例句）、W46–W47（提醒）、W48–W53（A1）；已知柜台 2 台电脑，主机 A 24 小时开着
 - [x] 诊所回答第二轮问卷（2026-10-08）：诊所不能放新电脑 → 5b 先装在柜台另一台电脑（D53）；同意在主机 A 开只读帐号（D52）；`VENEER` 也要 `*C`（D51）；旧病人的同意是「告知」不是「问同意」，要请律师看（`architecture.md` 8.8）
 - [x] W40b：纸本是每天一张、所有病人一起签的签名表，没有写 WhatsApp → 在签名表加一句 WhatsApp 的同意，不同意的写 `NO WA`（D55）
-- [ ] 等诊所：W54（柜台另一台可不可以一直装着、不关机）、W55（签名表加那一句）、W58（B 有 WhatsApp Desktop、登入诊所的号码；还没问员工现在用哪台发）
+- [x] 诊所回答 W54（B 下班有时候关、有时候不关）、W55（签名表加了 WhatsApp 的同意）、W58（B 的 WhatsApp Desktop 登入诊所的号码；员工现在用手机发提醒）（2026-10-13）
 - [x] Phase 5b 第一步程序：Reminders 页面（只看名单）+ Open in WhatsApp（`backend/app/reminders.py`、`api/reminders.py`、`reminders_cli.py`，`frontend/src/pages/RemindersPage.tsx`）；没有改数据库；云端 `pytest` 255 个、Vitest 41 个通过，headless Chromium 用假资料点过，全部假数据
 - [x] Phase 5b 第一步：开发电脑测试第 1–10 项全部通过（`--check-gpis` OK、4 个测试日期和以前的结果一致、假资料的 Open in WhatsApp 正常，2026-10-09；记录见 `backend/README.md`）
 - [x] 测试时找到 `C/UP AFTER ISSUE DENTURE`（装好之后的检查）被当成要等技工所 → `AFTER` 后面的戴牙代码不算（D57）；`pytest` 261 个
@@ -90,7 +90,8 @@
 - [x] 开发电脑重设 `postgres` 的密码（2026-10-12，系统管理员视窗：暂时只让本机的 `postgres` 不用密码 → `\password` → 改回来；新密码在密码管理器）
 - [x] 去诊所装电脑 B 的清单（`docs/pc-b-checklist.md`）；顺便改：B 装 PostgreSQL 18、第 7 节第 5 项按过要 *Mark as not sent*、第 6 项在 B 上测（不用 A 的浏览器）、`chatbot_reader` 的密码用密码管理器产生（A 上要看着打）、连 A 有 SSL / TLS 错误时只改 B（`Encrypt=no` → ODBC Driver 17）；合并进 `main`（PR #20）
 - [x] 电脑 B 安装第一天（2026-10-12，记录在 `docs/deploy-pc-b.md` 第 11 节）：没带 USB → zip 经 Google Drive 链接下载；ODBC 18、PostgreSQL 18、python.org 的 Python 3.11.9（B 本来有 Store 的 3.11 和 3.12.0，不动、不加 PATH）、`0004`、共用帐号 `admin` / `staff`、假资料（`REMINDER_SOURCE=demo`）、自动启动都好了；A 的只读帐号还没建。找到：`requirements-lock.txt` 的中文说明让英文 Windows 的 pip 读不了 → 改成只有 ASCII、加测试；Store 的 Python、*Python install manager* 不能用
-- [ ] 电脑 B 第二天：第 11 节「还没做」（重开机、假期、`staff` 登入、清理、告诉员工是假资料）
+- [x] 电脑 B 第二天（2026-10-13，记录在 `docs/deploy-pc-b.md` 第 11 节）：第一天剩下的都通过（重开机、假期 2026 / 2027 各 11 天、`staff` 登入、清理）；主机 A 建好 `chatbot_reader`（`.sql` 经 Drive 链接在 A 下载，D64；第三次才成功，前两次没有建任何东西）；B 接 A：`--check-gpis` 两个 `[OK]`（ODBC 18 连 SQL Server 2012 没有 TLS 问题）；10-14 的名单 13 个和 GPiS 一样；*Open in WhatsApp* 试过、按回 *Not sent*；A 上的 `COPY_ONLY` 备份删了、私人网盘已登出；B 装了 Windows Terminal（中文显示）；记录合并进 `main`（PR #22）
+- [ ] 试跑 1–2 星期（W42，2026-10-13 开始）：员工照旧用手机发提醒，同时对照 B 的名单；对不上的记下日期、时间、医生（不记名字、号码）
 - [x] 不用 USB（D64）：zip 和 A 的 `create_readonly_login.sql` 都经 Google Drive 链接，在 B / A 的 InPrivate 视窗下载（不登入）、对 hash、用完就删；文件照着改；第一天的记录、`requirements-lock.txt` 的修正和 D64 合并进 `main`（PR #21）
 - [x] Phase 5b 设计 + A1 合并进 `main`（PR #11）
 - [x] 5c 的 Plan B、第三方平台、Meta 的费用（2026-10-01 起 24 小时内的消息也收费）整理进 `docs/architecture.md` 第 10 节；5b 加「Open in WhatsApp」按钮，不用等 5c（D54）
@@ -98,11 +99,11 @@
 
 ## 下一步
 
-1. 下次去诊所：问 W54、W55、W58（员工现在用哪台发提醒）；确认主机 A 已经登出私人网盘帐号；问诊所之后，删掉主机 A 上我们做的 `COPY_ONLY` 备份 `.bak` 和 `.7z`（只删这两个）。拍表格、画面时只拍空白的，或先遮住手写的部分（规则 4）。
-2. 5b：B 已经用假资料装好（`docs/deploy-pc-b.md` 第 11 节）；先做完第 11 节「还没做」；下次在主机 A 建帐号（`sql/README.md`「只读帐号」第二步；`.sql` 经 Google Drive 链接在 A 下载，D64），B 的 `.env` 接 A、拿掉 `REMINDER_SOURCE=demo`，第 7 节第 4、5 项，员工照旧手动发、同时对照名单 1–2 星期（W42）。第一版模板没有按钮（D48）；真的发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
-3. 员工按「Open in WhatsApp」发，只要 A1 做好（第 4 点）。系统用模板自动发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（读主机的实时预约）、病人同意（W40、D46）。
-4. A1：5b 先把本系统装在柜台另一台电脑（D53），主机 A 的只读帐号照 D52、D60 做（脚本已在开发电脑试过）。Phase 6 之前决定长期放哪里（W54、`docs/architecture.md` 9.4）。
-5. 上线前：用 Admin Platform（*Settings → Clinic closures*）导入 2026、2027 年的公共假期（只有诊所休的那几种，D61），核对 Hari Raya 的日期（电脑 B 装好时 `clinic_closures` 是空的；提醒也要靠它决定假期前提早发；开发电脑的 `chatbot_dev` 已经导入好）。
+1. 试跑（W42，2026-10-13 开始）：1–2 星期后问员工名单有没有对不上的（只问日期、时间、医生，不要截图）；对不上的记下来，回来一起找原因。没问题再和诊所决定员工改用 *Open in WhatsApp* 发（D54）。
+2. 更新电脑 B：照 `docs/deploy-pc-b.md` 第 9 节（zip 经 Google Drive 链接、对 hash，D64）；更新前先在开发电脑跑过测试。B 上**不跑测试**，读的是主机 A 的正式资料。第一版模板没有按钮（D48）；真的用 Cloud API 发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
+3. 系统用模板自动发，要等三件事：5c（Coexistence 接上诊所的号码，A7 待决定：BSP 还是自己做 Embedded Signup）、A1（已经通了，但 B 有时候关机）、病人同意（W40、D46；签名表已经加了那一句，W55）。
+4. A1：B 经局域网用只读帐号读 A，已经通了（2026-10-13）。B 下班有时候关（W54）：Phase 6 之前决定长期放哪里（`docs/architecture.md` 9.4）。
+5. 假期：B 已经导入 2026、2027 年（2026-10-13）。2028 年的在 2027 年底前导入、核对回教节日的日期（D61）；诊所临时休息的日子 `admin` 自己加。
 6. Phase 6（AI 推荐时段）之前要解决 A8：还没录入 GPiS 的预约请求要算进空档。
 
 改空档规则时，`sql/check_available_slots.sql` 和 `backend/app/availability.py` 要一起改，再用上面的测试日期对照一次；提醒名单沿用同一套判断（D41），也要再看一次。

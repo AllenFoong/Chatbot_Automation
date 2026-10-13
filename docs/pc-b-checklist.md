@@ -7,7 +7,7 @@
 
 - **主机 A**：只跑 `create_readonly_login.sql`（建错了才跑 `drop_readonly_login.sql`），其他什么都不跑、不装、不改设定（规则 1）。`.sql` 用 InPrivate 视窗下载（不登入），跑完就删（D64）。
 - **B 不合要求**：不硬装、不换没演练过的版本。记下来，回来再决定（D63：测过的版本才知道能用）。
-- 病人资料、密码不进 Google Drive、照片、对话、仓库（规则 4、6）。在诊所的电脑上不登入自己的私人帐号（网盘、GitHub、密码管理器的网页版）。
+- 病人资料、密码不进 Google Drive、照片、对话、仓库（规则 4、6）。截图：GPiS 画面、真的名单不截；一定要截就先遮住名字、HP、Remarks，只说数目。在诊所的电脑上不登入自己的私人帐号（网盘、GitHub、密码管理器的网页版）。
 
 ## 0. 密码一览
 
@@ -25,7 +25,9 @@
 - **大写、小写、数字都要有**：A 的 Windows 密码规则可能要求（脚本用 `CHECK_POLICY = ON`）。
 - 20–24 个字，**不用容易看错的 `0 O 1 l I`**：要看着密码管理器一个个打。
 
-产生的方法（密码管理器没有「产生密码」也可以）：在开发电脑的 PowerShell 跑下面几行，印出 20 个字，存进密码管理器；要下一个就再跑最后两行。都存好后 `Remove-Variable p, b`、`cls`。
+`chatbot_reader` 不用记（只写在 B 的 `.env`，忘了就在 A 上拿掉再建），想要好记也可以：自己想 3–4 个没有关系的英文单词、第一个字母大写，后面加 4 个数字（不要空格、`-`、`_`，不要用诊所名字、人名、生日、电话，不要有 `chatbot`、`reader`）。
+
+随机产生的方法（密码管理器没有「产生密码」也可以）：在开发电脑的 PowerShell 跑下面几行，印出 20 个字，存进密码管理器；要下一个就再跑最后两行。都存好后 `Remove-Variable p, b`、`cls`。
 
 ```powershell
 $c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
@@ -158,7 +160,7 @@ $p
 **在 A 上**（第 9 步；诊所同意、病人少的时候）
 
 - [ ] A 的 Edge InPrivate 视窗照着打链接，下载 `create_readonly_login.sql`（不登入）→ 关掉视窗 → 开 PowerShell（普通视窗）`cd $HOME\Downloads` → hash 和开发电脑的一样（第 2 节）
-- [ ] 照 `sql/README.md` 第二步 2：`$pw = Read-Host …`（看着密码管理器打，和 B 的 `.env` 一样）→ `sqlcmd … -v DatabaseName="GPiS" …` → `Remove-Variable pw` → `cls`（`Read-Host` 打的字会留在画面上）
+- [ ] 照 `sql/README.md` 第二步 2（`Read-Host` 打完马上 `cls`，画面和截图都不会有密码）：`$pw = Read-Host …`（看着密码管理器打，和 B 的 `.env` 一样）→ `sqlcmd … -v DatabaseName="GPiS" …` → `Remove-Variable pw` → `cls`（`Read-Host` 打的字会留在画面上）
 - [ ] 印出的和开发电脑一样：`GRANT` 3 个、数据库层 `DENY` 14 个 + `SELECT Tbl_User`、`ReadableTablesAndViews = 2`、`OtherDatabasePermissions = 0`、最后 `完成：…`。记下 `DeniedTablesAndViews` 的数目（开发电脑是 201；GPiS 之后加了表的话会不一样）
 - [ ] 诊所同意的话，在档案总管删掉 `D:\GPiS_Backup\GPiS_copy.bak` 和那个 `.7z`：选好按 **Shift + Delete**（不经过资源回收筒，不动 A 的资源回收筒）；`D:\GPiS_Backup` 是我们建的（`gpis-database.md` 第 5 节 ⑤），删完是空的就把文件夹也删掉。**只删这两个**
 - [ ] 看一下 A 已经登出私人网盘帐号
@@ -174,9 +176,12 @@ $p
 | 4 | PostgreSQL 装到一半失败 | 记下讯息，不要换别的版本；回来问 |
 | 6 | `Activate.ps1` 不让执行，`Set-ExecutionPolicy` 也被挡 | 不用 activate：之后的指令前面都加 `.\.venv\Scripts\`（例：`.\.venv\Scripts\python.exe -m pip …`、`.\.venv\Scripts\alembic.exe upgrade head`）。自动启动不受影响（它自己用 `-ExecutionPolicy Bypass`） |
 | 6 | pip 连不上或很慢 | `Test-NetConnection pypi.org -Port 443`；通的话等一下再装一次，不通就停，回来问 |
+| 任何一步 | PowerShell 的中文变成 `?`、方块 | 英文 Windows 的 PowerShell 视窗没有中文字体：从 Microsoft Store 装 *Windows Terminal*（Microsoft Corporation，不登入），在 Terminal 里打指令；只看日志就 `notepad` |
 | 6 | `Could not open requirements file` | 不在 `backend` 里：`cd C:\Chatbot_Automation\backend`。venv 也要在 `backend\.venv`（建错地方就删掉重建） |
 | 6 | pip `UnicodeDecodeError: 'charmap' codec …` | 旧的 `requirements-lock.txt` 有中文说明（2026-10-12 改成只有 ASCII）：先 `$env:PYTHONUTF8 = "1"` 再装 |
 | 9 | 脚本第一句就停：`要用有管理权限（sysadmin）的 Windows 帐号` | 这个 Windows 帐号在 SQL Server 不是 sysadmin。以前在 A 用 `-E` 做过 `COPY_ONLY` 备份，所以先试：PowerShell 按右键 *以系统管理员身分执行*（诊所的人打密码），再跑一次。还是不行就停，**不要改用 `sa`**，回来再想 |
+| 9 | `Sqlcmd: '-v': Missing argument` | `sqlcmd` 那行被拆成两行（`-v` 后面按了 Enter）。什么都没建，整行重打 |
+| 9 | `Msg 50000 … Line 25` | 密码检查没过（要 16 个字以上、只有英文字母和数字）。什么都没建。`$pw.Length`、`$pw -match '[^A-Za-z0-9]'` 看原因（不会印出密码），换一个，B 的 `.env` 也改 |
 | 9 | `Password validation failed` | 密码不够复杂，**还没建任何东西**。密码管理器换一个（大写、小写、数字都有），B 的 `.env` 也改，再跑 |
 | 9 | `帐号 chatbot_reader 已经存在` | 不要猜是谁建的：先跑 `drop_readonly_login.sql`（经 Drive 链接下载、对 hash；`-C -f 65001`，`-v DatabaseName="GPiS"`），再跑一次 |
 | 9 | 脚本报错：`chatbot_reader 的权限不对` | 帐号建了但权限不对：马上跑 `drop_readonly_login.sql` 拿掉；把印出的权限（没有病人资料）抄下来回来问 |

@@ -1,6 +1,6 @@
 # 装到柜台电脑 B（Phase 5b 试跑，D53、D62）
 
-柜台有两台电脑：**A**（主机，SQL Server + GPiS 数据库，24 小时开着）、**B**（另一台，下班会关，W54）。
+柜台有两台电脑：**A**（主机，SQL Server + GPiS 数据库，24 小时开着）、**B**（另一台，下班有时候关、有时候不关，W54）。
 本系统装在 **B**，经局域网用只读帐号读 A 的 GPiS（D52、D60）。**A 上什么都不装**（规则 1）。
 
 **先在开发电脑照这份文件演练一次**（第 8 节），全部通过才去诊所装。
@@ -55,6 +55,7 @@
 ## 3. 在 B 上安装程序（只做一次）
 
 用员工平常登入的 Windows 帐号。
+B 是英文 Windows 的话，PowerShell 视窗显示不了中文（字体没有中文，变成 `?`、方块）：从 Microsoft Store 装 *Windows Terminal*（发行者 Microsoft Corporation，不登入），指令都在 Terminal 里打；只看日志的话用 `notepad`（第 11 节）。
 
 1. **Python**：先在 *设定 → 应用* 搜 `Python`，看 B 本来有没有别的 Python。执行 `python-3.11.9-amd64.exe`：
    - B 上**没有**别的 Python：勾 *Add python.exe to PATH*。
@@ -271,15 +272,27 @@ $LASTEXITCODE                                                        # → 0
 | 自动启动 | ✅ `install-autostart.ps1`、`Start-ScheduledTask`；`start.log` 3 行（启动、备份、uvicorn 启动） |
 | 第 7 节第 6 项 | ✅ B 的局域网 IP → `False`、`127.0.0.1` → `True` |
 | `postgres` 要密码 | ✅ `no password supplied` |
-| PowerShell 的中文 | B 是英文 Windows：脚本印的中文显示成 `?`、方块；程序本身正常，网页正常 |
+| PowerShell 的中文 | B 是英文 Windows：PowerShell 视窗的字体没有中文，脚本、Python 印的中文显示成 `?`、方块；程序本身正常，网页正常。第二天装了 Windows Terminal 解决 |
 
-还没做（第二天）：
+### 第二天（2026-10-13）
 
-- 第 7 节第 1、2 项（重开机：先请员工关 B 上的 GPiS）、第 3 项（假期 2026、2027 各 11 天，核对 Hari Raya）、第 7 项（`staff` 登入）
-- `Get-Content C:\Chatbot_Automation\VERSION.txt` 和开发电脑的 commit 一样（第一天解压前没有对 hash）
-- `start.log` 的时间（23:52）和实际时间一样吗
-- *设定 → 应用* 已经没有 *Python Install Manager*
-- 清理：B 的「下载」（zip、安装程序、`.msix`）；Google Drive 的 zip 和垃圾桶
-- 告诉员工：现在的名单是**假资料**，不能拿来发提醒；试跑等接上 A 才开始
+| 步骤 | 结果 |
+|---|---|
+| 第一天剩下的 | ✅ 重开机（先请员工关 GPiS）→ 登入画面、`start.log` 新的 3 行；时间对；假期 2026、2027 各 *Added 11 day(s)*，Hari Raya 核对过；`staff` 登入看得到名单、*Settings* 不能改；`VERSION.txt` 的 commit 和开发电脑一样；*Python Install Manager* 已经移除；B 的「下载」和 Google Drive 清好了；告诉员工那时的名单是假资料 |
+| `.sql` 带到 A | ✅ D64：开发电脑上传 Drive → A 的 InPrivate 视窗下载（不登入）→ hash 和开发电脑一样 |
+| A 建只读帐号 | ⚠️ 第三次才成功，前两次都**什么都没建**：① `sqlcmd` 那行在 `-v` 后面按了 Enter（`'-v': Missing argument`），而且 `Read-Host` 打的密码有 `-`、截图里看得到 → 那个密码作废；② `Msg 50000 … Line 25`（脚本的密码检查：要 16 个字以上、只有英文字母和数字）；③ 换成几个英文单词 + 数字的密码，`ReadableTablesAndViews = 2`、`OtherDatabasePermissions = 0`。`DeniedTablesAndViews` 没有记下 |
+| A 收尾 | ✅ 下载的 `.sql` 删了（Shift + Delete）；以前的 `COPY_ONLY` 备份 `.bak`、`.7z` 删了（诊所同意）；A 已经登出私人网盘帐号 |
+| B 接 A | ✅ `.env` 第一行填 A 的地址（照 B 的 `GPiS.exe.config` 的 `Database.Server`）和密码，拿掉 `REMINDER_SOURCE=demo` → `--check-gpis` 两个 `[OK]`。**ODBC Driver 18 连 SQL Server 2012 没有遇到 SSL / TLS 的问题**（`TrustServerCertificate=yes`，不用 `Encrypt=no`、不用 ODBC 17） |
+| 重开本系统 | ✅ `stop-chatbot.ps1` → `Start-ScheduledTask` |
+| 第 7 节第 4 项 | ✅ 2026-10-14（星期三）：Ready 13 个号码 / 13 个预约、Needs staff 0、取消和 `00:00` 都没有；GPiS 的 Appointment 画面也是 13 个，对得上。有 `*C` 的戴牙预约（3 个）都在 Ready |
+| 第 7 节第 5 项 | ✅ 员工挑一行按 *Open in WhatsApp*：WhatsApp Desktop 打开那位病人的对话、消息填好；没有按 Enter；之后按 *Mark as not sent* |
+| Windows Terminal | 装在 B（Microsoft Store，Microsoft Corporation），中文看得到了 |
+| 教员工 | ✅ 试跑开始（W42）：员工照旧用手机手动发提醒，同时看系统的名单对照 1–2 星期；试跑期间不用 *Open in WhatsApp* 发 |
 
-下次：A 的只读帐号（`sql/README.md` 第二步，`.sql` 经 Drive 链接在 A 下载，D64）→ `.env` 第一行填 A 的 IP 和密码、拿掉 `REMINDER_SOURCE=demo` → `stop-chatbot.ps1`、`Start-ScheduledTask` → `--check-gpis` → 第 7 节第 4、5 项 → 员工开始试跑（W42）。
+第二天找到的：
+
+- 主机 A 上的截图：`Read-Host` 打的字会留在画面上 → 打完马上 `cls` 再截图（`sql/README.md` 第二步）。
+- GPiS 画面的截图要遮住 HP、Remarks（规则 4）；对照只要说数目。
+- `sqlcmd` 那行是**一整行**；`-v` 后面按 Enter 会出 `'-v': Missing argument`（没有建任何东西）。
+
+B 上现在装的（给以后维护、移除时看）：python.org 的 Python 3.11.9（只给员工的帐号、没有加 PATH）、ODBC Driver 18、PostgreSQL 18、Windows Terminal、本系统（`C:\Chatbot_Automation`、工作排程器 `Chatbot_Automation`、`%LOCALAPPDATA%\Chatbot`、`%APPDATA%\postgresql\pgpass.conf`）；开了「允许超过 260 个字的路径」。B 本来就有的 Python 3.11（Store）、3.12.0、Python Launcher 没有动。

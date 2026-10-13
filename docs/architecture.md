@@ -457,7 +457,7 @@ Footer（建议加，D46）：Reply STOP to stop reminders
 
 **建议**（D46）：
 
-1. **在每天的签名表上加一句**（D55，W55 待确认）。病人每次来都要签这张表，所以**新病人、旧病人下次来的时候都签到了**，不用另外一个个去问旧病人（W40d），也有纸本记录。
+1. **在每天的签名表上加一句**（D55；诊所 2026-10-13 加了，W55）。病人每次来都要签这张表，所以**新病人、旧病人下次来的时候都签到了**，不用另外一个个去问旧病人（W40d），也有纸本记录。
    和表上现在的声明一样用马来文 + 英文（正式的要写诊所名字，由诊所 / 律师定稿）：
 
    > SAYA BERSETUJU KLINIK MENGHANTAR PERINGATAN TEMUJANJI DAN BALASAN MELALUI WHATSAPP KE NOMBOR H/P SAYA (MESEJ DIHANTAR MELALUI META). TULIS "NO WA" DI RUANGAN REMARK JIKA TIDAK BERSETUJU.
