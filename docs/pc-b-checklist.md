@@ -1,13 +1,13 @@
-# 去诊所装电脑 B：清单（5b 试跑，D53、D62、D63）
+# 去诊所装电脑 B：清单（5b 试跑，D53、D62、D63、D64）
 
 一项一项打勾。**怎么做**照 [`deploy-pc-b.md`](deploy-pc-b.md)（下面的「第 N 节」= 那份文件的第 N 节）和 [`sql/README.md`](../sql/README.md)「只读帐号」第二步；
 这份只列要准备、要带、要看、要问、要确认的事，和遇到问题怎么办。
 
 **三个原则**
 
-- **主机 A**：只跑 `create_readonly_login.sql`（建错了才跑 `drop_readonly_login.sql`），其他什么都不跑、不装、不改设定（规则 1）。
+- **主机 A**：只跑 `create_readonly_login.sql`（建错了才跑 `drop_readonly_login.sql`），其他什么都不跑、不装、不改设定（规则 1）。`.sql` 用 InPrivate 视窗下载（不登入），跑完就删（D64）。
 - **B 不合要求**：不硬装、不换没演练过的版本。记下来，回来再决定（D63：测过的版本才知道能用）。
-- 病人资料、密码不进 USB、照片、对话、仓库（规则 4、6）。在诊所的电脑上不登入自己的私人帐号（网盘、GitHub、密码管理器的网页版）。
+- 病人资料、密码不进 Google Drive、照片、对话、仓库（规则 4、6）。在诊所的电脑上不登入自己的私人帐号（网盘、GitHub、密码管理器的网页版）。
 
 ## 0. 密码一览
 
@@ -23,11 +23,20 @@
 
 - **只用英文字母和数字**：`DATABASE_URL`、`pgpass.conf` 不能有 `@ : / ? # %`；只读帐号的脚本只收字母和数字。
 - **大写、小写、数字都要有**：A 的 Windows 密码规则可能要求（脚本用 `CHECK_POLICY = ON`）。
-- 20–24 个字，**不用容易看错的 `0 O 1 l I`**：要看着手机一个个打。
+- 20–24 个字，**不用容易看错的 `0 O 1 l I`**：要看着密码管理器一个个打。
+
+产生的方法（密码管理器没有「产生密码」也可以）：在开发电脑的 PowerShell 跑下面几行，印出 20 个字，存进密码管理器；要下一个就再跑最后两行。都存好后 `Remove-Variable p, b`、`cls`。
+
+```powershell
+$c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+do { $b = New-Object byte[] 20; $rng.GetBytes($b); $p = -join ($b | ForEach-Object { $c[$_ % $c.Length] }) } until ($p -cmatch '[A-Z]' -and $p -cmatch '[a-z]' -and $p -match '\d')
+$p
+```
 
 ## 1. 出发前（开发电脑）
 
-先在桌面建一个文件夹 `ToClinic`，下面的东西都先放这里，第 2 节再一起放进 USB。
+**不用 USB**（D64）：zip 和 `.sql` 经 Google Drive 链接带过去（第 2 节）；安装程序到了在 B 上从官网下载。
 
 **和诊所约好**
 
@@ -38,41 +47,26 @@
 
 **程序**
 
-- [ ] `git checkout main`、`git pull`；`git log -1 --oneline` 是 `4390d15` 或更新的（这份清单合并后会多一个只改文件的 commit，用它也一样）；`git status` 干净
+- [ ] `git checkout main`、`git pull`；`git log -1 --oneline` 和 GitHub 上的 `main` 一样；`git status` 干净
 - [ ] `backend`：`pytest` 全部通过、没有 skipped；`frontend`：`npm test` 通过
-- [ ] `.\deploy\make-package.ps1` → 桌面的 `chatbot-<commit>.zip`，搬进 `ToClinic\B\`；记下 `<commit>`
+- [ ] `.\deploy\make-package.ps1` → 桌面的 `chatbot-<commit>.zip`；记下 `<commit>` 和 hash 的前 8 个字：`(Get-FileHash "$HOME\Desktop\chatbot-*.zip").Hash.Substring(0,8)`
 - [ ] 解压到暂时的文件夹看一次：有 `frontend\dist\index.html`、`backend\.env.example`、`backend\requirements-lock.txt`、`deploy\` 的 4 个 `.ps1`、`sql\create_readonly_login.sql`；**没有** `.env`、`.dump`、`.bak`、`.7z`。看完删掉那个暂时的文件夹
 
-**安装程序**（只从官网下载，放进 `ToClinic\B\`；下载后右键 → *内容* → *数位签章*，看发行者对不对）
+**安装程序**（到了在 B 上直接从官网下载；下载后右键 → *内容* → *数位签章*，看发行者对不对）
 
-- [ ] Python **3.11.9**，Windows installer (64-bit)（Python Software Foundation）
+- [ ] Python **3.11.9**，Windows installer (64-bit)（Python Software Foundation）：`https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe`，**不是** python.org 首页的 *Python install manager*（`.msix`）
 - [ ] PostgreSQL **18.x**，Windows x86-64，EDB installer（EnterpriseDB）。和开发电脑、演练一样是 18
-- [ ] ODBC Driver **18** for SQL Server，x64（Microsoft）。顺便在开发电脑 *设定 → 应用程式* 看装的是哪个版本，记下来
-- [ ] 备用，放 `ToClinic\B\备用\`（第 4 节出问题才装，平常不装）：
-  - Visual C++ Redistributable x64（`vc_redist.x64.exe`，Microsoft）：ODBC 装不上、说少了 Visual C++ 时用
-  - ODBC Driver **17** for SQL Server，x64（Microsoft）：B 连 A 出现 SSL / TLS 错误时用（A 是 SQL Server 2012，和 Driver 18 可能谈不拢加密）
+- [ ] ODBC Driver **18** for SQL Server，x64（Microsoft）
+- [ ] 出问题才下载（第 4 节「遇到问题」）：Visual C++ Redistributable x64（`vc_redist.x64.exe`，ODBC 说少了 Visual C++ 时）、ODBC Driver **17** for SQL Server x64（B 连 A 出现 SSL / TLS 错误时；A 是 SQL Server 2012）
+- [ ] B 要连得到网络（2026-10-12 确认过：`pypi.org` 通）
 
-**套件，备用：B 没有网络、或 pip 很慢时用**
+**给 A 的档案**
 
-- [ ] 在仓库的 `backend`（开发电脑是 Windows + Python 3.11.9，下载的就是 B 要的那种安装档）：
-  ```powershell
-  python -m pip download -r requirements-lock.txt -d "$HOME\Desktop\ToClinic\B\wheels" --only-binary=:all:
-  ```
-- [ ] 试一次只用这些档案装得起来（不连网络）：
-  ```powershell
-  python -m venv "$env:TEMP\wheeltest"
-  & "$env:TEMP\wheeltest\Scripts\python.exe" -m pip install --no-index --find-links "$HOME\Desktop\ToClinic\B\wheels" -r requirements-lock.txt
-  Remove-Item -Recurse -Force "$env:TEMP\wheeltest"
-  ```
-  → `Successfully installed …`，没有 `No matching distribution`
-
-**给 A 的两个档案**
-
-- [ ] 从仓库（最新的 `main`）复制 `sql\create_readonly_login.sql`、`sql\drop_readonly_login.sql` 到 `ToClinic\A\`。zip 里也有，但 A 上不解压 zip
+- [ ] 从最新的 `main` 记下 `sql\create_readonly_login.sql` 的 hash 前 8 个字：`(Get-FileHash .\sql\create_readonly_login.sql).Hash.Substring(0,8)`。`drop_readonly_login.sql` 也记（建错要重来才用）
 
 **密码、笔记**
 
-- [ ] 密码管理器先产生 `postgres`（B）、`chatbot`（B）、`chatbot_reader` 三个（照第 0 节），标清楚是哪一台的哪一个。手机**不连网络**也要打得开
+- [ ] 密码管理器先产生 `postgres`（B）、`chatbot`（B）、`chatbot_reader` 三个（照第 0 节），标清楚是哪一台的哪一个（例：`B-postgres`、`B-chatbot`、`A-chatbot_reader`）
 - [ ] 自己的笔记（不进仓库）准备 `.env` 里不是密码的几项：`REMINDER_CLINIC_NAME`、`REMINDER_CLINIC_NAME_EN`、`REMINDER_BRANCH`（照员工现在发的提醒的原文，D47）；`<主机A的IP>`（2026-10-09 在 B 的 `GPiS.exe.config` 看过，到了再看一次）
 - [ ] Admin Platform 的帐号名单：谁拿 ADMIN、几位员工、各人的用户名（只有名字；密码各人到时自己打）
 
@@ -85,27 +79,18 @@
 
 - [ ] 进度里还没做的：清理网盘中转文件（删除 + 清空回收站）
 
-## 2. USB
+## 2. 传档案（Google Drive，不用 USB，D64）
 
-- [ ] 先把 USB **格式化**（以前可能放过 GPiS 的备份，格式化最干净）
-- [ ] 把 `ToClinic` 里的 `A`、`B` 复制进去，**只有这些**：
-
-```
-USB\
-├─ B\                            ← 只插在电脑 B
-│  ├─ chatbot-<commit>.zip
-│  ├─ python-3.11.9-amd64.exe
-│  ├─ postgresql-18.x-windows-x64.exe
-│  ├─ msodbcsql.msi              （ODBC Driver 18）
-│  ├─ wheels\                    （备用：不连网络装套件）
-│  └─ 备用\                       vc_redist.x64.exe、ODBC Driver 17 的 msodbcsql.msi
-└─ A\                            ← 插到 A 只为了跑这个
-   ├─ create_readonly_login.sql
-   └─ drop_readonly_login.sql    （只有建错、要重来时用）
-```
-
-- [ ] **不能放**：任何 `.env`；密码（也不写在纸上带去）；GPiS 的备份（`.bak`、`.7z`）；`GPiS_Dev` 查出来的东西；`%LOCALAPPDATA%\Chatbot\backup` 的 `.dump`（有病人资料）；截图
-- [ ] **回来时** USB 里不能多出东西：B 的备份、日志、`.env` 都不复制到 USB（规则 4、6）
+- [ ] **只上传这些**，到了诊所、要下载之前才上传：
+  - 给 B：`chatbot-<commit>.zip`
+  - 给 A：`create_readonly_login.sql`（建错要重来才传 `drop_readonly_login.sql`）
+- [ ] 共用设成「知道链接的任何人」、检视者
+- [ ] 下载：B / A 的 Edge **InPrivate 视窗**照着打链接 → 下载 → 关掉视窗。**不登入 Google 或任何帐号**
+- [ ] 对 hash：`(Get-FileHash <档名>).Hash.Substring(0,8)` 和开发电脑的一样。不一样就不要用，删掉重新下载
+- [ ] 下载完**马上**删掉 Drive 里的档案、清空 Drive 的垃圾桶
+- [ ] B：zip 解压后 `Unblock-File`（`deploy-pc-b.md` 第 3 节第 5 步），再删掉「下载」里的 zip。A：`.sql` 跑完就删（Shift + Delete）
+- [ ] **不能上传**：任何 `.env`；密码；GPiS 的备份（`.bak`、`.7z`）；`GPiS_Dev` 查出来的东西；`%LOCALAPPDATA%\Chatbot\backup` 的 `.dump`（有病人资料）；截图
+- [ ] **反过来也不行**：B 的备份、日志、`.env` 都不上传、不复制出来（规则 4、6）
 
 ## 3. 到了先看、先问（还没装任何东西）
 
@@ -127,7 +112,7 @@ USB\
 | 硬盘 | 档案总管 → `C:` | 至少 5 GB 空的 |
 | 能不能装程序 | 问诊所 | 有人会打系统管理员密码 |
 | 时间 | 右下角的时间；`Get-TimeZone` | 时间对，时区 `(UTC+08:00) Kuala Lumpur, Singapore`（系统用 UTC 换算「明天」，时间错了名单的日期就错） |
-| 网络 | `Test-NetConnection pypi.org -Port 443` | `TcpTestSucceeded : True`（`False` 就用 USB 的 `wheels\`） |
+| 网络 | `Test-NetConnection pypi.org -Port 443` | `TcpTestSucceeded : True`（`False` = 下载不了 zip、安装程序、套件） |
 | port 8000、5432 | `Get-NetTCPConnection -LocalPort 8000,5432 -State Listen -ErrorAction SilentlyContinue` | 什么都没印 = 空着 |
 | 有没有别的 Python、PostgreSQL | `python --version`；`Get-Service postgresql*` | 「找不到 Python」/ 打开 Microsoft Store = 没有；`Get-Service` 什么都没印 = 没有 |
 | A 的 IP | B 的 GPiS 文件夹里的 `GPiS.exe.config`，只看 `Database.Server` | 和笔记一样；`sa`、密码那几行不看（规则 5） |
@@ -142,9 +127,9 @@ USB\
 | 内存刚好 4 GB | 可以装。装好后 GPiS、WhatsApp、浏览器都开着，看 *工作管理员 → 效能 → 记忆体*；常常在 90% 以上就和诊所讨论 |
 | `C:` 不到 5 GB | 不要自己删诊所的档案；告诉诊所，下次再装 |
 | 没有人会打系统管理员密码 | 今天只看、只问（加上第 4 节 A 的清理，如果诊所同意）；约下次 |
-| 没有网络 | 照装，第 3 节第 5 步的 `pip install` 换成：`pip install --no-index --find-links <USB>:\B\wheels -r requirements-lock.txt` |
+| 没有网络 | 今天不装：zip、安装程序、套件都要从网络下载（D64）。告诉诊所，回来再想 |
 | port 8000 或 5432 已经有程序在用 | 停下来。`Get-Process -Id (Get-NetTCPConnection -LocalPort 8000 -State Listen).OwningProcess`（5432 一样）记下程序名字，**不要关掉它**。8000 写在 `start-chatbot.ps1`、备份也用 5432，要改程序，回来做 |
-| 已经有别的 Python 或 PostgreSQL | 不要动它、不要移除。停下来，回来问 |
+| 已经有别的 Python 或 PostgreSQL | 都不要动、不要移除。Python：python.org 的 3.11.9 装在旁边、**不加 PATH**，venv 用完整路径建（`deploy-pc-b.md` 第 3 节第 1、5 步；2026-10-12 的 B 就是这样）。PostgreSQL：停下来，回来问 |
 | 时间或时区不对 | 不要自己改（GPiS 也用这个时间）；告诉诊所，改好再装 |
 | 没有 WhatsApp Desktop，或登入的不是诊所的号码 | 系统照装（试跑对照名单用不到它）；第 7 节第 5 项跳过、记下。**不用自己的号码登入**。要装的话由诊所用诊所的手机连结（linked device，W58） |
 | 防毒软件挡住安装或脚本 | 记下讯息，**不要关掉防毒**；回来问 |
@@ -156,13 +141,13 @@ USB\
 | # | 哪台 | 做什么 | 照 | 大约 |
 |---|---|---|---|---|
 | 1 | B | 第 3 节看过、问过，都合要求 | 上面 | 15 分钟 |
-| 2 | B | 装 Python 3.11.9（勾 *Add python.exe to PATH*）→ **开新的 PowerShell** → `python --version` = `Python 3.11.9` | 第 3 节第 1 步 | 5 分钟 |
+| 2 | B | 装 python.org 的 Python 3.11.9（B 上已经有别的 Python 就**不勾** *Add python.exe to PATH*）→ `& "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe" --version` = `Python 3.11.9` | 第 3 节第 1 步 | 5 分钟 |
 | 3 | B | 装 ODBC Driver 18 → `Get-OdbcDriver` 看得到它；GPiS 原来的 driver 也还在、不动 | 第 3 节第 2 步 | 5 分钟 |
 | 4 | B | 装 PostgreSQL 18（只选 *PostgreSQL Server*、*Command Line Tools*；`postgres` 的密码；port `5432`；防火墙不允许公用网络）→ psql 建 `chatbot` role 和数据库 | 第 3 节第 3 步 | 15–20 分钟 |
 | 5 | B | `pgpass.conf` → `psql … -w` 印出 `chatbot` | 第 3 节第 4 步 | 5 分钟 |
-| 6 | B | 解压到 `C:\Chatbot_Automation` → venv → `pip install -r requirements-lock.txt` → `.env`（先加 `REMINDER_SOURCE=demo`；`PWD=` 先空着） | 第 3 节第 5 步、第 4 节 | 20–30 分钟 |
+| 6 | B | 解压到 `C:\Chatbot_Automation` → **在 `backend` 里**用完整路径建 venv（`sys.base_prefix` 没有 `WindowsApps`）→ `pip install -r requirements-lock.txt` → `.env`（先加 `REMINDER_SOURCE=demo`；`PWD=` 先空着） | 第 3 节第 5 步、第 4 节 | 20–30 分钟 |
 | 7 | B | 确认数据库名字是 `chatbot` → `alembic upgrade head`（`0004`）→ seed → ADMIN、STAFF 帐号（各人自己打密码）→ 假资料的名单印得出来。**不跑** `app.db.demo` | 第 5 节 | 15–20 分钟 |
-| 8 | B | `notepad .env`，看着手机把 `chatbot_reader` 的密码打在 `PWD=` 后面，存档 | `sql/README.md` 第二步 1 | 5 分钟 |
+| 8 | B | `notepad .env`，看着密码管理器把 `chatbot_reader` 的密码打在 `PWD=` 后面，存档 | `sql/README.md` 第二步 1 | 5 分钟 |
 | 9 | **A** | 下面的「在 A 上」 | `sql/README.md` 第二步 2 | 10–15 分钟 |
 | 10 | B | `.env` 拿掉 `REMINDER_SOURCE=demo` → `python -m app.reminders_cli --check-gpis` 两个 `[OK]` → `python -m app.reminders_cli` 明天的名单，和 GPiS 的 Appointment 画面对照人数 | 第 5 节「接主机 A」 | 20–30 分钟 |
 | 11 | B | 自动启动 → 第 7 节 1–7 项。第 1 项要重开机：**先请员工关掉 B 上的 GPiS** | 第 6、7 节 | 30–40 分钟 |
@@ -172,28 +157,31 @@ USB\
 
 **在 A 上**（第 9 步；诊所同意、病人少的时候）
 
-- [ ] 插 USB，开 PowerShell（普通视窗），`cd` 到 USB 的 `A` 文件夹（例：`cd E:\A`）。**不复制任何档案到 A**
-- [ ] 照 `sql/README.md` 第二步 2：`$pw = Read-Host …`（看着手机打，和 B 的 `.env` 一样）→ `sqlcmd … -v DatabaseName="GPiS" …` → `Remove-Variable pw` → `cls`（`Read-Host` 打的字会留在画面上）
+- [ ] A 的 Edge InPrivate 视窗照着打链接，下载 `create_readonly_login.sql`（不登入）→ 关掉视窗 → 开 PowerShell（普通视窗）`cd $HOME\Downloads` → hash 和开发电脑的一样（第 2 节）
+- [ ] 照 `sql/README.md` 第二步 2：`$pw = Read-Host …`（看着密码管理器打，和 B 的 `.env` 一样）→ `sqlcmd … -v DatabaseName="GPiS" …` → `Remove-Variable pw` → `cls`（`Read-Host` 打的字会留在画面上）
 - [ ] 印出的和开发电脑一样：`GRANT` 3 个、数据库层 `DENY` 14 个 + `SELECT Tbl_User`、`ReadableTablesAndViews = 2`、`OtherDatabasePermissions = 0`、最后 `完成：…`。记下 `DeniedTablesAndViews` 的数目（开发电脑是 201；GPiS 之后加了表的话会不一样）
 - [ ] 诊所同意的话，在档案总管删掉 `D:\GPiS_Backup\GPiS_copy.bak` 和那个 `.7z`：选好按 **Shift + Delete**（不经过资源回收筒，不动 A 的资源回收筒）；`D:\GPiS_Backup` 是我们建的（`gpis-database.md` 第 5 节 ⑤），删完是空的就把文件夹也删掉。**只删这两个**
 - [ ] 看一下 A 已经登出私人网盘帐号
-- [ ] 关掉 PowerShell → 退出 USB → 拔掉
+- [ ] 删掉「下载」里的 `create_readonly_login.sql`（Shift + Delete）→ 关掉 PowerShell；Drive 的档案删了、垃圾桶清空
 
 **遇到问题**
 
 | 第几步 | 看到 | 怎么办 |
 |---|---|---|
-| 2 | 新开的 PowerShell，`python --version` 还不是 3.11.9 | B 有别的 Python 排在前面：venv 用完整路径建，`& "<安装程序最后显示的位置>\python.exe" -m venv .venv`（之后 venv 里的就是 3.11.9） |
-| 3 | ODBC 装不上，说少了 Visual C++ | 装 `备用\vc_redist.x64.exe`，再装一次 ODBC |
+| 2 | `python --version` 是 3.11.9，但 `(Get-Command python).Source` 有 `WindowsApps` | 那是 Microsoft Store 的 Python，不能用（`deploy-pc-b.md` 第 3 节第 1 步）。装 `python-3.11.9-amd64.exe`，venv 用完整路径建 |
+| 2 | 下载到的是 `.msix`，跳出 *Python installation manager configuration helper* | 拿错了档案。问题都答 `N`，*设定 → 应用* 移除 *Python Install Manager*（只移除它），改下载 `python-3.11.9-amd64.exe` |
+| 3 | ODBC 装不上，说少了 Visual C++ | 在 B 从 Microsoft 网站下载 `vc_redist.x64.exe` 装，再装一次 ODBC |
 | 4 | PostgreSQL 装到一半失败 | 记下讯息，不要换别的版本；回来问 |
 | 6 | `Activate.ps1` 不让执行，`Set-ExecutionPolicy` 也被挡 | 不用 activate：之后的指令前面都加 `.\.venv\Scripts\`（例：`.\.venv\Scripts\python.exe -m pip …`、`.\.venv\Scripts\alembic.exe upgrade head`）。自动启动不受影响（它自己用 `-ExecutionPolicy Bypass`） |
-| 6 | pip 连不上或很慢 | `pip install --no-index --find-links <USB>:\B\wheels -r requirements-lock.txt` |
+| 6 | pip 连不上或很慢 | `Test-NetConnection pypi.org -Port 443`；通的话等一下再装一次，不通就停，回来问 |
+| 6 | `Could not open requirements file` | 不在 `backend` 里：`cd C:\Chatbot_Automation\backend`。venv 也要在 `backend\.venv`（建错地方就删掉重建） |
+| 6 | pip `UnicodeDecodeError: 'charmap' codec …` | 旧的 `requirements-lock.txt` 有中文说明（2026-10-12 改成只有 ASCII）：先 `$env:PYTHONUTF8 = "1"` 再装 |
 | 9 | 脚本第一句就停：`要用有管理权限（sysadmin）的 Windows 帐号` | 这个 Windows 帐号在 SQL Server 不是 sysadmin。以前在 A 用 `-E` 做过 `COPY_ONLY` 备份，所以先试：PowerShell 按右键 *以系统管理员身分执行*（诊所的人打密码），再跑一次。还是不行就停，**不要改用 `sa`**，回来再想 |
 | 9 | `Password validation failed` | 密码不够复杂，**还没建任何东西**。密码管理器换一个（大写、小写、数字都有），B 的 `.env` 也改，再跑 |
-| 9 | `帐号 chatbot_reader 已经存在` | 不要猜是谁建的：先跑 `drop_readonly_login.sql`（`-C -f 65001`，`-v DatabaseName="GPiS"`），再跑一次 |
+| 9 | `帐号 chatbot_reader 已经存在` | 不要猜是谁建的：先跑 `drop_readonly_login.sql`（经 Drive 链接下载、对 hash；`-C -f 65001`，`-v DatabaseName="GPiS"`），再跑一次 |
 | 9 | 脚本报错：`chatbot_reader 的权限不对` | 帐号建了但权限不对：马上跑 `drop_readonly_login.sql` 拿掉；把印出的权限（没有病人资料）抄下来回来问 |
 | 10 | *Login failed for user 'chatbot_reader'* | `.env` 和 A 上打的不一样：A 上跑 `drop_readonly_login.sql`，从第 8 步重来（`sql/README.md` 第二步 4） |
-| 10 | SSL / TLS 的错误（`SSL Provider`、`certificate`、`TLS`、`encryption` 之类） | A 是 SQL Server 2012，和 ODBC Driver 18 可能谈不拢加密。**A 什么都不改**，只在 B 试：① 抄下完整的错误讯息（没有密码）；② `.env` 的连线字符串加 `Encrypt=no;`，再 `--check-gpis`（局域网里不加密，和 B 上的 GPiS 现在一样）；③ 还不行：装 `备用\` 的 ODBC Driver 17，`DRIVER={ODBC Driver 17 for SQL Server}`，再试；④ 还不行：停在这里，`.env` 加回 `REMINDER_SOURCE=demo`，告诉员工先不用，回来问。A 的帐号可以留着（只读得到那两个），诊所不想留就跑 `drop_readonly_login.sql`。②、③ 有用的话记下来（回来要写进文件） |
+| 10 | SSL / TLS 的错误（`SSL Provider`、`certificate`、`TLS`、`encryption` 之类） | A 是 SQL Server 2012，和 ODBC Driver 18 可能谈不拢加密。**A 什么都不改**，只在 B 试：① 抄下完整的错误讯息（没有密码）；② `.env` 的连线字符串加 `Encrypt=no;`，再 `--check-gpis`（局域网里不加密，和 B 上的 GPiS 现在一样）；③ 还不行：在 B 从 Microsoft 网站下载 ODBC Driver 17 装，`DRIVER={ODBC Driver 17 for SQL Server}`，再试；④ 还不行：停在这里，`.env` 加回 `REMINDER_SOURCE=demo`，告诉员工先不用，回来问。A 的帐号可以留着（只读得到那两个），诊所不想留就跑 `drop_readonly_login.sql`。②、③ 有用的话记下来（回来要写进文件） |
 | 10 | 名单的人数和 GPiS 不一样 | 先看是不是 `00:00`、取消的、*Needs staff* 里的（D50、D51、D57）。还是不一样：记下日期、时间、医生、`AppointmentID`（**不记名字、号码**），回来对照 |
 | 11 | 重开机后网页打不开 | 看 `%LOCALAPPDATA%\Chatbot\logs\` 的 `start.log`、最新的 `uvicorn-*.log` 最后几行（`backup-error.log` 是备份的）；改了什么就 `stop-chatbot.ps1` → `Start-ScheduledTask -TaskName Chatbot_Automation` |
 
@@ -219,7 +207,7 @@ Python、PostgreSQL、ODBC 留着不影响 GPiS；诊所要移除的话在 *设�
 **主机 A**
 
 - [ ] A 的 GPiS 照常（员工确认）
-- [ ] A 上没有留下我们的东西：脚本从 USB 跑、PowerShell 关了、USB 拔了；`COPY_ONLY` 的 `.bak`、`.7z` 删了（诊所同意的话）
+- [ ] A 上没有留下我们的东西：下载的 `.sql` 删了、PowerShell 关了；`COPY_ONLY` 的 `.bak`、`.7z` 删了（诊所同意的话）
 - [ ] A 已经登出私人网盘帐号
 
 **员工**
@@ -233,7 +221,7 @@ Python、PostgreSQL、ODBC 留着不影响 GPiS；诊所要移除的话在 *设�
 
 **带回来、记下来**（不含密码、IP、病人资料）
 
-- [ ] USB 里没有多出东西
+- [ ] Google Drive 里的档案删了、垃圾桶清空了
 - [ ] B 的规格（Windows 版本、内存、硬盘）、装的版本（Python、PostgreSQL、ODBC）、安装包的 commit
 - [ ] A 上脚本的结果：`DeniedTablesAndViews`、`ReadableTablesAndViews`、`OtherDatabasePermissions`
 - [ ] 第 7 节 1–7 项的结果；遇到的问题和怎么解决的（例：有没有用 `Encrypt=no`、ODBC 17）

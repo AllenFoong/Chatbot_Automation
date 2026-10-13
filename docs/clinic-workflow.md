@@ -327,6 +327,6 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 
 | # | 问题 | 为什么要问 |
 |---|---|---|
-| W58 | 电脑 B 有没有装 WhatsApp Desktop、登入的是诊所的号码吗？员工现在用哪台电脑 / 手机发提醒？ | *Open in WhatsApp* 会打开**按的那台电脑**上的 WhatsApp Desktop（D54、D62）；B 上没有的话要装、用诊所的号码连结（linked device） |
+| W58 | 电脑 B 有没有装 WhatsApp Desktop、登入的是诊所的号码吗？员工现在用哪台电脑 / 手机发提醒？ | *Open in WhatsApp* 会打开**按的那台电脑**上的 WhatsApp Desktop（D54、D62）；B 上没有的话要装、用诊所的号码连结（linked device）。**已知**（2026-10-12 在 B 上看）：有 WhatsApp Desktop，登入的是诊所的号码；还没问员工现在用哪台发 |
 | W55 | 签名表的声明下面加一句 WhatsApp 的同意（马来文 + 英文，例句见 `architecture.md` 8.8），不同意的病人在 Remark 写 `NO WA`：可以吗？签名表是谁印的、多久印一次？ | 病人每次来都签这张表，新、旧病人都会签到（D55） |
 | W54 | 柜台另一台电脑：试跑之后可以一直装着本系统吗？下班可以不关机吗？ | 那台下班会关：关机时收不到病人的回复，Phase 6 的 AI 晚上也不能回（`architecture.md` 9.4） |
