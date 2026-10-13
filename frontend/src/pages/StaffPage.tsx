@@ -4,7 +4,7 @@
 import { useState, type FormEvent } from "react";
 import * as api from "../api";
 import { useUser } from "../auth";
-import { Badge, ErrorBox, Loading } from "../components";
+import { Badge, ErrorBox, Loading, PageHeader } from "../components";
 import { useAction, useLoad } from "../hooks";
 import type { Role, StaffMember } from "../types";
 
@@ -23,8 +23,8 @@ function ResetPasswordForm({ member, onDone }: { member: StaffMember; onDone: ()
     <form className="inline" onSubmit={submit}>
       <input type="password" aria-label={`New password for ${member.username}`} placeholder="New password"
         autoComplete="new-password" minLength={MIN_PASSWORD} value={password} onChange={(e) => setPassword(e.target.value)} required />
-      <button type="submit" className="primary" disabled={action.busy}>Set password</button>
-      <button type="button" onClick={onDone}>Cancel</button>
+      <button type="submit" className="primary small" disabled={action.busy}>Set password</button>
+      <button type="button" className="small" onClick={onDone}>Cancel</button>
       <ErrorBox message={action.error} />
     </form>
   );
@@ -40,23 +40,23 @@ function StaffRow({ member, isMe, onChanged }: { member: StaffMember; isMe: bool
 
   return (
     <tr className={member.active ? undefined : "off"}>
-      <td>{member.username}{isMe && <span className="muted"> (you)</span>}</td>
+      <td><strong>{member.username}</strong>{isMe && <span className="muted"> (you)</span>}</td>
       <td>{member.name}</td>
       <td><Badge kind={member.role}>{member.role}</Badge></td>
       <td>{member.active ? <Badge kind="ok">Active</Badge> : <Badge kind="closed">Inactive</Badge>}</td>
-      <td>
+      <td className="cell-actions">
         {resetting ? (
           <ResetPasswordForm member={member} onDone={() => setResetting(false)} />
         ) : (
-          <div className="actions">
-            <button type="button" disabled={action.busy}
+          <div className="row-actions">
+            <button type="button" className="small" disabled={action.busy}
               onClick={() => {
                 const role: Role = member.role === "ADMIN" ? "STAFF" : "ADMIN";
                 void update(`Change ${member.username} to ${role}?`, { role });
               }}>
               Make {member.role === "ADMIN" ? "staff" : "admin"}
             </button>
-            <button type="button" disabled={action.busy}
+            <button type="button" className={member.active ? "small danger-text" : "small"} disabled={action.busy}
               onClick={() =>
                 update(
                   member.active
@@ -67,7 +67,7 @@ function StaffRow({ member, isMe, onChanged }: { member: StaffMember; isMe: bool
               }>
               {member.active ? "Deactivate" : "Activate"}
             </button>
-            <button type="button" onClick={() => setResetting(true)}>Reset password</button>
+            <button type="button" className="small" onClick={() => setResetting(true)}>Reset password</button>
           </div>
         )}
         <ErrorBox message={action.error} />
@@ -99,11 +99,13 @@ function AddStaffForm({ onAdded }: { onAdded: () => void }) {
 
   return (
     <form className="card inline-form" onSubmit={submit}>
-      <h3>Add a staff account</h3>
-      <p className="muted small">
-        Give the first password to the person directly (not by WhatsApp group). They can change it under their name
-        at the top right.
-      </p>
+      <div className="card-title">
+        <h3>Add a staff account</h3>
+        <p>
+          Give the first password to the person directly (not by WhatsApp group). They can change it under their name
+          at the bottom left.
+        </p>
+      </div>
       <div className="fields">
         <label>
           Username
@@ -116,8 +118,8 @@ function AddStaffForm({ onAdded }: { onAdded: () => void }) {
         <label>
           Role
           <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-            <option value="STAFF">STAFF – conversations and requests</option>
-            <option value="ADMIN">ADMIN – also settings and accounts</option>
+            <option value="STAFF">Staff</option>
+            <option value="ADMIN">Admin (settings, accounts)</option>
           </select>
         </label>
         <label>
@@ -138,27 +140,32 @@ export default function StaffPage() {
 
   return (
     <div className="page">
-      <h1>Staff accounts</h1>
+      <PageHeader
+        title="Staff accounts"
+        description="Who can log in. Leavers are deactivated, not deleted. Admins can also change settings and accounts."
+      />
       <ErrorBox message={list.error} onRetry={list.reload} />
       {list.data === undefined ? (
         list.loading && <Loading />
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>Name</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.data.map((m) => (
-              <StaffRow key={`${m.id}-${m.role}-${m.active}`} member={m} isMe={m.id === me.id} onChanged={list.reload} />
-            ))}
-          </tbody>
-        </table>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th aria-label="Actions"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.data.map((m) => (
+                <StaffRow key={`${m.id}-${m.role}-${m.active}`} member={m} isMe={m.id === me.id} onChanged={list.reload} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       <AddStaffForm onAdded={list.reload} />
     </div>

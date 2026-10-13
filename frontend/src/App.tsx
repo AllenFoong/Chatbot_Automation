@@ -1,12 +1,14 @@
-// 画面的外框：没登录 → 登录画面；登录了 → 上面一排选单 + 各个页面。
+// 画面的外框：没登录 → 登录画面；登录了 → 左边的选单 + 各个页面。
 // 选单里的 Staff accounts 只有 ADMIN 看得到。注意：这只是方便，真正挡住的是后端（STAFF 呼叫会得到 403）。
+// 打开网页先到 Reminders：现在员工每天用的是提醒名单（D65）；对话、预约请求要等 5c、AI 才有资料。
 
 import { useEffect } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router";
 import * as api from "./api";
 import { useAuth, useUser } from "./auth";
-import { ErrorBox, Loading } from "./components";
+import { APP_NAME, Avatar, ErrorBox, Loading, PageHeader } from "./components";
 import { useLoad } from "./hooks";
+import { BellIcon, ChatIcon, ClipboardIcon, LogOutIcon, SlidersIcon, ToothIcon, UsersIcon } from "./icons";
 import AccountPage from "./pages/AccountPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import LoginPage from "./pages/LoginPage";
@@ -39,31 +41,59 @@ function Layout() {
 
   return (
     <div className="app">
-      <header className="topbar">
-        <span className="brand">Clinic Admin</span>
-        <nav aria-label="Main">
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="brand-mark">
+            <ToothIcon size={20} />
+          </span>
+          <span className="brand-text">
+            <span className="brand-name">{APP_NAME}</span>
+            <span className="brand-sub">Front desk</span>
+          </span>
+        </div>
+        <nav className="nav" aria-label="Main">
+          <span className="nav-label">Daily work</span>
+          <NavLink to="/reminders">
+            <BellIcon />
+            Reminders
+          </NavLink>
           <NavLink to="/conversations">
+            <ChatIcon />
             Conversations {counts && counts.human > 0 && <span className="count">{counts.human}</span>}
           </NavLink>
           <NavLink to="/requests">
+            <ClipboardIcon />
             Requests {counts && counts.pending > 0 && <span className="count">{counts.pending}</span>}
           </NavLink>
-          <NavLink to="/reminders">Reminders</NavLink>
-          <NavLink to="/settings">Settings</NavLink>
-          {isAdmin && <NavLink to="/staff">Staff accounts</NavLink>}
-        </nav>
-        <div className="who">
-          <NavLink to="/account" title="My account">
-            {user.name} <span className="muted">({user.role})</span>
+          <span className="nav-label">Clinic setup</span>
+          <NavLink to="/settings">
+            <SlidersIcon />
+            Settings
           </NavLink>
-          <button type="button" onClick={() => void logout()}>
+          {isAdmin && (
+            <NavLink to="/staff">
+              <UsersIcon />
+              Staff accounts
+            </NavLink>
+          )}
+        </nav>
+        <div className="sidebar-footer">
+          <NavLink to="/account" className="user-chip" title="My account">
+            <Avatar name={user.name} />
+            <span className="user-text">
+              <span className="user-name">{user.name}</span>
+              <span className="user-role">{user.role === "ADMIN" ? "Admin" : "Staff"} · My account</span>
+            </span>
+          </NavLink>
+          <button type="button" className="logout" onClick={() => void logout()}>
+            <LogOutIcon />
             Log out
           </button>
         </div>
-      </header>
+      </aside>
       <main>
         <Routes>
-          <Route path="/" element={<Navigate to="/conversations" replace />} />
+          <Route path="/" element={<Navigate to="/reminders" replace />} />
           <Route path="/conversations" element={<ConversationsPage />} />
           <Route path="/conversations/:id" element={<ConversationsPage />} />
           <Route path="/requests" element={<RequestsPage />} />
@@ -72,9 +102,20 @@ function Layout() {
           <Route path="/settings/:section" element={<SettingsPage />} />
           <Route path="/staff" element={isAdmin ? <StaffPage /> : <Navigate to="/" replace />} />
           <Route path="/account" element={<AccountPage />} />
-          <Route path="*" element={<p>Page not found.</p>} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
+    </div>
+  );
+}
+
+function NotFound() {
+  return (
+    <div className="page">
+      <PageHeader title="Page not found" description="This address does not exist in Clinic Admin." />
+      <p>
+        <NavLink to="/reminders">Go to Reminders</NavLink>
+      </p>
     </div>
   );
 }

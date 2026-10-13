@@ -73,59 +73,63 @@ function ScheduleEditor({ doctor, canEdit }: { doctor: Doctor; canEdit: boolean 
 
   return (
     <div className="card">
-      <h3>Weekly schedule – {doctor.display_name}</h3>
-      <p className="muted small">
-        "Last slot" is the last time a 30-minute appointment can start. Slots from "break start" up to (not
-        including) "break end" cannot be booked.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Day</th>
-            <th>Working</th>
-            <th>Start</th>
-            <th>Last slot</th>
-            <th>Break start</th>
-            <th>Break end</th>
-          </tr>
-        </thead>
-        <tbody>
-          {days.map((d) => {
-            const name = weekdayName(d.weekday);
-            const off = !d.is_working;
-            return (
-              <tr key={d.weekday} className={off ? "off" : undefined}>
-                <td>{name}</td>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={`${name} working`}
-                    checked={d.is_working}
-                    disabled={!canEdit}
-                    onChange={(e) => update(d.weekday, { is_working: e.target.checked })}
-                  />
-                </td>
-                <td>
-                  <TimeSelect label={`${name} start`} value={d.start_time} disabled={!canEdit || off}
-                    onChange={(v) => update(d.weekday, { start_time: v })} />
-                </td>
-                <td>
-                  <TimeSelect label={`${name} last slot`} value={d.last_slot} disabled={!canEdit || off}
-                    onChange={(v) => update(d.weekday, { last_slot: v })} />
-                </td>
-                <td>
-                  <TimeSelect label={`${name} break start`} value={d.break_start} disabled={!canEdit || off} optional
-                    onChange={(v) => update(d.weekday, { break_start: v })} />
-                </td>
-                <td>
-                  <TimeSelect label={`${name} break end`} value={d.break_end} disabled={!canEdit || off} optional
-                    onChange={(v) => update(d.weekday, { break_end: v })} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div className="card-title">
+        <h3>Weekly schedule – {doctor.display_name}</h3>
+        <p>
+          "Last slot" is the last time a 30-minute appointment can start. Slots from "break start" up to (not
+          including) "break end" cannot be booked.
+        </p>
+      </div>
+      <div className="table-wrap flat">
+        <table>
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Working</th>
+              <th>Start</th>
+              <th>Last slot</th>
+              <th>Break start</th>
+              <th>Break end</th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((d) => {
+              const name = weekdayName(d.weekday);
+              const off = !d.is_working;
+              return (
+                <tr key={d.weekday} className={off ? "off" : undefined}>
+                  <td>{name}</td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`${name} working`}
+                      checked={d.is_working}
+                      disabled={!canEdit}
+                      onChange={(e) => update(d.weekday, { is_working: e.target.checked })}
+                    />
+                  </td>
+                  <td>
+                    <TimeSelect label={`${name} start`} value={d.start_time} disabled={!canEdit || off}
+                      onChange={(v) => update(d.weekday, { start_time: v })} />
+                  </td>
+                  <td>
+                    <TimeSelect label={`${name} last slot`} value={d.last_slot} disabled={!canEdit || off}
+                      onChange={(v) => update(d.weekday, { last_slot: v })} />
+                  </td>
+                  <td>
+                    <TimeSelect label={`${name} break start`} value={d.break_start} disabled={!canEdit || off} optional
+                      onChange={(v) => update(d.weekday, { break_start: v })} />
+                  </td>
+                  <td>
+                    <TimeSelect label={`${name} break end`} value={d.break_end} disabled={!canEdit || off} optional
+                      onChange={(v) => update(d.weekday, { break_end: v })} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       {canEdit && problems.length > 0 && (
         <ul className="error" role="alert">
           {problems.map((p) => (
@@ -180,14 +184,14 @@ function DoctorRow({ doctor, canEdit, selected, onSelect, onChanged }: {
 
   return (
     <tr className={selected ? "selected" : undefined}>
-      <td>{doctor.id}</td>
+      <td><strong>{doctor.id}</strong></td>
       {editing ? (
         <td colSpan={2}>
           <form className="inline" onSubmit={save}>
             <input aria-label="Display name" value={name} onChange={(e) => setName(e.target.value)} required />
             <input aria-label="Remark tag" value={tag} onChange={(e) => setTag(e.target.value)} size={4} maxLength={5} />
-            <button type="submit" className="primary" disabled={action.busy}>Save</button>
-            <button type="button" onClick={() => setEditing(false)}>Cancel</button>
+            <button type="submit" className="primary small" disabled={action.busy}>Save</button>
+            <button type="button" className="small" onClick={() => setEditing(false)}>Cancel</button>
           </form>
           <ErrorBox message={action.error} />
         </td>
@@ -198,16 +202,20 @@ function DoctorRow({ doctor, canEdit, selected, onSelect, onChanged }: {
         </>
       )}
       <td>{doctor.active ? <Badge kind="ok">Active</Badge> : <Badge kind="closed">Inactive</Badge>}</td>
-      <td className="actions">
-        <button type="button" onClick={onSelect} disabled={selected}>Schedule</button>
-        {canEdit && !editing && (
-          <>
-            <button type="button" onClick={() => setEditing(true)}>Edit</button>
-            <button type="button" onClick={toggleActive} disabled={action.busy}>
-              {doctor.active ? "Deactivate" : "Activate"}
-            </button>
-          </>
-        )}
+      <td className="cell-actions">
+        <div className="row-actions">
+          <button type="button" className="small" onClick={onSelect} disabled={selected}>
+            {selected ? "Schedule shown" : "Schedule"}
+          </button>
+          {canEdit && !editing && (
+            <>
+              <button type="button" className="small" onClick={() => setEditing(true)}>Edit</button>
+              <button type="button" className={doctor.active ? "small danger-text" : "small"} onClick={toggleActive} disabled={action.busy}>
+                {doctor.active ? "Deactivate" : "Activate"}
+              </button>
+            </>
+          )}
+        </div>
         {!editing && <ErrorBox message={action.error} />}
       </td>
     </tr>
@@ -238,8 +246,10 @@ function AddDoctorForm({ onAdded }: { onAdded: (id: string) => void }) {
 
   return (
     <form className="card inline-form" onSubmit={submit}>
-      <h3>Add a doctor</h3>
-      <p className="muted small">The new doctor starts with every day off. Set the working days in the schedule.</p>
+      <div className="card-title">
+        <h3>Add a doctor</h3>
+        <p>The new doctor starts with every day off. Set the working days in the schedule.</p>
+      </div>
       <div className="fields">
         <label>
           GPiS DoctorID
@@ -274,23 +284,25 @@ export default function DoctorsSection({ canEdit }: { canEdit: boolean }) {
       ) : list.length === 0 ? (
         <Empty>No doctors yet.</Empty>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Remark tag</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((d) => (
-              <DoctorRow key={`${d.id}-${d.display_name}-${d.remark_tag}-${d.active}`} doctor={d} canEdit={canEdit}
-                selected={d.id === selected?.id} onSelect={() => setSelectedId(d.id)} onChanged={doctors.reload} />
-            ))}
-          </tbody>
-        </table>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Remark tag</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((d) => (
+                <DoctorRow key={`${d.id}-${d.display_name}-${d.remark_tag}-${d.active}`} doctor={d} canEdit={canEdit}
+                  selected={d.id === selected?.id} onSelect={() => setSelectedId(d.id)} onChanged={doctors.reload} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {selected && <ScheduleEditor key={selected.id} doctor={selected} canEdit={canEdit} />}
       {canEdit && (

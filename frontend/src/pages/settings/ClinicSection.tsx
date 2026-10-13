@@ -39,14 +39,18 @@ export default function ClinicSection({ canEdit }: { canEdit: boolean }) {
 
   const choices = [1, 2, 3];
   return (
-    <form className="card inline-form" onSubmit={submit}>
+    <form className="card inline-form settings-form" onSubmit={submit}>
+      <div className="card-title">
+        <h3>Slot limits</h3>
+        <p>How many patients can share one 30-minute slot, and the clinic's own contact in GPiS.</p>
+      </div>
       <label>
         Patients per slot (at most)
         <select value={form.max_per_slot} disabled={!canEdit} onChange={(e) => change({ max_per_slot: Number(e.target.value) })}>
           {choices.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
       </label>
-      <p className="muted small">The 3rd place is only for short treatments ("Can be 3rd") and only when the slots next to it are not full.</p>
+      <p className="help">The 3rd place is only for short treatments ("Can be 3rd") and only when the slots next to it are not full.</p>
 
       <label>
         Patients per slot the AI may book (at most)
@@ -54,14 +58,14 @@ export default function ClinicSection({ canEdit }: { canEdit: boolean }) {
           {choices.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
       </label>
-      <p className="muted small">Set to 2 to keep the 3rd place for staff only.</p>
+      <p className="help">Set to 2 to keep the 3rd place for staff only.</p>
 
       <label>
         Clinic's own ContactID in GPiS
         <input type="number" min={1} value={form.clinic_contact_id} disabled={!canEdit}
           onChange={(e) => change({ clinic_contact_id: Number(e.target.value) })} required />
       </label>
-      <p className="muted small">Appointments under this contact (other than OFF DAY) mark the day for staff review.</p>
+      <p className="help">Appointments under this contact (other than OFF DAY) mark the day for staff review.</p>
 
       <ErrorBox message={action.error} />
       {canEdit && (
