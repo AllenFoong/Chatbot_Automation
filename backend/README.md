@@ -669,6 +669,8 @@ pytest                        # 应该 272 passed，没有 skipped
 云端容器（2026-10-14，假资料）：`npm test` 48 passed（新的测试在旧的程序上会失败）；`npm run build` 成功；
 headless Chromium 照上面第 2、3 项点过（PR #23 的版本也重现过这个问题）。
 
+开发电脑（2026-10-14，假资料）：第 1–3 项全部通过（`npm test` 48 passed；切分页回来还是 *Opened* / *Not sent*，上方的数目对）。
+
 ## 资料保留（A10）：提醒过了 90 天就删掉
 
 设计见 `docs/decisions.md` D67、`docs/architecture.md` A10。

@@ -104,7 +104,7 @@
 - [x] A10：开发电脑测试 10 项全部通过（2026-10-13，Windows PowerShell 5.1；记录见 `backend/README.md`）：`0005 (head)`、`pytest` 316 个、`npm test` 47 个；没有 pgpass 时备份失败、不清理；有了之后先备份再删 1 条、40 天前的假备份删了、`reminder_stats` 累加成 `2 | 1 | 4`；`no-store`；已经清理干净。找到：开发电脑的 `psql` 不在 PATH（用完整路径 `$psql`）、过了半夜 `CURRENT_DATE` 会变 → 清单改了
 - [x] A10（D67）和开发电脑的测试记录合并进 `main`（PR #26）
 - [x] B 的 uvicorn 日志「留最新 14 个」其实没有在删：删的那一行在 uvicorn 停了之后，关机、`stop-chatbot.ps1` 都会连脚本一起停掉、轮不到 → 改成**启动前**删（`deploy/start-chatbot.ps1`）；PowerShell 7 用假档案跑过脚本里的那一段（20 个旧的、启动 4 次 → 剩 14 个）；开发电脑 Windows PowerShell 5.1 试过（2026-10-14：20 个假日志 → 启动一次剩 14 个，最旧的是 `0908`）；合并进 `main`（PR #27）
-- [ ] 开发电脑找到：按了 *Open in WhatsApp* → *Needs staff* 分页 → 回 *Ready*，卡片变回 *To send*（*Refresh* 才对；后端有记下来，是画面的问题）→ 按过的结果改放在整个页面、不放在卡片里（`RemindersPage.tsx`）；没有改后端、没有改表；云端 `npm test` 48 个，headless Chromium 照步骤点过（记录见 `backend/README.md`）；要在开发电脑测试（3 项）
+- [x] 开发电脑找到：按了 *Open in WhatsApp* → *Needs staff* 分页 → 回 *Ready*，卡片变回 *To send*（*Refresh* 才对；后端有记下来，是画面的问题）→ 按过的结果改放在整个页面、不放在卡片里（`RemindersPage.tsx`）；没有改后端、没有改表；云端 `npm test` 48 个，headless Chromium 照步骤点过（记录见 `backend/README.md`）；开发电脑测试 3 项全部通过（2026-10-14）；要合并（PR #28）
 
 ## 下一步
 
