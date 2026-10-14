@@ -790,7 +790,11 @@ implant、denture、RCT、crown、bridge 的后续步骤、要 1 hour 的，AI �
    - 员工按之前要**先在 GPiS 输入**：先按的话，中间那几分钟 `PENDING` 不算、GPiS 还没有，别人可能约走那一格。
 4. 一个 GPiS 预约只能对上**一个**请求：两个请求都对得上同一个预约（例：同一位病人重复请求）→ 都不自动，留给员工。
 5. *Reject*、病人取消 → 马上不算。员工很久没处理的 `PENDING`：照样算占用（宁可少推荐），Requests 页面显示「等了多久」。
-6. **确认消息和 24 小时规则**：病人最后一条消息超过 24 小时（例：晚上约、隔天才处理），WhatsApp 只能发**送审过的模板**。要再送审一个 utility 模板（`appointment_confirmed`，每条约 RM0.06–0.07），或那种情况改成提醒员工自己通知病人（W63 一起问）。
+6. **确认消息和 24 小时规则**（D70）：病人最后一条消息超过 24 小时（例：晚上约、隔天才处理），WhatsApp 只能发送审过的模板 → **不送审模板，由员工自己通知**：
+   - 请求照样变 `CONFIRMED`，Requests 页面标出 ***Confirmed – please tell the patient (over 24 hours)***，上面有「要通知：N 个」。
+   - 那一行有 *Open in WhatsApp*（确认的文字已经填好，像提醒那样，D54）；员工也可以用手机传。传了按 ***Patient told ✓***，那一行才消失。
+   - 员工忘了的话：病人还是会收到**预约前一天的提醒**（提醒名单读 GPiS，D41），不会完全不知道。
+   - 不用送审、不用钱；代价是员工多做一步。
 
 - 只改 `availability.py`（多加一个「本系统的请求」来源）；`sql/check_available_slots.sql` 是只读 GPiS 的参考 SQL，这一层不放进去。
 - 提醒名单（D41）不受影响：只看 GPiS。
