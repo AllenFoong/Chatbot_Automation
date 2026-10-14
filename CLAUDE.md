@@ -109,6 +109,7 @@
 - [x] 5c 的比较（2026-10-14，D68）：**提醒继续手动**，不为提醒接 5c（省的时间不够付费用）；5c 等 Phase 6 的 AI 才接，选只给 API、支持 Coexistence 的 BSP；不自己当 Tech Provider（要验证自己的公司）；全部用诊所的名义，开发者当管理员；刚开始不做商家验证（要的时候用 SSM + 水电费单 / 银行月结单）；Coexistence 之后 B 的 WhatsApp for Windows 不支持
 - [x] Phase 6 设计草稿（只有文件，没有程序）：`docs/architecture.md` 第 11 节（AI 推荐时段、员工先输入 GPiS 再按 *Confirm*；A8 的做法；工具只回最少资料；转员工的情况；病人资料和 AI 公司 A11；默认 Claude Opus 5.5 和费用粗估；分 6a–6d）；要问诊所 W61–W71；病人传了 IC / 护照号码：存之前遮掉后面 6 位、留生日（D69），要问 W72；员工在 GPiS 输入后，系统营业时间每 3 分钟自动找（同病人、同日、同时段、同医生）→ `CONFIRMED` + 自动通知病人，新病人、改了时间的员工按 *Entered in GPiS ✓*；超过 24 小时系统传不了的，页面标「要通知」，员工自己通知后按 *Patient told ✓*（D70）
 - [x] Phase 6 设计、D68–D70 合并进 `main`（PR #30）
+- [x] Phase 6a-1 初版：病人传的 IC / 护照号码，webhook 存之前遮掉后面 6 位（`backend/app/redact.py`，D69）；没有改表、不用更新 B；云端 `pytest` 351 个（新增 35 个，全部假号码）
 
 ## 下一步
 
@@ -116,7 +117,7 @@
 2. 画面整理（D66，PR #23）：B 已经更新（2026-10-13）。和第 1 项一起，一两个星期后问员工新画面（卡片、☰）好不好用。画面还是英文（D24）。
 3. A10（D67）：B 已经是 `0005`（2026-10-14）。问诊所 W60（90 天可以吗）。B 2027-01-13 之前每次都是 `删了 0 条`；那之后看一次 `start.log`，确认第一次真的删了。
 4. 更新电脑 B：照 `docs/deploy-pc-b.md` 第 9 节（zip 经 Google Drive 链接、对 hash，D64）；更新前先在开发电脑跑过测试。B 上**不跑测试**，读的是主机 A 的正式资料。第一版模板没有按钮（D48）；真的用 Cloud API 发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
-5. Phase 6（AI）：先看设计草稿（`docs/architecture.md` 第 11 节），整理 W61–W71 的中英问卷请老板回答，照回答改设计，再从 6a（A8 + 工具，不接 AI）开始写程序。提醒继续手动（D68）；5c 等 AI 要上线才接（BSP + Coexistence，老板签约）。
+5. Phase 6（AI）：6a-1（遮证件号码）开发电脑测试（`backend/README.md`「Phase 6a-1」5 项）→ 合并；接着 6a-2（A8：`PENDING` 算占用 + 每 3 分钟找 GPiS 的预约，D70）、6a-3（工具）。同时整理 W61–W72 的中英问卷请老板回答；6b（接 AI）要等 W62。提醒继续手动（D68）；5c 等 AI 要上线才接（BSP + Coexistence，老板签约）。
 6. A1：B 经局域网用只读帐号读 A，已经通了（2026-10-13）。B 下班有时候关（W54）：Phase 6 之前决定长期放哪里（`docs/architecture.md` 9.4）。
 7. 假期：B 已经导入 2026、2027 年（2026-10-13）。2028 年的在 2027 年底前导入、核对回教节日的日期（D61）；诊所临时休息的日子 `admin` 自己加。
 8. A8（还没录入 GPiS 的请求要算占用）是 Phase 6 的第一步（6a），建议的做法在 `docs/architecture.md` 11.6。

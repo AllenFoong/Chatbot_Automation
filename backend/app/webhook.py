@@ -5,6 +5,7 @@
 - 同一条消息 Meta 可能送两次：record_incoming_message 用 wa_message_id 去重。
 - 处理失败（例如数据库连不上）回 500，Meta 会再送一次；处理好了回 200。
 - 还没有 AI（Phase 6）：新对话直接交给员工（D37）。
+- 病人传的 IC / 护照号码：存之前先遮掉后面 6 位（D69，app/redact.py）。
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from .config import WhatsAppSettings, ai_replies_enabled, get_whatsapp_settings
 from .db import conversations as conv
 from .db.models import ConversationMode
 from .db.session import get_session
+from .redact import mask_id_numbers
 from .whatsapp import parse_webhook, valid_signature
 
 log = logging.getLogger(__name__)
@@ -72,7 +74,7 @@ def receive(
     for m in messages:
         try:
             message, is_new = conv.record_incoming_message(
-                session, m.wa_phone, m.body, m.wa_message_id, profile_name=m.profile_name
+                session, m.wa_phone, mask_id_numbers(m.body), m.wa_message_id, profile_name=m.profile_name
             )
         except ValueError:
             log.warning("看不懂的号码，不处理这条消息（%s）", m.wa_message_id)

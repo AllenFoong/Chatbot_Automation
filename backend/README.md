@@ -8,6 +8,7 @@
 - **Phase 5a**：接上 WhatsApp Cloud API：收病人的消息（webhook）、员工在 Admin Platform 回复、显示送达状态。开发时只用 Meta 的测试号码。
 - **Phase 5b**（第一步）：预约提醒的名单（只看名单）+ *Open in WhatsApp*，见下面「Phase 5b」。
 - **资料保留（A10）**：提醒过了预约日期 90 天就删掉、只留每天的数目，见最后的「资料保留（A10）」。
+- **Phase 6a-1**：病人传的 IC / 护照号码存之前遮掉后面 6 位（D69），见最后的「Phase 6a-1」。
 
 | 文件 | 内容 |
 |---|---|
@@ -24,6 +25,7 @@
 | `app/db/reminders.py` | `reminders` 表、号码的 opt-out：员工对提醒做过的事（名单本身不存） |
 | `app/reminders_cli.py` | 在终端印出名单的摘要（没有名字、号码）；`--check-gpis` 检查 GPiS 的栏位 |
 | `app/reminder_demo.py` | 提醒的假资料（`REMINDER_SOURCE=demo`），不连 GPiS 也能试画面 |
+| `app/redact.py` | 病人传的 IC / 护照号码：存之前遮掉后面 6 位（D69） |
 | `app/db/retention.py`、`app/retention.py` | 资料保留（A10、D67）：删掉预约日期过了 90 天的提醒、只留每天的数目（`python -m app.retention`） |
 | `app/webhook.py`、`app/webhook_main.py` | 收 WhatsApp webhook 的小程序（port 8001），开发时只有它经 tunnel 放上网 |
 | `app/db/create_staff.py` | 建员工账号（第一个 ADMIN 用这个建） |
@@ -798,3 +800,43 @@ DELETE FROM reminder_stats WHERE appointment_date = CURRENT_DATE - 100;
 - 开发电脑的 `psql` 不在 PATH（`The term 'psql' is not recognized`）→ 用 `$psql` 完整路径（`start-chatbot.ps1` 自己找 `pg_dump.exe`，不受影响）。
 - 先确认 `psql -w` 连得上，再跑脚本：pgpass 没设好时备份会失败，清理也不会做（第 8 项的情况）。
 - 测到半夜 12 点前后：`CURRENT_DATE` 会变，改用写出来的日期。
+
+## Phase 6a-1：遮证件号码（D69）
+
+设计见 `docs/decisions.md` D69、`docs/architecture.md` 11.7。
+
+- 病人在 WhatsApp 传的 **IC / 护照号码**，webhook 收到时**存进数据库之前**先遮掉后面 6 位（`app/redact.py`）。
+  数据库、Admin Platform（以后的 AI）都只看得到遮过的。
+- 马来西亚 IC 留前面 6 位（生日）：`900101-01-1234` → `900101-**-****`（`-`、空格照留）。
+- 新加坡 NRIC / FIN、护照：遮后面 6 个字，`S1234567A` → `S12******`、`A12345678` → `A12******`。
+- 前面有 `IC`、`NRIC`、`MyKad`、`passport`、`护照`、`身份证`、`KP` 的号码：格式认不出来也遮后面 6 个字。
+- 日期、时间、牙位、疗程代码、普通的电话号码不遮；遮两次结果一样（不会把生日也遮掉）。
+- 没有改表、没有改网页；电脑 B 不收 WhatsApp，**不用更新 B**。以前存的消息不会改（开发时只有假资料）。
+
+### 更新（开发电脑）
+
+在 `backend` 里（先启用 venv）：
+
+```powershell
+git fetch origin claude/patient-data-retention-a10-e77qwk
+git checkout claude/patient-data-retention-a10-e77qwk
+git pull
+pytest                        # 应该 351 passed，没有 skipped
+```
+
+### 6a-1 完成的条件（在开发电脑上测试）
+
+第 2–4 项要用 Phase 5a 的 Meta 测试号码（视窗 1–3：Admin API、webhook、cloudflared，见「Phase 5a」的「使用」）。cloudflared 重开后要改 Meta 的 *Callback URL*；token 有问题先跑 `python -m app.whatsapp_check`。
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的「更新」 | 351 passed、没有 skipped |
+| 2 | 用**自己的手机**传给测试号码（**假号码**）：`我的IC是 900101-01-1234，passport A12345678` | — |
+| 3 | Admin Platform → *Conversations* → 那段对话 | `我的IC是 900101-**-****，passport A12******` |
+| 4 | psql（`$psql`，见「资料保留完成的条件」）：`SELECT count(*) FROM messages WHERE body LIKE '%01-1234%' OR body LIKE '%A12345678%';` | `0` |
+| 5 | 视窗 2（webhook）的日志 | 没有消息内容、没有号码 |
+
+### 云端容器的测试记录（2026-10-14，PostgreSQL 16、Python 3.11、只用假资料）
+
+- `pytest` → 351 passed（新增 35 个：IC 有 `-` / 没有 / 空格、马来文和中文的句子、新加坡 NRIC / FIN、护照、各种关键字、两个号码、不该遮的（日期、时间、牙位、疗程代码、电话、`clinic`、太短的）、遮两次结果一样、webhook 存进数据库的是遮过的）。
+- 写的时候找到、已经改好：有关键字的规则一开始在格式规则之后跑，会把已经遮过的 `900101-**-****` 的生日也遮掉 → 改成先跑关键字、而且后面接着 `*` 的不再遮。
