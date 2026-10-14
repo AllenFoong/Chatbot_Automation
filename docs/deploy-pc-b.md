@@ -235,9 +235,15 @@ Windows PowerShell 5.1、Python 3.11.9、PostgreSQL 18.6、`GPiS_Dev`（`chatbot
    改名前关掉**其他**开在这个文件夹里的东西：别的 PowerShell / Terminal 视窗和分页（例如还在 `(.venv)` 的）、文件总管、从里面打开的记事本。
    `Access to the path ... is denied` = 还有程序在用它：`resmon` → *CPU* → *Associated Handles* 搜 `Chatbot_Automation` 看是哪个程序；
    **改名没有成功就停在这里，不要解压**（2026-10-13 在 B 上：改名失败后照样解压，第 11 节「更新到 PR #23」）。
-3. 先确认 `Test-Path C:\Chatbot_Automation` 是 `False`（旧的已经改名），再解压新的到 `C:\Chatbot_Automation`、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
-4. `alembic upgrade head`（最近一次启动时的备份就是改表之前的那一份；要退回见第 10 节）；`python -m app.retention --dry-run` 看会删几条（只看、不删）。
-   有改表的更新（例：A10 的 `0005`）在**当天的提醒发完之后**才做：还原用的是开机那份备份，之后按的 *Open in WhatsApp* 还原后会不见。
+3. 先确认 `Test-Path C:\Chatbot_Automation` 是 `False`（旧的已经改名；是 `True` 就停下来，先查里面是什么），再解压新的到 `C:\Chatbot_Automation`、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
+4. 先 `alembic current` 记下现在是哪一版。有改表的话，改表前**再手动备份一次**（开机那份没有今天按过的 *Open in WhatsApp*，退回时员工会看不到今天发过谁）：
+   ```powershell
+   $pgDump = (Get-ChildItem "C:\Program Files\PostgreSQL\*\bin\pg_dump.exe" | Select-Object -First 1).FullName
+   & $pgDump -h localhost -U chatbot -w -Fc -f "$env:LOCALAPPDATA\Chatbot\backup\chatbot-$(Get-Date -Format 'yyyyMMdd-HHmm').dump" chatbot
+   $LASTEXITCODE                                        # → 0
+   ```
+   然后 `alembic upgrade head`（要退回见第 10 节，用上面那一份）；`python -m app.retention --dry-run` 看会删几条（只看、不删）。
+   有改表的更新（例：A10 的 `0005`）在**当天的提醒发完之后**才做：万一要退回，员工当天不用在一半的时候停下来；手动备份之后才按的 *Open in WhatsApp* 还原后会不见。
 5. `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。没问题再删 `.old`。
 
 ## 10. 还原备份（更新失败、数据库坏了）
@@ -322,4 +328,27 @@ B 上现在装的（给以后维护、移除时看）：python.org 的 Python 3.
 
 - 改名前要关掉所有开在 `C:\Chatbot_Automation` 里的视窗；改名失败就停下来，不要解压（第 9 节已经加上，`resmon` 可以查是谁在用）。
 - 这次是「直接盖在原来的文件夹」也没问题，因为只改网页（`.env`、`.venv` 不在 zip 里，不会被盖）。有改表、改套件版本的更新一定要照第 9 节：先改名留 `.old`，重新建 venv。
+
+### 更新到 `4f8935b`（2026-10-14，切分页的修正 + uvicorn 日志的修正 + A10）
+
+开发电脑做的 `chatbot-4f8935b.zip`：做安装包时开发电脑还在 PR #28 的分支上（测试那个修正），不是合并后的 `main`（`92e23aa`）。
+两个只差 `CLAUDE.md`、`backend/README.md` 三行字，B 用到的程序、网页、migration 完全一样，所以照用。经 Google Drive 链接下载到 B（D64）。
+
+| 步骤 | 结果 |
+|---|---|
+| hash | ✅ `B5E6AA13`，和开发电脑一样 |
+| 旧文件夹改名成 `.old` | ✅；`.old` 的 `VERSION.txt` = `commit afb06e8, 2026-10-13 23:51`（不是记录上的 `16655f6`，见下面） |
+| 解压前 `Test-Path C:\Chatbot_Automation` | ⚠️ `True`（应该是 `False`），照样解压了。解压没有出现 *already exists*、新文件夹没有旧的 `.venv`；对过数目：文件夹的档案 = zip 的档案 + 1（`.env`）→ 那时是空的文件夹。为什么会有，不知道 |
+| 解压、`.env` | ✅ `VERSION.txt` = `commit 4f8935b, 2026-10-14 14:16`；`.env` 从 `.old` 复制 |
+| venv | ✅ 重新建（Python 3.11.9），`pip install -r requirements-lock.txt` |
+| `alembic current` | `0005 (head)`：**改表之前就已经是 `0005`**，`upgrade head` 什么都没做 |
+| `--dry-run`、`--check-gpis` | ✅ 0 条；两个 `[OK]` |
+| 启动 | ✅ `start.log`：`备份：…chatbot-20261014-1459.dump` → `清理：预约日期在 2026-07-16 之前的提醒删了 0 条…不用再留的号码删了 0 个` → `uvicorn 启动`；uvicorn 日志 11 个（没有超过 14 个，这次不用删） |
+| 清理 | ✅ `.old`、下载的 zip 删了 |
+
+这次找到的：
+
+- **B 在 PR #23 之后、这次之前，已经装过 A10（`afb06e8`）、改过表（`0005`），没有记录**：什么时候、怎么装的已经查不到。之后每次更新都要记下来（日期、zip 的名字、hash、`alembic current` 前后）。
+- 做安装包前先确认开发电脑在 `main` 的最新版（`git checkout main`、`git pull`）：这次是在测试用的分支上做的，碰巧程序一样。
+- 第 9 节加了：改表前先 `alembic current`、再手动备份一次；解压前 `Test-Path` 是 `True` 就停下来。
 
