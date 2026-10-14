@@ -105,7 +105,7 @@
 - [x] A10（D67）和开发电脑的测试记录合并进 `main`（PR #26）
 - [x] B 的 uvicorn 日志「留最新 14 个」其实没有在删：删的那一行在 uvicorn 停了之后，关机、`stop-chatbot.ps1` 都会连脚本一起停掉、轮不到 → 改成**启动前**删（`deploy/start-chatbot.ps1`）；PowerShell 7 用假档案跑过脚本里的那一段（20 个旧的、启动 4 次 → 剩 14 个）；开发电脑 Windows PowerShell 5.1 试过（2026-10-14：20 个假日志 → 启动一次剩 14 个，最旧的是 `0908`）；合并进 `main`（PR #27）
 - [x] 5c 的比较（2026-10-14，D68）：**提醒继续手动**，不为提醒接 5c（省的时间不够付费用）；5c 等 Phase 6 的 AI 才接，选只给 API、支持 Coexistence 的 BSP；不自己当 Tech Provider（要验证自己的公司）；全部用诊所的名义，开发者当管理员；刚开始不做商家验证（要的时候用 SSM + 水电费单 / 银行月结单）；Coexistence 之后 B 的 WhatsApp for Windows 不支持
-- [x] Phase 6 设计草稿（只有文件，没有程序）：`docs/architecture.md` 第 11 节（AI 推荐时段、员工先输入 GPiS 再按 *Confirm*；A8 的做法；工具只回最少资料；转员工的情况；病人资料和 AI 公司 A11；默认 Claude Opus 5.5 和费用粗估；分 6a–6d）；要问诊所 W61–W71
+- [x] Phase 6 设计草稿（只有文件，没有程序）：`docs/architecture.md` 第 11 节（AI 推荐时段、员工先输入 GPiS 再按 *Confirm*；A8 的做法；工具只回最少资料；转员工的情况；病人资料和 AI 公司 A11；默认 Claude Opus 5.5 和费用粗估；分 6a–6d）；要问诊所 W61–W71；病人传了 IC / 护照号码：存之前遮掉后面 6 位、留生日（D69），要问 W72
 
 ## 下一步
 
