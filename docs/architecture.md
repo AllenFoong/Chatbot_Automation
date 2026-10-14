@@ -708,7 +708,7 @@ implant、denture、RCT、crown、bridge 的后续步骤、要 1 hour 的，AI �
 | ③ AI 自己确认 | 马上确定 | 只要在 GPiS 输入 | 员工忘了输入 = GPiS 没有这个预约，别人会约到同一格；病人以为约好了 |
 
 **建议 ②**：和 D6 一样，GPiS 照旧是正本、员工把关。
-员工按 *Confirm* 后，系统自动发一句确认给病人（24 小时内，不用模板）；员工按 *Reject* 要写原因，AI 或员工再跟病人另约。
+员工在 GPiS 输入后，系统 3 分钟内自动找到、改成 `CONFIRMED`、通知病人（D70，11.6）；找不到的（新病人、改了时间）员工按 *Entered in GPiS ✓*。员工按 *Reject* 要写原因，AI 或员工再跟病人另约。
 上线几个月、员工几乎不用改 AI 的请求之后，再讨论 `OR` 这种固定的复诊能不能改成 ③。
 
 ### 11.3 一段对话怎么走
@@ -741,6 +741,7 @@ implant、denture、RCT、crown、bridge 的后续步骤、要 1 hour 的，AI �
 | `find_patients()` | 用**这段对话的号码**找病人（不能查别的号码） | 每位一个代号 + 名字；没有 NRIC、Remarks、病历 |
 | `get_treatment_doctor(patient, service)` | 多步骤疗程找原来的医生（W9、D16） | 医生代号 |
 | `check_available_slots(date, service, doctor?)` | 现在的空档计算（`availability.py`）+ 还没录入 GPiS 的请求（A8） | 只有 AI 可以推荐的时段（`ai_can_book`、`max_per_slot_for_ai`）；不回其他病人的任何资料 |
+| `find_next_available(service, doctor?, from_date)` | 病人要的那天满了：往后找最近几天有空的（最多看 14 天） | 最近 3 天、每天几个时段；AI 照这个推荐，**不推荐没有空位的时间** |
 | `create_appointment_request(patient, service, doctor, date, slot)` | 再查一次那个时段还有没有、疗程能不能由 AI 约、日期在今天之后 60 天内 → `PENDING` | 请求编号 |
 | `hand_over_to_human(reason)` | 转员工（已经有） | — |
 
@@ -764,19 +765,36 @@ implant、denture、RCT、crown、bridge 的后续步骤、要 1 hour 的，AI �
 
 转员工时写原因（`handover_reason`，给员工看），告诉病人「员工会回复你」，之后 AI 不再回这段对话（D22）。
 
-### 11.6 还没录入 GPiS 的请求要算占用（A8）
+### 11.6 还没录入 GPiS 的请求要算占用（A8）、自动找到 GPiS 的预约（D70）
 
+请求建在**本系统**（`PENDING` 名单），真正的预约由员工在 **GPiS** 做（D5、D6）。「`PENDING` 算占用」= 查空档时，还在名单上的请求也当作那一格有人。
 不算的话：AI 把 10:00 推荐给病人 A，员工还没录入 GPiS 之前，病人 B 来问，10:00 还是空的。
 
-**建议的做法**：
+**例子**（PHANG 21/10 10:00 本来 2 人）：
 
-1. `PENDING` 的请求**算占用**（和 GPiS 的预约一起算人数），直到员工处理。
-2. 员工的步骤改成：**先在 GPiS 输入，再按 *Confirm***。按了 *Confirm* 就不再另外算（GPiS 已经有那个预约了），不用把请求和 GPiS 的预约对上。
-3. *Reject*、病人取消 → 马上不算。
-4. 员工很久没处理的 `PENDING`：照样算占用（宁可少推荐），Requests 页面显示「等了多久」。
+| 时间 | 发生什么 | GPiS 里 10:00 | `PENDING` | 系统算的人数 |
+|---|---|---|---|---|
+| 09:00 | AI 帮 A 建请求 | 2 | A | 2 + 1 = **3**（满） |
+| 09:05 | B 来问 10:00 | 2 | A | 3 → AI 不推荐 10:00 给 B |
+| 09:30 | 员工在 GPiS 帮 A 输入 10:00 | **3** | A | 3 + 1 = 4（多算，只是少推荐） |
+| 09:33 内 | 系统每 3 分钟查 GPiS，找到了 → A 变 `CONFIRMED`，**不再另外算**，自动通知病人 | 3 | — | **3** |
+
+**做法**：
+
+1. `PENDING` 的请求**算占用**（和 GPiS 的预约一起算人数），直到变成别的状态。
+2. **系统每 3 分钟查一次 GPiS**（D70，只在营业时间 9:00–17:30）：只读那几个请求日期的预约。
+   找到「**同一位病人**（`customers.gpis_contact_id` = GPiS 的 `ContactID`）、**同一天、同一个时段、同一位医生**、算病人的预约（不是 `Canceled` / `Postpone`）」→ 请求自动变 `CONFIRMED`（`handled_by` 空 = 系统；记下 `gpis_appointment_id`），**马上自动发确认给病人**，日期、时间、医生照 GPiS 写的。
+3. 找不到就一直是 `PENDING`，员工按 ***Entered in GPiS ✓***（备用的按钮）：
+   - **新病人**（本系统还没有他的 `ContactID`，GPiS 的名字写法也可能不一样）：一律由员工按。
+   - 员工约成**别的时间**（和请求不一样）：系统不当作是同一个，员工按的时候改成 GPiS 上的时间，确认消息照那个时间发。
+   - 员工按之前要**先在 GPiS 输入**：先按的话，中间那几分钟 `PENDING` 不算、GPiS 还没有，别人可能约走那一格。
+4. 一个 GPiS 预约只能对上**一个**请求：两个请求都对得上同一个预约（例：同一位病人重复请求）→ 都不自动，留给员工。
+5. *Reject*、病人取消 → 马上不算。员工很久没处理的 `PENDING`：照样算占用（宁可少推荐），Requests 页面显示「等了多久」。
+6. **确认消息和 24 小时规则**：病人最后一条消息超过 24 小时（例：晚上约、隔天才处理），WhatsApp 只能发**送审过的模板**。要再送审一个 utility 模板（`appointment_confirmed`，每条约 RM0.06–0.07），或那种情况改成提醒员工自己通知病人（W63 一起问）。
 
 - 只改 `availability.py`（多加一个「本系统的请求」来源）；`sql/check_available_slots.sql` 是只读 GPiS 的参考 SQL，这一层不放进去。
 - 提醒名单（D41）不受影响：只看 GPiS。
+- 每 3 分钟的查询只读 `PENDING` 那几天的预约（和提醒用的一样，只读帐号）；B 关机时不查，开机后下一次就会查到。
 
 ### 11.7 病人资料和 AI 公司（A11）
 
