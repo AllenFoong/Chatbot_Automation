@@ -651,6 +651,24 @@ pytest                        # 应该 272 passed，没有 skipped
 
 - 第 1–8 项全部通过：`0004 (head)`、`pytest` 272 passed、`npm test` 44 passed、`npm run build` 成功；假资料的 *Opened*、重新整理和另一个帐号、*Mark as not sent*、*NO WA*、`reminders_cli`、*Allow reminders again* 都正常；日志没有名字和号码。
 
+### 修正：切到 *Needs staff* 再回来，*Opened* 变回 *To send*（2026-10-14）
+
+开发电脑找到的：按了 *Open in WhatsApp*（卡片 *Opened*）→ 按 *Needs staff* 分页 → 再按 *Ready*，卡片又写 *To send*，
+上方的 `Opened in WhatsApp: 1 of 2` 却没变；按 *Refresh* 才回到 *Opened*。
+
+- 原因：后端有记下来（所以 *Refresh* 是对的）。错在画面：按过之后后端回来的结果只放在那张卡片里；
+  切到别的分页，卡片会拿掉，回到 *Ready* 重新建立，就又用一开始读的名单（那时还没按）。
+- 改了：按过的结果放在整个 Reminders 页面（`frontend/src/pages/RemindersPage.tsx`），卡片和上方的数目都读同一份。没有改后端、没有改表。
+
+| # | 做什么（假资料，同上） | 应该看到 |
+|---|---|---|
+| 1 | `npm test` | **48 passed**（新增 1 个：切分页回来还是 *Opened*） |
+| 2 | 按 A & B 的 *Open in WhatsApp* → *Needs staff* → *Ready* | 还是 *Opened*、`Opened in WhatsApp by …`；上方 `1 of 2` |
+| 3 | 按 *Mark as not sent* → *Needs staff* → *Ready* | 还是 *Not sent*；上方 `0 of 2` |
+
+云端容器（2026-10-14，假资料）：`npm test` 48 passed（新的测试在旧的程序上会失败）；`npm run build` 成功；
+headless Chromium 照上面第 2、3 项点过（PR #23 的版本也重现过这个问题）。
+
 ## 资料保留（A10）：提醒过了 90 天就删掉
 
 设计见 `docs/decisions.md` D67、`docs/architecture.md` A10。

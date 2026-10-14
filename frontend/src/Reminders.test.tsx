@@ -62,6 +62,32 @@ describe("reminders", () => {
     });
   });
 
+  it("still shows Opened after going to Needs staff and back", async () => {
+    // 以前按过的只记在卡片里：切到 Needs staff 卡片被拿掉，回到 Ready 又显示 To send（重新整理才对）
+    const { calls } = fakeApi({
+      ...base,
+      "GET /api/reminders": ok(fakeReminderList()),
+      "POST /api/reminders/opened": ok(OPENED),
+    });
+    renderApp("/reminders");
+    const user = userEvent.setup();
+    const card = (await screen.findByText("DEMO PATIENT A & DEMO PATIENT B")).closest("li")!;
+    await user.click(within(card).getByRole("link", { name: "Open in WhatsApp" }));
+    expect(await within(card).findByText("Opened")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: /Needs staff/ }));
+    expect(screen.queryByText("DEMO PATIENT A & DEMO PATIENT B")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: /Ready/ }));
+
+    const again = screen.getByText("DEMO PATIENT A & DEMO PATIENT B").closest("li")!;
+    expect(within(again).getByText("Opened")).toBeInTheDocument();
+    expect(within(again).queryByText("To send")).not.toBeInTheDocument();
+    expect(within(again).getByRole("link", { name: "Open in WhatsApp again" })).toBeInTheDocument();
+    expect(within(again).getByText(/Opened in WhatsApp by Amy Tan/)).toBeInTheDocument();
+    expect(screen.getByText("Opened in WhatsApp: 1 of 1")).toBeInTheDocument();
+    expect(calls.filter((c) => c.path.startsWith("/api/reminders") && c.method === "GET")).toHaveLength(1); // 没有重新读名单
+  });
+
   it("shows what another staff did and can mark it as not sent", async () => {
     const list = fakeReminderList();
     list.ready = list.ready.map((g) => ({ ...g, record: { ...OPENED, changed: true } }));
