@@ -15,7 +15,7 @@ import { Badge, Empty, ErrorBox, Loading, Notice, PageHeader, Tabs } from "../co
 import { formatDate, formatDateTime, formatPhone } from "../format";
 import { useAction, useLoad } from "../hooks";
 import { AlertIcon, CopyIcon, RefreshIcon, WhatsAppIcon } from "../icons";
-import type { PhoneKind, ReminderGroup, ReminderList, ReminderRecord, ReminderStatus } from "../types";
+import type { PhoneKind, ReminderGroup, ReminderList, ReminderRecord } from "../types";
 
 type View = "READY" | "STAFF" | "OTHER";
 
@@ -112,21 +112,19 @@ function OptOutButton({ group, onChanged }: { group: ReminderGroup; onChanged: (
 
 function ReadyCard({
   group,
+  record,
   showDate,
   production,
   onChanged,
   onRecorded,
 }: {
   group: ReminderGroup;
+  record: ReminderRecord | null;
   showDate: boolean;
   production: boolean;
   onChanged: () => void;
-  onRecorded: (key: string, status: ReminderStatus) => void;
+  onRecorded: (key: string, record: ReminderRecord) => void;
 }) {
-  // 后端回来的最新状态；名单重新读了就用名单上的
-  const [saved, setSaved] = useState<ReminderRecord | null>(null);
-  useEffect(() => setSaved(null), [group.record]);
-  const record = saved ?? group.record;
   const opened = record?.status === "OPENED";
   const [copied, setCopied] = useState(false);
   const action = useAction();
@@ -138,18 +136,14 @@ function ReadyCard({
     setCopied(true);
   }
 
-  function keep(r: ReminderRecord) {
-    setSaved(r);
-    onRecorded(group.key, r.status); // 上面的「Opened in WhatsApp: x of y」马上更新
-  }
-
-  // 连结照常打开 WhatsApp；同时记在后端（失败的话显示错误，WhatsApp 那边还是打开了）
+  // 连结照常打开 WhatsApp；同时记在后端（失败的话显示错误，WhatsApp 那边还是打开了）。
+  // 后端回来的结果交给页面记着（onRecorded）：上面的「Opened in WhatsApp: x of y」马上更新，切分页回来也还在
   function recordOpened() {
-    void action.run(async () => keep(await api.reminders.opened(group.date, group.phone!)));
+    void action.run(async () => onRecorded(group.key, await api.reminders.opened(group.date, group.phone!)));
   }
 
   function markNotSent() {
-    void action.run(async () => keep(await api.reminders.notSent(group.date, group.phone!)));
+    void action.run(async () => onRecorded(group.key, await api.reminders.notSent(group.date, group.phone!)));
   }
 
   return (
@@ -254,8 +248,8 @@ function Summary({ data }: { data: ReminderList }) {
   );
 }
 
-function Progress({ data, recorded }: { data: ReminderList; recorded: Record<string, ReminderStatus> }) {
-  const opened = data.ready.filter((g) => (recorded[g.key] ?? g.record?.status) === "OPENED").length;
+function Progress({ data, recorded }: { data: ReminderList; recorded: Record<string, ReminderRecord> }) {
+  const opened = data.ready.filter((g) => (recorded[g.key] ?? g.record)?.status === "OPENED").length;
   const total = data.ready.length;
   return (
     <div className="progress">
@@ -275,8 +269,9 @@ export default function RemindersPage() {
   const [view, setView] = useState<View>("READY");
   const list = useLoad(() => api.reminders.list(date || undefined), [date]);
   const data = list.data;
-  // 这一页按过的（还没重新读名单之前）；重新读了就用名单上的
-  const [recorded, setRecorded] = useState<Record<string, ReminderStatus>>({});
+  // 这一页按过的（还没重新读名单之前）；重新读了就用名单上的。
+  // 放在页面、不放在卡片里：切分页时卡片会拿掉再重新建立，放在卡片里的会不见、又显示成 To send
+  const [recorded, setRecorded] = useState<Record<string, ReminderRecord>>({});
   useEffect(() => setRecorded({}), [data]);
   const showDate = (data?.dates.length ?? 0) > 1;
   const otherCount = data?.not_appointments.reduce((n, r) => n + r.count, 0) ?? 0;
@@ -358,10 +353,11 @@ export default function RemindersPage() {
                   <ReadyCard
                     key={g.key}
                     group={g}
+                    record={recorded[g.key] ?? g.record}
                     showDate={showDate}
                     production={data.production}
                     onChanged={list.reload}
-                    onRecorded={(key, status) => setRecorded((r) => ({ ...r, [key]: status }))}
+                    onRecorded={(key, record) => setRecorded((r) => ({ ...r, [key]: record }))}
                   />
                 ))}
               </ul>
