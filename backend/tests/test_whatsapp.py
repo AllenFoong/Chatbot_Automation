@@ -181,6 +181,12 @@ def test_new_message_stays_with_ai_when_ai_is_on(webhook, session, monkeypatch):
     assert session.scalars(select(Message)).one().conversation.mode == ConversationMode.BOT
 
 
+def test_id_numbers_are_masked_before_saving(webhook, session):
+    """D69：数据库里只有遮过的号码（假号码）。"""
+    webhook.post_signed(payload([text("w1", "我的IC是 900101-01-1234，passport A12345678")]))
+    assert session.scalars(select(Message)).one().body == "我的IC是 900101-**-****，passport A12******"
+
+
 def test_same_message_twice_is_saved_once(webhook, session):
     webhook.post_signed(payload([text("w1")]))
     webhook.post_signed(payload([text("w1")]))                             # Meta 重送
