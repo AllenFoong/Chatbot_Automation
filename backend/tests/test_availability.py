@@ -1,11 +1,17 @@
 """空档计算测试：用假数据重现 sql/README.md 的 T1–T11。不连接任何数据库。"""
 
-from datetime import date
+from datetime import date, time
 from itertools import count
 
 import pytest
 
-from app.availability import GpisAppointment, check_available_slots, duration_slots, normalize_remarks
+from app.availability import (
+    GpisAppointment,
+    HeldRequest,
+    check_available_slots,
+    duration_slots,
+    normalize_remarks,
+)
 from app.clinic_rules import ClinicRules
 from tests.rules import RULES
 
@@ -18,8 +24,13 @@ def appt(slot, remarks="S+P", status="Booked", contact_id=1):
     return GpisAppointment(next(_ids), slot, status, contact_id, remarks)
 
 
-def run(day, doctor, appts=(), service="S+P", rules=RULES):
-    return check_available_slots(day, doctor, service, list(appts), rules)
+def run(day, doctor, appts=(), service="S+P", rules=RULES, held=()):
+    return check_available_slots(day, doctor, service, list(appts), rules, held)
+
+
+def held(hhmm, minutes=30):
+    h, m = map(int, hhmm.split(":"))
+    return HeldRequest(next(_ids), time(h, m), minutes)
 
 
 def slot(result, hhmm):
@@ -186,3 +197,52 @@ def test_closure_and_leave():
 def test_unknown_doctor_and_case_insensitive_input():
     assert run(WED, "CHER").day_status == "UNKNOWN_DOCTOR"
     assert run(WED, " phang ", service="s+p").day_status == "OK"
+
+
+# ---------- 本系统还没录入 GPiS 的请求（A8，architecture.md 11.6） ----------
+
+def test_no_requests_same_as_gpis_only():
+    appts = [appt("10:00"), appt("16:00", "RCT 1 hour")]
+    with_none = run(WED, "PHANG", appts)
+    assert with_none.requests == 0 and with_none.held_requests == []
+    assert all(s.requests == 0 for s in with_none.slots)
+
+
+def test_pending_request_takes_a_place():
+    r = run(WED, "PHANG", [appt("10:00"), appt("10:00")], held=[held("10:00")])
+    ten = slot(r, "10:00")
+    assert ten.booked == 3 and ten.requests == 1
+    assert ten.remaining == 0 and not ten.can_30
+    assert r.patients == 2 and r.requests == 1     # patients 只算 GPiS（和 SQL 一样）
+
+
+def test_example_in_architecture_11_6():
+    """PHANG 10:00 本来 2 人，AI 帮 A 建请求 → 满了，B 来问不推荐 10:00。"""
+    before = run(WED, "PHANG", [appt("10:00"), appt("10:00")])
+    assert slot(before, "10:00").can_30
+    after = run(WED, "PHANG", [appt("10:00"), appt("10:00")], held=[held("10:00")])
+    assert not slot(after, "10:00").can_30
+
+
+def test_pending_request_alone_closes_one_hour():
+    r = run(WED, "PHANG", held=[held("10:00")])
+    assert slot(r, "10:00").can_30 and not slot(r, "10:00").can_60
+    assert not slot(r, "09:30").can_60     # 下一格有人
+
+
+def test_pending_one_hour_request_blocks_two_slots():
+    r = run(WED, "PHANG", held=[held("16:00", 60)])
+    for t in ("16:00", "16:30"):
+        assert slot(r, t).kind == "LONG APPT" and slot(r, t).remaining == 0
+    assert slot(r, "15:30").can_30 and not slot(r, "15:30").can_60
+
+
+def test_pending_request_counts_for_neighbour_cap():
+    """前后一格是 3 人（2 个 GPiS + 1 个请求）→ 这格最多 2 人（W15）。"""
+    r = run(WED, "PHANG", [appt("09:30"), appt("09:30")], held=[held("09:30")])
+    assert slot(r, "09:00").cap == 2 and slot(r, "10:00").cap == 2
+
+
+def test_pending_request_on_closed_day_changes_nothing():
+    r = run(TUE, "PHANG", held=[held("10:00")])
+    assert r.day_status == "DOCTOR_NOT_WORKING" and r.slots == []

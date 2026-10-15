@@ -16,6 +16,7 @@ from datetime import date, time
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..availability import HeldRequest
 from .models import AppointmentRequest, Conversation, Customer, Doctor, RequestStatus, Service, Staff
 
 _ALLOWED = {
@@ -111,3 +112,22 @@ def list_pending_requests(session: Session) -> list[AppointmentRequest]:
             .order_by(AppointmentRequest.created_at, AppointmentRequest.id)
         )
     )
+
+
+def held_requests(session: Session, day: date, doctor_id: str) -> list[HeldRequest]:
+    """这天这位医生还在 PENDING 的请求：查空档时算占用（A8，architecture.md 11.6）。
+
+    没有医生或没有时段的请求不算（不知道占哪一格）；CONFIRMED 之后不算（GPiS 里已经有了）。
+    只回请求编号、时段、时长，没有病人资料。
+    """
+    rows = session.execute(
+        select(AppointmentRequest.id, AppointmentRequest.preferred_slot, AppointmentRequest.duration_minutes)
+        .where(
+            AppointmentRequest.status == RequestStatus.PENDING,
+            AppointmentRequest.preferred_date == day,
+            AppointmentRequest.doctor_id == doctor_id.strip().upper(),
+            AppointmentRequest.preferred_slot.is_not(None),
+        )
+        .order_by(AppointmentRequest.preferred_slot, AppointmentRequest.id)
+    )
+    return [HeldRequest(request_id, slot, minutes) for request_id, slot, minutes in rows]

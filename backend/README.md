@@ -13,7 +13,7 @@
 | 文件 | 内容 |
 |---|---|
 | `app/clinic_rules.py` | 诊所设置在程序里的样子（`ClinicRules`）；设置本身存在 PostgreSQL |
-| `app/availability.py` | 空档计算（= SQL 第 3–7 节），不连接数据库 |
+| `app/availability.py` | 空档计算（= SQL 第 3–7 节），不连接数据库；本系统 `PENDING` 的请求也算占用（A8，Phase 6a-2a） |
 | `app/gpis.py` | 读 `Tbl_CAH_Appointment`：只有一条 `SELECT`；数据库名字不是 `GPIS_EXPECTED_DATABASE` 就拒绝 |
 | `app/main.py` | API 入口：`GET /availability`、`GET /health`，加上 `app/api/` 的 Admin API |
 | `app/auth.py` | 员工登录：Argon2 加密密码、session cookie、ADMIN / STAFF 权限 |
@@ -30,7 +30,7 @@
 | `app/webhook.py`、`app/webhook_main.py` | 收 WhatsApp webhook 的小程序（port 8001），开发时只有它经 tunnel 放上网 |
 | `app/db/create_staff.py` | 建员工账号（第一个 ADMIN 用这个建） |
 | `app/db/demo.py` | 放假资料到 `chatbot_dev`，方便看画面（只能用在 `_dev` 数据库） |
-| `app/cli.py` | 在终端印出和 SQL 7a / 7b / 7c 一样格式的结果，方便对照 |
+| `app/cli.py` | 在终端印出和 SQL 7a / 7b / 7c 一样格式的结果，方便对照；`PENDING` 的请求印在 7d，`--gpis-only` 只看 GPiS |
 | `app/phone.py` | 手机号转成国际格式（例 `60123456789`），WhatsApp 的号码和员工输入的号码才能比对 |
 | `app/db/models.py` | 本系统的 15 张表（表结构以这里为准；Phase 4 加了 `staff_sessions`，Phase 5 加了消息的送达状态、`reminders`，A10 加了 `reminder_stats`） |
 | `app/db/seed.py` | 设置的初始值（= SQL 第 2 节 + 疗程代码）；`python -m app.db.seed` 写入 |
@@ -125,10 +125,12 @@ uvicorn app.main:app --reload
 |---|---|
 | `day_status` | 和 SQL 一样：`OK`、`NEEDS_REVIEW`、`DOCTOR_NOT_WORKING`、`CLINIC_CLOSED`、`DOCTOR_ON_LEAVE`、`OFFDAY_IN_GPIS`、`UNKNOWN_DOCTOR` |
 | `bookable` | `day_status = OK` 才是 `true`；`NEEDS_REVIEW` 空档照算，但 AI 不自动推荐 |
-| `patients` | 这天已约的病人数 |
+| `patients` | 这天 GPiS 里已约的病人数（和 SQL 一样，不含本系统的请求） |
+| `requests` | 这天这位医生本系统还在 `PENDING` 的请求，算进了 `booked`（A8）；加 `requests=false` 只看 GPiS（和 SQL 对照用），这里是 `0` |
 | `available_30` / `available_60` | 30 分钟 / 1 hour 预约可以开始的时段 |
-| `slots` | 每个时段，栏位和 SQL 7b 一样（`booked`、`cap`、`remaining`、`can_30`、`can_60`） |
+| `slots` | 每个时段，栏位和 SQL 7b 一样（`booked`、`cap`、`remaining`、`can_30`、`can_60`），多一栏 `requests`（`booked` 里面有几个是请求） |
 | `appointments` | 只有加 `debug=true` 才有：每条预约怎么被解读（= SQL 7c，只有 ID，没有名字和 Remarks） |
+| `held_requests` | 只有加 `debug=true` 才有：算进去的请求（请求编号、时段、几格），没有病人资料 |
 
 读 GPiS 或本系统的 PostgreSQL 失败时回 `503`，不会把连接字符串或错误细节回给调用方（细节在终端日志里）。
 
@@ -200,7 +202,8 @@ python -m app.db.demo                    # 放假资料（4 段对话、4 个预
 
 ## 对照 Phase 1（Phase 2 完成的条件）
 
-用 `sql/README.md` 测试记录里的日期，同一天分别跑 SQL 和 `python -m app.cli`，两边的 7a、7b、7c 必须完全一样：
+用 `sql/README.md` 测试记录里的日期，同一天分别跑 SQL 和 `python -m app.cli`，两边的 7a、7b、7c 必须完全一样
+（Phase 6a-2a 之后：SQL 只读 GPiS，所以对照时在指令后面加 `--gpis-only`，7b 最后一栏 `Requests` 都是 `0`）：
 
 | # | 指令 |
 |---|---|
@@ -845,3 +848,48 @@ pytest                        # 应该 351 passed，没有 skipped
 
 - 第 1–5 项全部通过：`pytest` 351 passed、没有 skipped；手机传 `我的IC是 900101-01-1234，passport A12345678` → 视窗 2 `webhook：1 条新消息`、`POST /webhook … 200`；
   *Conversations* 显示 `我的IC是 900101-**-****，passport A12******`；数据库找不到完整的号码（`0`）；webhook 的日志没有消息内容、号码。
+
+## Phase 6a-2a：还没录入 GPiS 的请求算占用（A8）
+
+设计见 `docs/architecture.md` 11.6（第 1 项）、`docs/decisions.md` D71。
+
+- 查空档（`GET /availability`、`python -m app.cli`）时，本系统还在 **`PENDING`** 的请求也当作那一格有人，和 GPiS 的预约一起算人数。
+  例：PHANG 10:00 GPiS 有 2 人 + 1 个 `PENDING` 的请求 = 3 人（满了），AI 不会再把 10:00 推荐给别人。
+- 只算**有医生、有日期、有时段**的请求；60 分钟的请求和 GPiS 的 `1HOUR` 一样，把下一格也封住。
+- 变成 `CONFIRMED`、`REJECTED`、`CANCELLED` 就不算。员工在 GPiS 输入之后、按确认之前，同一位病人会被算两次：只是少推荐，不会约重。
+- `patients` 还是只算 GPiS（和 SQL 一样）；多了 `requests`。`requests=false`（API）/ `--gpis-only`（终端）= 只看 GPiS，和 SQL 对照时用。
+- 输出只有请求编号、时段、几格，**没有病人资料**。
+- 没有改表、没有改网页；电脑 B 的提醒名单不受影响（只看 GPiS，D41），**不用更新 B**。
+- 还没做的（6a-2b、6a-2c、6a-3）：员工按 *Entered in GPiS ✓* 时当场查 GPiS、ADMIN 的自动确认开关、AI 建请求时锁住再查一次。
+
+### 更新（开发电脑）
+
+在 `backend` 里（先启用 venv）：
+
+```powershell
+git fetch origin claude/dazzling-wozniak-xqaz84
+git checkout claude/dazzling-wozniak-xqaz84
+git pull
+pytest                        # 应该 364 passed，没有 skipped
+```
+
+### 6a-2a 完成的条件（在开发电脑上测试）
+
+预约读 `GPiS_Dev`，请求读 `chatbot_dev`（里面的请求都是 `python -m app.db.demo` 的假资料）。输出没有病人资料，可以直接贴回来。
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的「更新」 | 364 passed、没有 skipped |
+| 2 | `python -m app.cli 2026-09-02 PHANG S+P --gpis-only`、`python -m app.cli 2026-09-09 PHANG S+P --gpis-only` | 7a、7b、7c 和「对照记录」的 T6、T8 一样（7a 后面多 `(GPiS only)`，7b 多一栏 `Requests` 都是 `0`） |
+| 3 | Admin Platform → *Requests* → *Pending*：找 Demo Kid A / Demo Kid B（PHANG、16:00）的日期，下面叫 `D` | 两个都是 `PENDING` |
+| 4 | `python -m app.cli D PHANG S+P`（`D` 写成 `2026-10-09` 这样） | 7a `Requests=2`；7b 16:00 的 `Requests` 是 `2`、`Booked` 比第 5 项多 2；7d 列出 2 个请求编号、`16:00`、`1` |
+| 5 | `python -m app.cli D PHANG S+P --gpis-only` | 7a `(GPiS only)`、没有 7d；16:00 的 `Booked` 只有 GPiS 的人数 |
+| 6 | `uvicorn app.main:app --reload` → `/docs` → `GET /availability`：`date` = `D`、`doctor` = `PHANG`、`service` = `S+P`、`debug` = `true` → *Execute* | `requests: 2`；`held_requests` 有 2 个（只有 `request_id`、`time`、`dur_slots`）；整个回应没有 `Demo Kid` |
+| 7 | Admin Platform → Demo Kid A → *Confirm*（随便填 `123456`）→ 再跑第 4 项 | `Requests=1`，7d 只剩 1 个（**会改掉假资料**：Demo Kid A 变成 `CONFIRMED`） |
+
+### 云端容器的测试记录（2026-10-15，PostgreSQL 16、Python 3.11 + `requirements-lock.txt` 和 3.13、只用假资料、没有 GPiS）
+
+- `pytest` → 364 passed（新增 13 个：请求占一个名额、architecture.md 11.6 的例子、60 分钟的请求封住两格、前后一格 3 人时上限 2、医生休息的日子不受影响、没有请求时结果不变；
+  数据库只读 `PENDING`、这天、这位医生、有时段的请求（别的医生、别的日子、没有时段、没有医生、已确认、已拒绝、已取消都不算）；
+  API 的 `requests`、`requests=false` 不读请求、`debug` 只有编号、读请求失败回 `503` 不露出密码；API 真的从测试数据库读到请求，回应没有病人名字）。
+- `python -m app.cli`（GPiS 换成假的：16:00 有 1 人；测试数据库有 2 个 16:00 的请求，一个 30 分钟、一个 60 分钟）：7a `Patients=1  Requests=2`；16:00 `Booked 3`、`Requests 2`，16:00、16:30 变成 `LONG APPT`；7d 列出 2 个请求。加 `--gpis-only`：16:00 `Booked 1`、`Can30 1`，没有 7d。
