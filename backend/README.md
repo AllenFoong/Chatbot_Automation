@@ -876,16 +876,19 @@ pytest                        # 应该 364 passed，没有 skipped
 ### 6a-2a 完成的条件（在开发电脑上测试）
 
 预约读 `GPiS_Dev`，请求读 `chatbot_dev`（里面的请求都是 `python -m app.db.demo` 的假资料）。输出没有病人资料，可以直接贴回来。
+**不会改任何资料**（假资料的请求留给 6a-2b 测）。psql 用 `$psql`（见「资料保留完成的条件」）。
 
 | # | 做什么 | 应该看到 |
 |---|---|---|
 | 1 | 上面的「更新」 | 364 passed、没有 skipped |
 | 2 | `python -m app.cli 2026-09-02 PHANG S+P --gpis-only`、`python -m app.cli 2026-09-09 PHANG S+P --gpis-only` | 7a、7b、7c 和「对照记录」的 T6、T8 一样（7a 后面多 `(GPiS only)`，7b 多一栏 `Requests` 都是 `0`） |
-| 3 | Admin Platform → *Requests* → *Pending*：找 Demo Kid A / Demo Kid B（PHANG、16:00）的日期，下面叫 `D` | 两个都是 `PENDING` |
-| 4 | `python -m app.cli D PHANG S+P`（`D` 写成 `2026-10-09` 这样） | 7a `Requests=2`；7b 16:00 的 `Requests` 是 `2`、`Booked` 比第 5 项多 2；7d 列出 2 个请求编号、`16:00`、`1` |
-| 5 | `python -m app.cli D PHANG S+P --gpis-only` | 7a `(GPiS only)`、没有 7d；16:00 的 `Booked` 只有 GPiS 的人数 |
-| 6 | `uvicorn app.main:app --reload` → `/docs` → `GET /availability`：`date` = `D`、`doctor` = `PHANG`、`service` = `S+P`、`debug` = `true` → *Execute* | `requests: 2`；`held_requests` 有 2 个（只有 `request_id`、`time`、`dur_slots`）；整个回应没有 `Demo Kid` |
-| 7 | Admin Platform → Demo Kid A → *Confirm*（随便填 `123456`）→ 再跑第 4 项 | `Requests=1`，7d 只剩 1 个（**会改掉假资料**：Demo Kid A 变成 `CONFIRMED`） |
+| 3 | `& $psql -h localhost -U chatbot -d chatbot_dev -c "SELECT id, doctor_id, preferred_date, preferred_slot, duration_minutes FROM appointment_requests WHERE status = 'PENDING' ORDER BY id;"` | 还在 `PENDING` 的请求（没有名字）。通常有 PHANG 16:00 一个（Demo Kid B；Demo Kid A 在 Phase 4b 测试时已经确认了）、GOH 10:00 一个（Demo Patient）。PHANG 那一行的日期下面叫 `D`、GOH 的叫 `E`，记下 `id` |
+| 4 | `python -m app.cli D PHANG S+P`（`D` 写成 `2026-10-09` 这样） | 7a `Requests=` 第 3 项 PHANG、`D` 那天的行数；7b 16:00 的 `Requests` 一样多；7d 的请求编号和第 3 项的 `id` 一样、`16:00`、`1` |
+| 5 | `python -m app.cli D PHANG S+P --gpis-only` | 7a `(GPiS only)`、没有 7d；16:00 的 `Booked` 比第 4 项少了第 4 项的 `Requests` 那么多，其他时段一样 |
+| 6 | `python -m app.cli E GOH OR` | 7a `Requests=1`；10:00 的 `Requests` 是 `1`；7d 是 GOH 那一行的 `id` |
+| 7 | `python -m app.cli D GOH S+P`（PHANG 的日子查 GOH） | `Requests=0`、没有 7d（别的医生的请求不算） |
+| 8 | `uvicorn app.main:app --reload` → <http://127.0.0.1:8000/docs> → `GET /availability`：`date` = `D`、`doctor` = `PHANG`、`service` = `S+P`、`debug` = `true` → *Execute* | `requests` 和第 4 项一样；`held_requests` 只有 `request_id`、`time`、`dur_slots`；整个回应没有 `Demo` |
+| 9 | 同上，再把 `requests` 改成 `false` → *Execute* | `requests: 0`、`held_requests: []`，16:00 的 `booked` 和第 5 项一样 |
 
 ### 云端容器的测试记录（2026-10-15，PostgreSQL 16、Python 3.11 + `requirements-lock.txt` 和 3.13、只用假资料、没有 GPiS）
 
