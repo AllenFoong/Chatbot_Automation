@@ -1,6 +1,6 @@
 """读取 GPiS 的预约（只读）。
 
-只执行 SELECT（空档、提醒、检查栏位），不写入任何数据。连接前检查数据库名字，
+只执行 SELECT（空档、提醒、找请求的预约、检查栏位），不写入任何数据。连接前检查数据库名字，
 防止不小心连到主机的正式数据库（CLAUDE.md 规则 1、2）。
 读主机的 GPiS 时还要确认用的是只读帐号（D52，sql/create_readonly_login.sql）：不是的话拒绝读取。
 """
@@ -11,6 +11,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Protocol
 
 from .availability import GpisAppointment
+from .matching import BookedAppointment
 from .reminders import ReminderAppointment
 
 APPOINTMENTS_SQL = """
@@ -34,7 +35,17 @@ WHERE a.AppointmentDate >= ?
   AND a.AppointmentDate <  ?
 """
 
-# 上面两条 SELECT 用到的栏位。python -m app.reminders_cli --check-gpis 会检查它们在不在（只看栏位名字）
+# 找请求的预约（D70，每 3 分钟）：那一天、那几位病人（ContactID）的预约。不读名字、号码
+MATCH_SQL = """
+SELECT a.AppointmentID, a.AppointmentDate, a.TimeSlot, a.DoctorID, a.Status, a.ContactID, a.Remarks
+FROM dbo.Tbl_CAH_Appointment a
+WHERE a.AppointmentDate >= ?
+  AND a.AppointmentDate <  ?
+  AND a.ContactID IN ({placeholders})
+"""
+MAX_CONTACTS_PER_QUERY = 500     # SQL Server 一次最多 2100 个参数
+
+# 上面几条 SELECT 用到的栏位。python -m app.reminders_cli --check-gpis 会检查它们在不在（只看栏位名字）
 REQUIRED_COLUMNS = {
     "Tbl_CAH_Appointment": ("AppointmentID", "AppointmentDate", "TimeSlot", "DoctorID", "Status",
                             "ContactID", "ContactName", "Remarks"),
@@ -194,6 +205,27 @@ class GpisReader:
                 remarks=r.Remarks,
             )
         return list(by_id.values())
+
+    def patient_appointments(self, day: date, contact_ids: set[int]) -> list[BookedAppointment]:
+        """那一天、这几位病人在 GPiS 的预约（取消的也读，由 matching.py 判断）。"""
+        start = datetime.combine(day, time.min)
+        ids = sorted(contact_ids)
+        found: list[BookedAppointment] = []
+        for i in range(0, len(ids), MAX_CONTACTS_PER_QUERY):
+            chunk = ids[i:i + MAX_CONTACTS_PER_QUERY]
+            sql = MATCH_SQL.format(placeholders=", ".join("?" * len(chunk)))
+            for r in self._query(sql, start, start + timedelta(days=1), *chunk):
+                found.append(BookedAppointment(
+                    appointment_id=r.AppointmentID,
+                    appointment_date=r.AppointmentDate.date() if isinstance(r.AppointmentDate, datetime)
+                    else r.AppointmentDate,
+                    time_slot=r.TimeSlot,
+                    doctor_id=r.DoctorID,
+                    status=r.Status,
+                    contact_id=r.ContactID,
+                    remarks=r.Remarks,
+                ))
+        return found
 
     def missing_columns(self) -> list[str]:
         return missing_columns({(r.TABLE_NAME, r.COLUMN_NAME) for r in self._query(COLUMNS_SQL)})

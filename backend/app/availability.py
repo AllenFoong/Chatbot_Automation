@@ -1,12 +1,14 @@
 """空档计算：sql/check_available_slots.sql 的 Python 版本。
 
-这里只做计算，不连接数据库：输入是 GPiS 当天的预约（由 gpis.py 读出），
-输出是每个时段还能不能约。Remarks 只在内存里用来判断时长、OFF DAY，不会出现在输出里。
+这里只做计算，不连接数据库：输入是 GPiS 当天的预约（由 gpis.py 读出）和本系统还没录入 GPiS 的请求
+（PENDING，A8，由 db/appointment_requests.py 读出），输出是每个时段还能不能约。
+Remarks 只在内存里用来判断时长、OFF DAY，不会出现在输出里。
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, time
 
@@ -33,6 +35,22 @@ class GpisAppointment:
     status: str | None
     contact_id: int | None
     remarks: str | None
+
+
+@dataclass(frozen=True)
+class PendingHold:
+    """本系统一个 PENDING 的请求（A8、D70）：员工还没录入 GPiS，查空档时也当作那一格有人。
+
+    变成 CONFIRMED（GPiS 已经有了）、REJECTED、CANCELLED 就不再算。1 hour 的占 2 格，和 GPiS 的 1HOUR 一样。
+    """
+
+    request_id: int
+    slot: time
+    duration_minutes: int = SLOT_MINUTES
+
+    @property
+    def dur_slots(self) -> int:
+        return max(self.duration_minutes // SLOT_MINUTES, 1)
 
 
 @dataclass(frozen=True)
@@ -77,9 +95,10 @@ class DayAvailability:
     service: str
     day_status: str
     note: str | None
-    patients: int
+    patients: int             # GPiS 里算病人的预约
     slots: list[SlotResult]
     appointments: list[ParsedAppointment]
+    pending: int = 0          # 一起算进去的 PENDING 请求（A8）
 
     @property
     def bookable(self) -> bool:
@@ -144,7 +163,9 @@ def check_available_slots(
     service: str,
     gpis_appointments: list[GpisAppointment],
     rules: ClinicRules,
+    pending: Sequence[PendingHold] = (),
 ) -> DayAvailability:
+    """pending：这位医生这天还没录入 GPiS 的请求（A8），和 GPiS 的预约一起算人数。"""
     doctor_id = doctor_id.strip().upper()
     service = service.strip().upper()
 
@@ -177,6 +198,8 @@ def check_available_slots(
         day_status, note = "OK", None
 
     occupying = [a for a in appts if a.occupies]
+    # 算人数用的 (时段, 几格)：GPiS 的预约 + PENDING 的请求
+    taken = [(a.slot, a.dur_slots) for a in occupying] + [(_minutes(h.slot), h.dur_slots) for h in pending]
 
     # ---------- 时段表：营业时段 + 最后一格之后的一格（给 1 hour 从最后一格开始用） ----------
     grid: list[tuple[int, bool, bool, int, bool]] = []  # (slot, is_break, after_hours, booked, long_blocked)
@@ -186,10 +209,10 @@ def check_available_slots(
         b_end = _minutes(schedule.break_end) if schedule.break_end else None
         for s in range(start, last + SLOT_MINUTES + 1, SLOT_MINUTES):
             is_break = b_start is not None and b_end is not None and b_start <= s < b_end
-            booked = sum(1 for a in occupying if a.slot == s)
+            booked = sum(1 for slot, _ in taken if slot == s)
             long_blocked = any(
-                a.dur_slots >= 2 and a.slot <= s < a.slot + SLOT_MINUTES * a.dur_slots
-                for a in occupying
+                dur >= 2 and slot <= s < slot + SLOT_MINUTES * dur
+                for slot, dur in taken
             )
             grid.append((s, is_break, s > last, booked, long_blocked))
 
@@ -245,4 +268,5 @@ def check_available_slots(
         patients=len(occupying),
         slots=slots,
         appointments=sorted(appts, key=lambda a: ((a.time_slot or ""), a.appointment_id)),
+        pending=len(pending),
     )

@@ -1,4 +1,7 @@
-"""预约请求：AI（或员工）建立 PENDING → 员工确认后手动录入 GPiS（D6）。
+"""预约请求：AI（或员工）建立 PENDING → 员工在 GPiS 录入 → CONFIRMED（D6）。
+
+CONFIRMED 有两种（D70）：员工按确认（confirmed_by = STAFF），或系统每 3 分钟在 GPiS 找到了（SYSTEM，
+app/request_matcher.py）。PENDING 的请求查空档时算占用（A8，pending_holds）。
 
 状态只能这样改：
   PENDING   → CONFIRMED / REJECTED / CANCELLED
@@ -16,7 +19,8 @@ from datetime import date, time
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import AppointmentRequest, Conversation, Customer, Doctor, RequestStatus, Service, Staff
+from ..availability import PendingHold
+from .models import AppointmentRequest, Conversation, Customer, Doctor, DoneBy, RequestStatus, Service, Staff
 
 _ALLOWED = {
     RequestStatus.PENDING: {RequestStatus.CONFIRMED, RequestStatus.REJECTED, RequestStatus.CANCELLED},
@@ -76,8 +80,10 @@ def create_appointment_request(
 def _change_status(request: AppointmentRequest, new: RequestStatus, staff: Staff | None) -> None:
     if new not in _ALLOWED.get(request.status, set()):
         raise InvalidTransition(f"{request.status} 不能改成 {new}")
+    # 先读 staff.id：读的时候可能要查数据库（autoflush），那时 status 改了一半会违反 CHECK
+    staff_id = staff.id if staff else None
     request.status = new
-    request.handled_by = staff.id if staff else None
+    request.handled_by = staff_id
     request.handled_at = func.now()
 
 
@@ -86,9 +92,50 @@ def confirm_request(
 ) -> None:
     """员工确认（录入 GPiS）。gpis_appointment_id 可以不填：GPiS 画面不显示 AppointmentID。"""
     _change_status(request, RequestStatus.CONFIRMED, staff)
+    request.confirmed_by = DoneBy.STAFF
     if gpis_appointment_id is not None:
         request.gpis_appointment_id = gpis_appointment_id
     session.flush()
+
+
+def confirm_found_in_gpis(session: Session, request: AppointmentRequest, gpis_appointment_id: int) -> None:
+    """系统在 GPiS 找到了这个预约（D70）：handled_by 空 = 系统。"""
+    _change_status(request, RequestStatus.CONFIRMED, None)
+    request.confirmed_by = DoneBy.SYSTEM
+    request.gpis_appointment_id = gpis_appointment_id
+    session.flush()
+
+
+def mark_patient_notified(session: Session, request: AppointmentRequest, staff: Staff | None = None) -> None:
+    """病人知道约好了：staff = None 是系统经 WhatsApp 发的，不然是员工自己通知后按 Patient told ✓。"""
+    if request.status != RequestStatus.CONFIRMED:
+        raise InvalidTransition(f"{request.status} 的请求不用通知")
+    if request.patient_notified_at is not None:
+        raise InvalidTransition("已经通知过了")
+    staff_id = staff.id if staff else None
+    request.patient_notified_at = func.now()
+    request.patient_notified_by = DoneBy.STAFF if staff else DoneBy.SYSTEM
+    request.patient_notified_staff_id = staff_id
+    request.notify_problem = None
+    session.flush()
+
+
+def pending_holds(session: Session, day: date, doctor_id: str) -> list[PendingHold]:
+    """这位医生这天还没录入 GPiS 的请求（A8）：查空档时算占用。
+
+    只算有日期、时段、医生的；没有时段的（只说了哪一天）不知道占哪一格，不算。
+    """
+    rows = session.execute(
+        select(AppointmentRequest.id, AppointmentRequest.preferred_slot, AppointmentRequest.duration_minutes)
+        .where(
+            AppointmentRequest.status == RequestStatus.PENDING,
+            AppointmentRequest.preferred_date == day,
+            AppointmentRequest.doctor_id == doctor_id.strip().upper(),
+            AppointmentRequest.preferred_slot.is_not(None),
+        )
+        .order_by(AppointmentRequest.id)
+    )
+    return [PendingHold(request_id=r.id, slot=r.preferred_slot, duration_minutes=r.duration_minutes) for r in rows]
 
 
 def reject_request(session: Session, request: AppointmentRequest, staff: Staff) -> None:

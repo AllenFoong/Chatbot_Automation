@@ -799,6 +799,13 @@ implant、denture、RCT、crown、bridge 的后续步骤、要 1 hour 的，AI �
 - 只改 `availability.py`（多加一个「本系统的请求」来源）；`sql/check_available_slots.sql` 是只读 GPiS 的参考 SQL，这一层不放进去。
 - 提醒名单（D41）不受影响：只看 GPiS。
 - 每 3 分钟的查询只读 `PENDING` 那几天的预约（和提醒用的一样，只读帐号）；B 关机时不查，开机后下一次就会查到。
+- **后端已经写好**（6a-2a，`app/matching.py`、`app/request_matcher.py`、migration `0006`；测试清单见 `backend/README.md`「Phase 6a-2a」）。写的时候定下来的细节：
+  - 每 3 分钟的查询跟着 Admin API 一起跑（启动时先跑一次）；只读那几天、**那几位病人**（`ContactID`）的预约，不读名字、号码；没有要找的请求就不连 GPiS。
+  - 只找今天以后的请求；已经记在别的请求上的 GPiS 预约（例：改期时 `AppointmentID` 不变，W5）不再拿来对；`gpis_appointment_id` 加 UNIQUE。
+  - 确认消息存成 BOT 的消息（系统的通知）：员工接手了（`HUMAN`）也照发。对话已经结束、不是从 WhatsApp 来的请求 → 不发，标「要通知」。
+  - 发不了的原因记在 `notify_problem`（英文，给员工看）；`CONFIRMED` 但 `patient_notified_at` 空 = 要通知。员工的 *Patient told ✓* 记 `patient_notified_by = STAFF` 和哪位员工。
+  - 系统和员工同时确认：锁住那一行，只有一边改得到，不会发两次。
+  - Requests 页面（「要通知 N」、*Entered in GPiS ✓* 可以改时间、*Open in WhatsApp*、*Patient told ✓*、等了多久）是 6a-2b。
 
 ### 11.7 病人资料和 AI 公司（A11）
 

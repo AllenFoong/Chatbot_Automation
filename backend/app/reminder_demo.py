@@ -4,6 +4,7 @@
 - 第一位病人的号码 = WHATSAPP_ALLOWED_RECIPIENTS 的第一个号码（自己的手机），
   所以只有这一组会出现 Open in WhatsApp（D54：不是正式资料时，只给允许名单里的号码）。
 - 每一天都一样：合成一条的家人、没有 *C、有 *C、固网、没有号码、取消、00:00 各一个。
+- 每 3 分钟找请求的预约（D70）也可以用这些假资料：ContactID 是 9001–9008（DEMO_CONTACT_IDS）。
 """
 
 from __future__ import annotations
@@ -11,9 +12,11 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from .config import get_whatsapp_settings
+from .matching import BookedAppointment
 from .reminders import ReminderAppointment
 
 FALLBACK_PHONE = "60120000001"
+DEMO_CONTACT_IDS = range(9001, 9009)
 
 
 class DemoReminderSource:
@@ -35,6 +38,14 @@ class DemoReminderSource:
             rows.extend(self._day(d))
             d += timedelta(days=1)
         return rows
+
+    def patient_appointments(self, day: date, contact_ids: set[int]) -> list[BookedAppointment]:
+        return [
+            BookedAppointment(a.appointment_id, a.appointment_date, a.time_slot, a.doctor_id, a.status,
+                              a.contact_id, a.remarks)
+            for a in self._day(day)
+            if a.contact_id in contact_ids
+        ]
 
     def _day(self, d: date) -> list[ReminderAppointment]:
         weekday = d.isoweekday()

@@ -61,6 +61,10 @@ export function fakeRequest(overrides: Partial<AppointmentRequest> = {}): Appoin
     handled_by: null,
     handled_at: null,
     created_at: "2026-10-06T01:47:00Z",
+    confirmed_by: null,
+    patient_notified_at: null,
+    patient_notified_by: null,
+    notify_problem: null,
     ...overrides,
   };
 }

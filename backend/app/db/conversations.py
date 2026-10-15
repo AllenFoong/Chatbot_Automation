@@ -112,17 +112,21 @@ def record_outgoing_message(
     staff: Staff | None = None,
     wa_message_id: str | None = None,
     wa_status: WaStatus | None = None,
+    system_notice: bool = False,
 ) -> Message:
     """存一条发给病人的消息。sender = BOT（AI）或 STAFF（员工；staff = None 表示在手机 App 上发的）。
 
     经 WhatsApp API 发出的，wa_status = ACCEPTED，之后由 status webhook 更新（update_message_status）。
+    system_notice：系统自动发的通知（例：预约确认，D70），存成 BOT；员工接手了也照发，不算 AI 回复。
     """
     if sender == Sender.CUSTOMER:
         raise ValueError("病人的消息用 record_incoming_message")
     if sender == Sender.BOT and staff is not None:
         raise ValueError("AI 的消息没有员工")
     _require_open(conversation)
-    if sender == Sender.BOT and conversation.mode == ConversationMode.HUMAN:
+    if system_notice and sender != Sender.BOT:
+        raise ValueError("系统的通知存成 BOT")
+    if sender == Sender.BOT and conversation.mode == ConversationMode.HUMAN and not system_notice:
         raise BotMuted("员工已接手，AI 不能回复")
     if sender == Sender.STAFF and conversation.mode == ConversationMode.BOT:
         take_over(session, conversation, staff)     # 员工回复 = 接手，AI 停止回复

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from contextlib import asynccontextmanager
 from datetime import date
 from functools import lru_cache
 
@@ -14,17 +16,29 @@ from sqlalchemy.orm import Session
 
 from .api import auth as auth_api
 from .api import conversations, reminders, requests, settings, staff
-from .availability import check_available_slots
+from .availability import PendingHold, check_available_slots
 from .clinic_rules import ClinicRules
 from .config import get_settings
+from .db.appointment_requests import pending_holds
 from .db.rules import RulesNotConfigured, load_clinic_rules
 from .db.session import get_session
 from .frontend_files import frontend_dist, mount_frontend
 from .gpis import AppointmentSource, GpisReader, WrongDatabaseError
+from .request_matcher import start_background
 
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="Chatbot_Automation API", version="0.5.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """启动时开始每 3 分钟找 GPiS 的预约（D70，app/request_matcher.py），停的时候一起停。"""
+    stop = start_background()
+    yield
+    if stop is not None:
+        stop.set()
+
+
+app = FastAPI(title="Chatbot_Automation API", version="0.6.0", lifespan=lifespan)
 for module in (auth_api, conversations, reminders, requests, settings, staff):
     app.include_router(module.router)
 
@@ -78,6 +92,7 @@ class AvailabilityOut(BaseModel):
     note: str | None
     bookable: bool
     patients: int
+    pending: int              # 一起算进去的、还没录入 GPiS 的请求（A8）
     available_30: list[str]
     available_60: list[str]
     slots: list[SlotOut]
@@ -105,6 +120,14 @@ def get_rules(session: Session = Depends(get_session)) -> ClinicRules:
         raise HTTPException(status_code=503, detail="读取本系统设置失败，请看服务器日志") from e
 
 
+PendingLoader = Callable[[date, str], list[PendingHold]]
+
+
+def get_pending_holds(session: Session = Depends(get_session)) -> PendingLoader:
+    """还没录入 GPiS 的请求（PENDING，A8）也算占用：每次都从 PostgreSQL 读。"""
+    return lambda day, doctor: pending_holds(session, day, doctor)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -118,6 +141,7 @@ def availability(
     debug: bool = Query(False, description="加上每条预约怎么被解读（只有 ID，没有名字和 Remarks）"),
     source: AppointmentSource = Depends(get_appointment_source),
     rules: ClinicRules = Depends(get_rules),
+    load_pending: PendingLoader = Depends(get_pending_holds),
 ) -> AvailabilityOut:
     try:
         rows = source.appointments_for(date_, doctor)
@@ -127,7 +151,13 @@ def availability(
         log.exception("读取 GPiS 失败")
         raise HTTPException(status_code=503, detail="读取 GPiS 失败，请看服务器日志") from e
 
-    r = check_available_slots(date_, doctor, service, rows, rules)
+    try:
+        holds = load_pending(date_, doctor)
+    except SQLAlchemyError as e:
+        log.exception("读取预约请求失败")
+        raise HTTPException(status_code=503, detail="读取预约请求失败，请看服务器日志") from e
+
+    r = check_available_slots(date_, doctor, service, rows, rules, holds)
     return AvailabilityOut(
         date=r.date,
         weekday=r.weekday,
@@ -137,6 +167,7 @@ def availability(
         note=r.note,
         bookable=r.bookable,
         patients=r.patients,
+        pending=r.pending,
         available_30=[s.time for s in r.slots if s.can_30],
         available_60=[s.time for s in r.slots if s.can_60],
         slots=[SlotOut(**s.__dict__) for s in r.slots],

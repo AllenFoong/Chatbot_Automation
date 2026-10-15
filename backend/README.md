@@ -9,6 +9,7 @@
 - **Phase 5b**（第一步）：预约提醒的名单（只看名单）+ *Open in WhatsApp*，见下面「Phase 5b」。
 - **资料保留（A10）**：提醒过了预约日期 90 天就删掉、只留每天的数目，见最后的「资料保留（A10）」。
 - **Phase 6a-1**：病人传的 IC / 护照号码存之前遮掉后面 6 位（D69），见最后的「Phase 6a-1」。
+- **Phase 6a-2a**：`PENDING` 的请求查空档时算占用（A8）；每 3 分钟在 GPiS 找员工约好的预约 → 自动确认、通知病人（D70），见最后的「Phase 6a-2a」。
 
 | 文件 | 内容 |
 |---|---|
@@ -26,18 +27,21 @@
 | `app/reminders_cli.py` | 在终端印出名单的摘要（没有名字、号码）；`--check-gpis` 检查 GPiS 的栏位 |
 | `app/reminder_demo.py` | 提醒的假资料（`REMINDER_SOURCE=demo`），不连 GPiS 也能试画面 |
 | `app/redact.py` | 病人传的 IC / 护照号码：存之前遮掉后面 6 位（D69） |
+| `app/matching.py` | `PENDING` 的请求对不对得上 GPiS 的预约（D70）、确认消息的文字。不连接数据库 |
+| `app/request_matcher.py` | 每 3 分钟找 GPiS 的预约 → 自动确认、通知病人（D70）；`python -m app.request_matcher --once` |
 | `app/db/retention.py`、`app/retention.py` | 资料保留（A10、D67）：删掉预约日期过了 90 天的提醒、只留每天的数目（`python -m app.retention`） |
 | `app/webhook.py`、`app/webhook_main.py` | 收 WhatsApp webhook 的小程序（port 8001），开发时只有它经 tunnel 放上网 |
 | `app/db/create_staff.py` | 建员工账号（第一个 ADMIN 用这个建） |
 | `app/db/demo.py` | 放假资料到 `chatbot_dev`，方便看画面（只能用在 `_dev` 数据库） |
+| `app/db/demo_match.py` | 开发电脑试自动确认用的 2 个假请求（`REMINDER_SOURCE=demo`、`_dev` 数据库） |
 | `app/cli.py` | 在终端印出和 SQL 7a / 7b / 7c 一样格式的结果，方便对照 |
 | `app/phone.py` | 手机号转成国际格式（例 `60123456789`），WhatsApp 的号码和员工输入的号码才能比对 |
-| `app/db/models.py` | 本系统的 15 张表（表结构以这里为准；Phase 4 加了 `staff_sessions`，Phase 5 加了消息的送达状态、`reminders`，A10 加了 `reminder_stats`） |
+| `app/db/models.py` | 本系统的 15 张表（表结构以这里为准；Phase 4 加了 `staff_sessions`，Phase 5 加了消息的送达状态、`reminders`，A10 加了 `reminder_stats`，6a-2a 加了请求的确认、通知栏位） |
 | `app/db/seed.py` | 设置的初始值（= SQL 第 2 节 + 疗程代码）；`python -m app.db.seed` 写入 |
 | `app/db/rules.py` | 从 PostgreSQL 读设置 → `ClinicRules` |
 | `app/db/conversations.py` | 收 / 发 WhatsApp 消息、转人工、WhatsApp 24 小时规则 |
 | `app/db/customers.py` | 病人；用电话找病人（可能找到几位） |
-| `app/db/appointment_requests.py` | 预约请求：`PENDING` → `CONFIRMED` / `REJECTED` / `CANCELLED` |
+| `app/db/appointment_requests.py` | 预约请求：`PENDING` → `CONFIRMED` / `REJECTED` / `CANCELLED`；`PENDING` 算占用（A8） |
 | `migrations/`、`alembic.ini` | Alembic：建表、改表结构的记录 |
 | `tests/` | 测试，全部用假数据 |
 
@@ -845,3 +849,78 @@ pytest                        # 应该 351 passed，没有 skipped
 
 - 第 1–5 项全部通过：`pytest` 351 passed、没有 skipped；手机传 `我的IC是 900101-01-1234，passport A12345678` → 视窗 2 `webhook：1 条新消息`、`POST /webhook … 200`；
   *Conversations* 显示 `我的IC是 900101-**-****，passport A12******`；数据库找不到完整的号码（`0`）；webhook 的日志没有消息内容、号码。
+
+## Phase 6a-2a：`PENDING` 算占用、自动找 GPiS 的预约（A8、D70）
+
+设计见 `docs/decisions.md` D70、`docs/architecture.md` 11.6。只有后端，**网页没有改**（Requests 页面的「要通知」、*Entered in GPiS ✓*、*Patient told ✓* 是 6a-2b）。
+
+- **`PENDING` 算占用**：`GET /availability` 把还没录入 GPiS 的请求和 GPiS 的预约一起算人数（回传多了 `pending`）。
+  只算有日期、时段、医生的；1 hour 的占 2 格（和 GPiS 的 `1HOUR` 一样）。变成 `CONFIRMED` / `REJECTED` / `CANCELLED` 就不算。提醒名单不受影响（只看 GPiS，D41）。
+- **每 3 分钟找 GPiS**（`app/request_matcher.py`）：跟着 Admin API（`uvicorn app.main:app`）一起跑，启动时先跑一次，之后营业时间（马来西亚时间 9:00–17:30）每 3 分钟一次。
+  只找「今天以后、有时段和医生、病人有 GPiS `ContactID`」的 `PENDING` 请求；只读那几天、那几位病人的预约（`AppointmentID`、日期、时段、医生、状态、`ContactID`、Remarks，**不读名字、号码**）。没有要找的请求就不连 GPiS。
+- **对上** = 同一位病人（`ContactID`）、同一天、同一个时段、同一位医生，而且算病人（不是 `Canceled` / `Postpone`、不是 `00:00`、不是 OFF DAY）（`app/matching.py`）。
+  一对一才自动：两个请求对得上同一个预约、一个请求对得上两个预约、这个预约已经记在别的请求上 → 都不自动，留给员工。`gpis_appointment_id` 加了 UNIQUE。
+- 对上了 → `CONFIRMED`（`confirmed_by = SYSTEM`、`handled_by` 空、记下 `gpis_appointment_id`）→ 马上发确认：
+  - 病人最后一条消息在 24 小时内、对话没结束、这台电脑接了 WhatsApp → 系统发确认（日期、时间、医生 = GPiS 的），存成 BOT 的消息；员工接手了（HUMAN）也照发。`patient_notified_by = SYSTEM`。
+  - 发不了 → 记下原因（`notify_problem`，英文）：`More than 24 hours since the patient's last message`、`WhatsApp is not connected on this computer`（电脑 B 现在就是）、`The conversation is closed`、`Not from a WhatsApp conversation`、`Number not in WHATSAPP_ALLOWED_RECIPIENTS`、WhatsApp 的错误。`patient_notified_at` 空 = 要员工通知（6a-2b 的页面显示）。
+- 员工按 *Confirm* 也会记 `confirmed_by = STAFF`；系统和员工同时确认，只有一边改得到（另一边 409），不会发两次。
+- 资料从哪里来和提醒一样：`REMINDER_SOURCE=demo` 用假资料（`app/reminder_demo.py`，ContactID 9001–9008），不然读 `GPIS_CONNECTION_STRING`。`REQUEST_MATCHER=off` 不跑。
+- 日志只记请求编号和数目，没有名字、号码、消息内容。
+- migration `0006`：`appointment_requests` 加 `confirmed_by`、`patient_notified_at`、`patient_notified_by`、`patient_notified_staff_id`、`notify_problem`。以前就是 `CONFIRMED` 的当作员工确认、员工通知过。
+- 电脑 B **暂时不用更新**：B 没有 `PENDING` 请求（AI 还没上线），装了也不会读主机 A。
+
+```powershell
+python -m app.request_matcher --once            # 现在跑一次（不管营业时间），印出数目
+python -m app.request_matcher --once --dry-run  # 只印对得上几个，不改、不发
+python -m app.db.demo_match                     # 开发电脑：明天放 2 个假请求（要 REMINDER_SOURCE=demo、_dev 数据库）
+python -m app.db.demo_match --remove            # 删掉这些假请求、假病人
+```
+
+### 更新（开发电脑）
+
+在 `backend` 里（先启用 venv）：
+
+```powershell
+git fetch origin claude/patient-data-retention-a10-e77qwk
+git checkout claude/patient-data-retention-a10-e77qwk
+git pull
+alembic upgrade head          # 0005 -> 0006
+alembic current               # 应该是 0006 (head)
+pytest                        # 应该 399 passed，没有 skipped
+```
+
+在 `frontend` 里：`npm test` → **48 passed**；`npm run build` 成功（只改了 `types.ts`，画面没有改）。
+
+### 6a-2a 完成的条件（在开发电脑上测试）
+
+只用 `chatbot_dev`、假的预约来源和假请求（`Demo Match A`、`Demo Match C`）；`GPiS_Dev` 只在第 2、4 项（空档）和第 10 项（`--dry-run`）**只读**。**主机 A 不碰。**
+先改 `backend\.env`：`REMINDER_SOURCE=demo`、`REQUEST_MATCHER=off`（前面不要有 `#`），`WHATSAPP_ALLOWED_RECIPIENTS` = 自己的手机。改完重开视窗 1（Admin API）。
+psql 用 `$psql`（见「资料保留完成的条件」）。下面的「请求」SQL：
+
+```sql
+SELECT id, status, confirmed_by, gpis_appointment_id, patient_notified_by, notify_problem
+FROM appointment_requests WHERE customer_id IN (SELECT id FROM customers WHERE name LIKE 'Demo Match%') ORDER BY id;
+```
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的「更新」 | `0006 (head)`、399 passed、没有 skipped；`npm test` 48 |
+| 2 | 浏览器开 `http://127.0.0.1:8000/availability?date=<明天>&doctor=<医生>&service=S%2BP`（明天是星期二用 `GOH`，不然 `PHANG`），记下 `10:00`、`11:30` 的 `booked` | `"pending": 0` |
+| 3 | `python -m app.db.demo_match` | `Added 2 PENDING requests for <明天> with <医生>: #a at 10:00 (will match), #b at 11:30 (will not match).`、`Your own number has no open conversation …`（有对话的话是 `Linked to …`，也可以） |
+| 4 | 第 2 项的网址再开一次 | `"pending": 2`；`10:00`、`11:30` 的 `booked` 各多 1，别的时段一样 |
+| 5 | `python -m app.request_matcher --once --dry-run` | `（--dry-run，没有改）找了 2 个请求（读了 GPiS 1 天）：对得上 1 个` |
+| 6 | `python -m app.request_matcher --once`，再跑「请求」SQL | `自动确认 1 个`；`#a` 是 `CONFIRMED`、`SYSTEM`、有 `gpis_appointment_id`；`#b` 还是 `PENDING`。第 2 项的网址：`"pending": 1`、`10:00` 回到原来的数目 |
+| 7 | 有 WhatsApp（视窗 2、3：webhook、cloudflared）：`python -m app.db.demo_match --remove` → 用**自己的手机**传任何消息给测试号码 → `python -m app.db.demo_match`（应该是 `Linked to …`）→ `.env` 改 `REQUEST_MATCHER=on`、在 9:00–17:30 之间重开视窗 1 | 几秒内手机收到 `预约已确认 ✅`（明天的日期、`10:00 AM`、医生）；*Conversations* 那段对话有这条（BOT）；「请求」SQL：`#a` 的 `patient_notified_by` 是 `SYSTEM`、`notify_problem` 空 |
+| 8 | 超过 24 小时：`.env` 改回 `REQUEST_MATCHER=off`、重开视窗 1；`demo_match --remove` → `demo_match`；psql：`UPDATE messages SET created_at = created_at - interval '25 hours' WHERE conversation_id IN (SELECT c.id FROM conversations c JOIN wa_contacts w ON w.id = c.wa_contact_id WHERE w.wa_phone = '<自己的号码>');` → `request_matcher --once` | `要员工通知 1 个`；手机**没有**收到；`notify_problem` 是 `More than 24 hours since the patient's last message` |
+| 9 | 视窗 1 的日志 | 没有名字、号码、消息内容 |
+| 10 | 只读 `GPiS_Dev`：`.env` 改 `REMINDER_SOURCE=gpis`（或删掉那行）→ `python -m app.request_matcher --once --dry-run`（**只用 `--dry-run`**） | `找了 1 个请求（读了 GPiS 1 天）：对得上 0 个`（只有数目；`GPiS_Dev` 没有这些假的 `ContactID` 的预约） |
+| 11 | 清理：`.env` 改回 `REMINDER_SOURCE=demo` → `python -m app.db.demo_match --remove`；`REQUEST_MATCHER` 那行删掉（默认开着） | `Removed 2 demo match requests.` |
+
+- 第 10 项如果是 `对得上 1 个`：`GPiS_Dev` 刚好有一位真的病人用了那个 `ContactID`、明天 11:30 也有预约（几乎不会）。只有数目，不要再跑没有 `--dry-run` 的。
+- `REQUEST_MATCHER` 开着、`REMINDER_SOURCE=gpis` 时，Admin API 会每 3 分钟读 `GPiS_Dev`（`chatbot_dev` 有 `PENDING` 的假请求的话，例 `app.db.demo` 的）。只读，而且发确认也只能发给允许名单的号码。
+
+### 云端容器的测试记录（2026-10-15，PostgreSQL 16、Python 3.11、只用假资料、没有 GPiS）
+
+- `pytest` → 399 passed（新增 48 个：`PENDING` 算占用、1 hour 占 2 格、哪些不算；对上的四个条件、取消 / 00:00 / OFF DAY 不算、一对一、已经用过的预约；自动确认 + 发确认、员工接手了照发、只问请求的日期和病人、过了的日子和新病人不找；24 小时、对话结束、没接 WhatsApp、不在允许名单、WhatsApp 不接受、不是 WhatsApp 来的 → 要通知；员工按 *Patient told*；数据库的约束；营业时间；`--dry-run`、GPiS 出错都不改；和员工同时确认）。`npm test` 48 passed、`npm run build` 成功。
+- `chatbot_dev`（假资料）：`demo_match` → `--dry-run` 对得上 1 个 → `--once` 自动确认 1 个、要员工通知 1 个（`Not from a WhatsApp conversation`）；有对话、没有 WhatsApp token（像电脑 B）时开 uvicorn，启动就确认了、`notify_problem` 是 `WhatsApp is not connected on this computer`；`--remove` 清掉。
+- 写的时候找到、已经改好：员工确认时，读 `staff.id` 可能先查数据库，那时 `status` 改了、`confirmed_by` 还没写，违反新的 CHECK → 先读 `staff.id` 再改。

@@ -1,6 +1,6 @@
 """API 测试：用假的 GPiS 资料、固定的诊所设置代替数据库。"""
 
-from datetime import date
+from datetime import date, time
 
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
@@ -9,7 +9,8 @@ from app.availability import GpisAppointment
 from app.db.rules import RulesNotConfigured
 from app.db.session import get_session
 from app.gpis import WrongDatabaseError, ensure_expected_database
-from app.main import app, get_appointment_source, get_rules
+from app.availability import PendingHold
+from app.main import app, get_appointment_source, get_pending_holds, get_rules
 from tests.rules import RULES
 
 import pytest
@@ -32,6 +33,7 @@ class FakeSource:
 @pytest.fixture
 def client():
     app.dependency_overrides[get_rules] = lambda: RULES     # 不连 PostgreSQL
+    app.dependency_overrides[get_pending_holds] = lambda: lambda day, doctor: []
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -119,3 +121,33 @@ def test_settings_database_errors(client, monkeypatch, error, shown):
     assert r.status_code == 503
     assert shown in r.json()["detail"]
     assert "hunter2" not in r.text
+
+
+def test_pending_requests_count_as_booked(client):
+    """A8：还没录入 GPiS 的请求也算占用；1 hour 占 2 格。"""
+    use(FakeSource([GpisAppointment(1, "10:00", "Booked", 1, None)]))
+    seen = []
+
+    def holds(day, doctor):
+        seen.append((day, doctor))
+        return [PendingHold(1, time(10, 0)), PendingHold(2, time(10, 0)), PendingHold(3, time(15, 0), 60)]
+
+    app.dependency_overrides[get_pending_holds] = lambda: holds
+    body = client.get("/availability", params=PARAMS).json()
+    assert seen == [(date(2026, 9, 2), "PHANG")]
+    assert (body["patients"], body["pending"]) == (1, 3)
+    slots = {s["time"]: s for s in body["slots"]}
+    assert slots["10:00"]["booked"] == 3 and "10:00" not in body["available_30"]
+    assert slots["15:30"]["kind"] == "LONG APPT"
+    assert "15:00" not in body["available_30"] and "15:30" not in body["available_30"]
+
+
+def test_pending_requests_database_error_hides_details(client):
+    use(FakeSource())
+
+    def broken(day, doctor):
+        raise OperationalError("SELECT 1", {}, Exception("password=hunter2"))
+
+    app.dependency_overrides[get_pending_holds] = lambda: broken
+    r = client.get("/availability", params=PARAMS)
+    assert r.status_code == 503 and "hunter2" not in r.text

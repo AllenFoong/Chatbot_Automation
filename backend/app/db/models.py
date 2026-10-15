@@ -52,9 +52,15 @@ class WaStatus(enum.StrEnum):
 
 class RequestStatus(enum.StrEnum):
     PENDING = "PENDING"        # 等员工确认
-    CONFIRMED = "CONFIRMED"    # 员工确认，录入 GPiS
+    CONFIRMED = "CONFIRMED"    # GPiS 已经有这个预约（员工按了确认，或系统在 GPiS 找到了，D70）
     REJECTED = "REJECTED"      # 员工拒绝
     CANCELLED = "CANCELLED"    # 病人取消
+
+
+class DoneBy(enum.StrEnum):
+    """预约请求是谁确认的、病人是谁通知的（D70）。"""
+    SYSTEM = "SYSTEM"          # 系统：每 3 分钟在 GPiS 找到了 / 经 WhatsApp 发了确认
+    STAFF = "STAFF"            # 员工按的（Entered in GPiS ✓、Patient told ✓）
 
 
 class ReminderStatus(enum.StrEnum):
@@ -347,11 +353,20 @@ class AppointmentRequest(Base):
     )
     notes: Mapped[str | None] = mapped_column(Text)               # 病人说的需求、员工备注
     group_id: Mapped[uuid.UUID | None]                            # 一起来的几位病人共用（Remarks 的 WITH，W8）
-    # 员工录入 GPiS 后的 AppointmentID（改期时不变，W5）。GPiS 画面不显示这个 ID，将来由系统对上
+    # 员工录入 GPiS 后的 AppointmentID（改期时不变，W5）。GPiS 画面不显示这个 ID，由系统对上（D70）
     gpis_appointment_id: Mapped[int | None]
-    handled_by: Mapped[int | None] = mapped_column(ForeignKey("staff.id"))
+    handled_by: Mapped[int | None] = mapped_column(ForeignKey("staff.id"))   # 系统自动确认的 = NULL
     handled_at: Mapped[datetime | None]                           # 最后一次改状态的时间
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # 谁确认的（D70）：SYSTEM = 每 3 分钟在 GPiS 找到了；STAFF = 员工按的
+    confirmed_by: Mapped[DoneBy | None] = mapped_column(_enum(DoneBy, "request_confirmed_by"))
+    # 病人什么时候、由谁知道约好了（D70）：SYSTEM = 系统经 WhatsApp 发了；STAFF = 员工自己通知后按 Patient told ✓
+    # CONFIRMED 但还是 NULL = 要员工通知（Requests 页面的「要通知」）
+    patient_notified_at: Mapped[datetime | None]
+    patient_notified_by: Mapped[DoneBy | None] = mapped_column(_enum(DoneBy, "request_notified_by"))
+    patient_notified_staff_id: Mapped[int | None] = mapped_column(ForeignKey("staff.id"))   # 哪位员工按的
+    # 系统为什么发不了确认（给员工看，英文，D24），例：超过 24 小时、这台电脑没接 WhatsApp
+    notify_problem: Mapped[str | None] = mapped_column(Text)
 
     customer: Mapped[Customer] = relationship()
     service: Mapped[Service] = relationship()
@@ -362,6 +377,17 @@ class AppointmentRequest(Base):
         _on_grid("preferred_slot"),
         CheckConstraint("duration_minutes > 0 AND mod(duration_minutes, 30) = 0", name="duration"),
         CheckConstraint("(status = 'PENDING') = (handled_at IS NULL)", name="handled_at"),
+        # 一个 GPiS 预约只能对上一个请求（D70）
+        UniqueConstraint("gpis_appointment_id"),
+        CheckConstraint(
+            "(status <> 'CONFIRMED' OR confirmed_by IS NOT NULL) "
+            "AND (confirmed_by IS NULL OR status IN ('CONFIRMED', 'CANCELLED'))",
+            name="confirmed_by",
+        ),
+        CheckConstraint("(patient_notified_at IS NULL) = (patient_notified_by IS NULL)", name="notified_together"),
+        CheckConstraint("patient_notified_staff_id IS NULL OR patient_notified_by = 'STAFF'",
+                        name="notified_staff_only_for_staff"),
+        CheckConstraint("patient_notified_at IS NULL OR confirmed_by IS NOT NULL", name="notified_after_confirmed"),
     )
 
 

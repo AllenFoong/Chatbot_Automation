@@ -1,4 +1,7 @@
-"""预约请求：员工看待确认的请求，在 GPiS 录入后按确认；或拒绝、帮病人取消（D6）。"""
+"""预约请求：员工看待确认的请求，在 GPiS 录入后按确认；或拒绝、帮病人取消（D6）。
+
+系统每 3 分钟在 GPiS 找到的，会自己变 CONFIRMED（D70，app/request_matcher.py）。
+"""
 
 from __future__ import annotations
 
@@ -12,7 +15,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..auth import current_staff
 from ..db import appointment_requests as reqs
-from ..db.models import AppointmentRequest, RequestStatus, Staff
+from ..db.models import AppointmentRequest, DoneBy, RequestStatus, Staff
 from ..db.session import get_session
 
 router = APIRouter(prefix="/api/requests", tags=["appointment requests"], dependencies=[Depends(current_staff)])
@@ -38,6 +41,10 @@ class RequestOut(BaseModel):
     handled_by: int | None
     handled_at: datetime | None
     created_at: datetime
+    confirmed_by: DoneBy | None             # SYSTEM = 系统在 GPiS 找到了（D70）
+    patient_notified_at: datetime | None    # CONFIRMED 但还没有 = 要员工通知
+    patient_notified_by: DoneBy | None
+    notify_problem: str | None              # 系统为什么发不了确认
 
 
 class ConfirmIn(BaseModel):
@@ -53,6 +60,8 @@ def _out(r: AppointmentRequest) -> RequestOut:
         preferred_date=r.preferred_date, preferred_slot=r.preferred_slot, duration_minutes=r.duration_minutes,
         notes=r.notes, group_id=r.group_id, gpis_appointment_id=r.gpis_appointment_id,
         handled_by=r.handled_by, handled_at=r.handled_at, created_at=r.created_at,
+        confirmed_by=r.confirmed_by, patient_notified_at=r.patient_notified_at,
+        patient_notified_by=r.patient_notified_by, notify_problem=r.notify_problem,
     )
 
 
@@ -77,7 +86,8 @@ def list_requests(
 
 
 def _change(session: Session, request_id: int, change) -> RequestOut:
-    r = session.get(AppointmentRequest, request_id)
+    # 锁住这一行：系统（每 3 分钟）同时确认的话，后到的一边会看到已经不是 PENDING
+    r = session.get(AppointmentRequest, request_id, with_for_update=True)
     if r is None:
         raise HTTPException(status_code=404, detail="Request not found")
     try:

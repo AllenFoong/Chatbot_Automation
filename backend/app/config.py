@@ -93,6 +93,11 @@ def get_reminder_text():
     )
 
 
+def request_matcher_enabled() -> bool:
+    """每 3 分钟找 GPiS 的预约（D70）。默认开着；REQUEST_MATCHER=off 关掉（例：开发电脑同时开了两个 Admin API）。"""
+    return os.environ.get("REQUEST_MATCHER", "on").strip().lower() != "off"
+
+
 def reminder_source_name() -> str:
     """提醒名单的资料从哪里来：gpis（GPIS_CONNECTION_STRING）或 demo（假资料，不连 GPiS）。"""
     return os.environ.get("REMINDER_SOURCE", "gpis").strip().lower() or "gpis"

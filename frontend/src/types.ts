@@ -88,7 +88,14 @@ export interface AppointmentRequest {
   handled_by: number | null;
   handled_at: string | null;
   created_at: string;
+  // D70: SYSTEM = found in GPiS by the system; CONFIRMED with no patient_notified_at = staff must tell the patient
+  confirmed_by: DoneBy | null;
+  patient_notified_at: string | null;
+  patient_notified_by: DoneBy | null;
+  notify_problem: string | null;
 }
+
+export type DoneBy = "SYSTEM" | "STAFF";
 
 // ---------- 设置（app/api/settings.py） ----------
 
