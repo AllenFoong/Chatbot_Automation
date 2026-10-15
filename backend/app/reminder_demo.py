@@ -19,6 +19,7 @@ FALLBACK_PHONE = "60120000001"
 class DemoReminderSource:
     label = "Demo data"
     is_production = False
+    fake_data = True        # 全部是假名字：确认消息可以发给允许名单里的号码（app/confirm.py may_send）
 
     def __init__(self, own_phone: str | None = None):
         self.own_phone = own_phone or FALLBACK_PHONE

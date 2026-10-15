@@ -347,8 +347,18 @@ class AppointmentRequest(Base):
     )
     notes: Mapped[str | None] = mapped_column(Text)               # 病人说的需求、员工备注
     group_id: Mapped[uuid.UUID | None]                            # 一起来的几位病人共用（Remarks 的 WITH，W8）
-    # 员工录入 GPiS 后的 AppointmentID（改期时不变，W5）。GPiS 画面不显示这个 ID，将来由系统对上
+    # 确认时员工点选的 GPiS 预约（D71）：AppointmentID（改期时不变，W5）和当时 GPiS 上的日期、时间、医生。
+    # 员工可能约成和请求不一样的时间，确认消息照这里发。医生不加 FK：GPiS 可能有本系统没有的医生
     gpis_appointment_id: Mapped[int | None]
+    confirmed_date: Mapped[date | None]
+    confirmed_slot: Mapped[time | None]
+    confirmed_doctor_id: Mapped[str | None] = mapped_column(String(20))
+    # 通知病人（D71）：确认消息的内容；系统发出去或员工按 Patient told ✓ 的时间。
+    # CONFIRMED 而 patient_told_at 是空的 = 「要通知」；notify_problem = 系统为什么没发（给员工看）
+    confirm_message: Mapped[str | None] = mapped_column(Text)
+    patient_told_at: Mapped[datetime | None]
+    patient_told_by: Mapped[int | None] = mapped_column(ForeignKey("staff.id"))     # 空 = 系统自己发的
+    notify_problem: Mapped[str | None] = mapped_column(Text)
     handled_by: Mapped[int | None] = mapped_column(ForeignKey("staff.id"))
     handled_at: Mapped[datetime | None]                           # 最后一次改状态的时间
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -362,6 +372,12 @@ class AppointmentRequest(Base):
         _on_grid("preferred_slot"),
         CheckConstraint("duration_minutes > 0 AND mod(duration_minutes, 30) = 0", name="duration"),
         CheckConstraint("(status = 'PENDING') = (handled_at IS NULL)", name="handled_at"),
+        CheckConstraint("patient_told_by IS NULL OR patient_told_at IS NOT NULL", name="told_by_needs_time"),
+        # 一个 GPiS 预约只能确认一个请求（D71；两位员工同时点选同一个也不行，D19）
+        Index(
+            "uq_appointment_requests_confirmed_gpis_id", "gpis_appointment_id",
+            unique=True, postgresql_where=text("status = 'CONFIRMED'"),
+        ),
     )
 
 

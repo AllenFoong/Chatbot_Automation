@@ -1,12 +1,13 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { ADMIN, STAFF, err, fakeApi, fakeConversation, fakeRequest, ok } from "./test/fakeApi";
+import { ADMIN, STAFF, err, fakeApi, fakeChoices, fakeConversation, fakeRequest, ok } from "./test/fakeApi";
 import { renderApp } from "./test/render";
 
 // 选单上的数字（每个画面都会读）
 const counts = {
   "GET /api/conversations?mode=HUMAN": ok([]),
+  "GET /api/requests?to_tell=true": ok([]),
   "GET /api/requests?status=PENDING": ok([]),
 };
 
@@ -46,6 +47,7 @@ describe("login", () => {
     fakeApi({
       "GET /api/auth/me": ok(ADMIN),
       "GET /api/conversations?mode=HUMAN": () => (expired ? err(401, "Please log in") : ok([])),
+      "GET /api/requests?to_tell=true": ok([]),
       "GET /api/requests?status=PENDING": () => (expired ? err(401, "Please log in") : ok([])),
       "GET /api/conversations": ok([]),
     });
@@ -118,17 +120,19 @@ describe("treatments", () => {
 });
 
 describe("requests", () => {
-  it("confirms with the GPiS AppointmentID", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+  it("confirms by picking the appointment read from GPiS", async () => {
     let confirmed = false;
     const { calls } = fakeApi({
       "GET /api/auth/me": ok(STAFF),
       "GET /api/conversations?mode=HUMAN": ok([]),
+      "GET /api/requests?to_tell=true": ok([]),
       "GET /api/requests?status=PENDING": () =>
         ok(confirmed ? [] : [fakeRequest({ group_id: "g1" }), fakeRequest({ id: 2, customer_name: "Demo Kid B", group_id: "g1" })]),
-      "POST /api/requests/1/confirm": (body) => {
+      "GET /api/requests/1/gpis?date=2026-10-09": ok(fakeChoices()),
+      "GET /api/requests/1/gpis?date=2026-10-10": ok(fakeChoices({ date: "2026-10-10", choices: [] })),
+      "POST /api/requests/1/confirm": () => {
         confirmed = true;
-        return ok(fakeRequest({ status: "CONFIRMED", gpis_appointment_id: (body as { gpis_appointment_id: number }).gpis_appointment_id }));
+        return ok(fakeRequest({ status: "CONFIRMED", gpis_appointment_id: 101, patient_told_at: "2026-10-06T02:00:00Z" }));
       },
     });
     renderApp("/requests");
@@ -137,26 +141,117 @@ describe("requests", () => {
     expect(within(card).getByText("Demo Kid B")).toBeInTheDocument(); // Together with
     expect(within(card).getByText("Fri 09 Oct 2026 16:00")).toBeInTheDocument();
 
-    await user.click(within(card).getByRole("button", { name: "Confirm" }));
-    await user.type(within(card).getByLabelText(/GPiS AppointmentID/), "123456");
-    await user.click(within(card).getByRole("button", { name: /confirm$/ }));
+    await user.click(within(card).getByRole("button", { name: "Entered in GPiS ✓" }));
+    const pick = within(card).getByRole("button", { name: "Confirm this appointment" });
+    expect(pick).toBeDisabled(); // 要先点选
+    const radios = await within(card).findAllByRole("radio");
+    expect(radios.map((r) => r.closest("label")!.textContent)).toEqual([
+      "16:00 DEMO KID A · Dr PHANG Same doctor · Same time",
+      "10:00 SOMEONE ELSE · Dr GOH",
+      "16:00 DEMO KID B · Dr PHANG Same doctor · Same time · already confirms request #7",
+    ]);
+    expect(radios[2]!).toBeDisabled(); // 已经确认了别的请求
+
+    // 换日期 → 重新读 GPiS；那天没有就说要先在 GPiS 输入
+    const date = within(card).getByLabelText("GPiS date");
+    await user.clear(date);
+    await user.type(date, "2026-10-10");
+    expect(await within(card).findByText(/GPiS has no appointments on/)).toBeInTheDocument();
+    await user.clear(date);
+    await user.type(date, "2026-10-09");
+
+    await user.click((await within(card).findAllByRole("radio"))[0]!);
+    await user.click(pick);
+    expect(await screen.findByText(/confirmed, and the patient was sent the confirmation/)).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "POST")?.body).toEqual({ gpis_appointment_id: 101, date: "2026-10-09" });
     await waitFor(() => expect(screen.getByText("No pending requests.")).toBeInTheDocument());
-    expect(calls.find((c) => c.method === "POST")?.body).toEqual({ gpis_appointment_id: 123456 });
   });
 
-  it("confirms without an ID when the field is empty", async () => {
+  it("warns when the list comes from GPiS_Dev and shows why the patient was not messaged", async () => {
+    fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      ...counts,
+      "GET /api/requests?status=PENDING": ok([fakeRequest()]),
+      "GET /api/requests/1/gpis?date=2026-10-09": ok(fakeChoices({ source: "GPiS_Dev", can_notify: false })),
+      "POST /api/requests/1/confirm": ok(
+        fakeRequest({ status: "CONFIRMED", notify_problem: "Not sent: the GPiS list comes from GPiS_Dev" }),
+      ),
+    });
+    renderApp("/requests");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Entered in GPiS ✓" }));
+    expect(await screen.findByText(/comes from GPiS_Dev: the patient will not be messaged/)).toBeInTheDocument();
+    await user.click((await screen.findAllByRole("radio"))[0]!);
+    await user.click(screen.getByRole("button", { name: "Confirm this appointment" }));
+    expect(await screen.findByText(/confirmed, but the patient was not messaged/)).toHaveTextContent(
+      "Not sent: the GPiS list comes from GPiS_Dev",
+    );
+  });
+
+  it("shows GPiS errors and lets staff go back", async () => {
     const { calls } = fakeApi({
       "GET /api/auth/me": ok(STAFF),
       ...counts,
       "GET /api/requests?status=PENDING": ok([fakeRequest()]),
-      "POST /api/requests/1/confirm": ok(fakeRequest({ status: "CONFIRMED" })),
+      "GET /api/requests/1/gpis?date=2026-10-09": err(503, "Could not read GPiS. Please try again."),
     });
     renderApp("/requests");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Confirm" }));
-    await user.click(screen.getByRole("button", { name: /confirm$/ }));
-    await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
-    expect(calls.find((c) => c.method === "POST")?.body).toEqual({ gpis_appointment_id: null });
+    await user.click(await screen.findByRole("button", { name: "Entered in GPiS ✓" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not read GPiS");
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("button", { name: "Entered in GPiS ✓" })).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("lists patients to tell, with Open in WhatsApp and Patient told", async () => {
+    let told = false;
+    const message = "预约确认✅\nNAME: DEMO KID A";
+    const { calls } = fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      "GET /api/conversations?mode=HUMAN": ok([]),
+      "GET /api/requests?status=PENDING": ok([]),
+      "GET /api/requests?to_tell=true": () =>
+        ok(
+          told
+            ? []
+            : [
+                fakeRequest({
+                  status: "CONFIRMED",
+                  confirmed_date: "2026-10-09",
+                  confirmed_slot: "16:30:00",
+                  confirmed_doctor_id: "PHANG",
+                  confirm_message: message,
+                  notify_problem: "More than 24 hours since the patient's last message",
+                  whatsapp_allowed: true,
+                }),
+                fakeRequest({ id: 2, customer_name: "Demo Kid B", status: "CONFIRMED", confirm_message: message }),
+              ],
+        ),
+      "POST /api/requests/1/patient-told": () => {
+        told = true;
+        return ok(fakeRequest({ status: "CONFIRMED", patient_told_at: "2026-10-06T02:00:00Z", patient_told_by: 2 }));
+      },
+    });
+    renderApp("/requests");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "To tell patient (2)" }));
+    const card = (await screen.findByText("Demo Kid A", { selector: "strong" })).closest("li")!;
+    expect(within(card).getByText(/More than 24 hours/)).toBeInTheDocument();
+    expect(within(card).getByText("Fri 09 Oct 2026 16:30 · Dr PHANG")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Open in WhatsApp" })).toHaveAttribute(
+      "href",
+      "whatsapp://send?phone=60120000001&text=%E9%A2%84%E7%BA%A6%E7%A1%AE%E8%AE%A4%E2%9C%85%0ANAME%3A%20DEMO%20KID%20A",
+    );
+    // 不能 Open in WhatsApp 的（读 GPiS_Dev）：只有 Patient told
+    const other = screen.getByText("Demo Kid B", { selector: "strong" }).closest("li")!;
+    expect(within(other).queryByRole("link", { name: "Open in WhatsApp" })).toBeNull();
+    expect(within(other).getByText(/the system stopped before sending/)).toBeInTheDocument();
+
+    await user.click(within(card).getByRole("button", { name: "Patient told ✓" }));
+    await waitFor(() => expect(screen.getByText("Every confirmed patient has been told.")).toBeInTheDocument());
+    expect(calls.some((c) => c.method === "POST" && c.path === "/api/requests/1/patient-told")).toBe(true);
+    expect(screen.getByRole("tab", { name: "To tell patient" })).toBeInTheDocument();
   });
 
   it("shows the server's reason when a change is refused", async () => {
@@ -164,6 +259,7 @@ describe("requests", () => {
     fakeApi({
       "GET /api/auth/me": ok(STAFF),
       ...counts,
+      "GET /api/requests?to_tell=true": ok([]),
       "GET /api/requests?status=PENDING": ok([fakeRequest()]),
       "POST /api/requests/1/reject": err(409, "A CONFIRMED request cannot be changed like this"),
     });
@@ -177,6 +273,7 @@ describe("requests", () => {
     const { calls } = fakeApi({
       "GET /api/auth/me": ok(STAFF),
       ...counts,
+      "GET /api/requests?to_tell=true": ok([]),
       "GET /api/requests?status=PENDING": ok([fakeRequest()]),
     });
     renderApp("/requests");
@@ -190,6 +287,7 @@ describe("conversations", () => {
     let mode: "BOT" | "HUMAN" = "BOT";
     const { calls } = fakeApi({
       "GET /api/auth/me": ok(STAFF),
+      "GET /api/requests?to_tell=true": ok([]),
       "GET /api/requests?status=PENDING": ok([]),
       "GET /api/conversations?mode=HUMAN": () => ok(mode === "HUMAN" ? [fakeConversation({ mode })] : []),
       "GET /api/conversations": () => ok([fakeConversation({ mode })]),
@@ -293,6 +391,7 @@ describe("menu (hamburger)", () => {
   const routes = {
     "GET /api/auth/me": ok(STAFF),
     ...counts,
+    "GET /api/requests?to_tell=true": ok([]),
     "GET /api/requests?status=PENDING": ok([]),
   };
 

@@ -85,9 +85,47 @@ export interface AppointmentRequest {
   notes: string | null;
   group_id: string | null;
   gpis_appointment_id: number | null;
+  /** 确认时员工点选的 GPiS 预约当时的日期、时间、医生（D71）；确认消息照这个发 */
+  confirmed_date: string | null;
+  confirmed_slot: string | null;
+  confirmed_doctor_id: string | null;
+  confirm_message: string | null;
+  /** 系统发出确认消息、或员工按 Patient told 的时间；CONFIRMED 而这里是 null = 「要通知」 */
+  patient_told_at: string | null;
+  /** 按 Patient told 的员工；null = 系统自己发的 */
+  patient_told_by: number | null;
+  /** 系统为什么没有发确认消息（给员工看） */
+  notify_problem: string | null;
+  whatsapp_phone: string | null;
+  /** 能不能给 Open in WhatsApp（D54 的锁：读 GPiS_Dev 时没有） */
+  whatsapp_allowed: boolean;
   handled_by: number | null;
   handled_at: string | null;
   created_at: string;
+}
+
+/** GPiS 那一天的一个预约，给员工点选（GET /api/requests/{id}/gpis）。没有 Remarks、号码 */
+export interface GpisChoice {
+  appointment_id: number;
+  date: string;
+  time: string;
+  doctor_id: string;
+  doctor_name: string;
+  patient_name: string;
+  contact_id: number | null;
+  same_patient: boolean;
+  same_doctor: boolean;
+  same_time: boolean;
+  /** 已经确认了别的请求：不能再选 */
+  used_by_request_id: number | null;
+}
+
+export interface GpisChoices {
+  date: string;
+  source: string;
+  /** 确认后能不能经 WhatsApp 通知病人（读 GPiS_Dev 时不能） */
+  can_notify: boolean;
+  choices: GpisChoice[];
 }
 
 // ---------- 设置（app/api/settings.py） ----------

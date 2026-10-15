@@ -802,6 +802,7 @@ implant、denture、RCT、crown、bridge 的后续步骤、要 1 hour 的，AI �
 
 - 只改 `availability.py`（多加一个「本系统的请求」来源 `HeldRequest`，6a-2a 已经写好）；只算有医生、日期、时段的请求，60 分钟的和 GPiS 的 `1HOUR` 一样封住下一格。`sql/check_available_slots.sql` 是只读 GPiS 的参考 SQL，这一层不放进去：对照时用 `/availability?requests=false` 或 `python -m app.cli … --gpis-only`。
 - 提醒名单（D41）不受影响：只看 GPiS。
+- 6a-2b 写好的细节（点选名单只有时间、名字、医生；一个 GPiS 预约只确认一个请求；读 `GPiS_Dev` 时不发；确认消息在 AI 的对话算 AI 发的）见 D72。
 - 员工按的时候查一次、自动确认打开时每 3 分钟查一次，都只读 `PENDING` 那几天的预约（和提醒用的一样，只读帐号）；B 关机时不查，开机后下一次就会查到。
 - 确认之后 GPiS 改了、删了（W5、W26）：两种方式都还没处理；病人预约前一天的提醒照 GPiS 发（D41），时间会是新的。
 

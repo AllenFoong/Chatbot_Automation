@@ -83,13 +83,64 @@ def _change_status(request: AppointmentRequest, new: RequestStatus, staff: Staff
 
 
 def confirm_request(
-    session: Session, request: AppointmentRequest, staff: Staff, gpis_appointment_id: int | None = None
+    session: Session,
+    request: AppointmentRequest,
+    staff: Staff | None,
+    gpis_appointment_id: int | None = None,
+    *,
+    confirmed_date: date | None = None,
+    confirmed_slot: time | None = None,
+    confirmed_doctor_id: str | None = None,
+    confirm_message: str | None = None,
 ) -> None:
-    """员工确认（录入 GPiS）。gpis_appointment_id 可以不填：GPiS 画面不显示 AppointmentID。"""
+    """确认：员工在 GPiS 录入后点选了那个预约（D71 ①）；staff = None 是系统自动确认（D71 ②，6a-2c）。
+
+    之后这个请求在「要通知」，直到系统发出确认消息（patient_notified）或员工按 Patient told ✓（patient_told）。
+    """
     _change_status(request, RequestStatus.CONFIRMED, staff)
-    if gpis_appointment_id is not None:
-        request.gpis_appointment_id = gpis_appointment_id
+    request.gpis_appointment_id = gpis_appointment_id
+    request.confirmed_date = confirmed_date
+    request.confirmed_slot = confirmed_slot
+    request.confirmed_doctor_id = confirmed_doctor_id
+    request.confirm_message = confirm_message
+    request.patient_told_at = None
+    request.patient_told_by = None
+    request.notify_problem = None
     session.flush()
+
+
+def patient_notified(session: Session, request: AppointmentRequest) -> None:
+    """系统经 WhatsApp 发出了确认消息。"""
+    request.patient_told_at = func.now()
+    request.patient_told_by = None
+    request.notify_problem = None
+    session.flush()
+
+
+def notify_failed(session: Session, request: AppointmentRequest, problem: str) -> None:
+    """系统没有发确认消息：留在「要通知」，写原因给员工看。"""
+    request.notify_problem = problem
+    session.flush()
+
+
+def patient_told(session: Session, request: AppointmentRequest, staff: Staff) -> None:
+    """员工自己通知了病人（Open in WhatsApp、手机），按 Patient told ✓。"""
+    if request.status != RequestStatus.CONFIRMED or request.patient_told_at is not None:
+        raise InvalidTransition("只有还没通知的 CONFIRMED 请求可以按 Patient told")
+    request.patient_told_at = func.now()
+    request.patient_told_by = staff.id
+    session.flush()
+
+
+def list_to_tell(session: Session) -> list[AppointmentRequest]:
+    """「要通知」：确认了、病人还不知道的，先确认的排前面。"""
+    return list(
+        session.scalars(
+            select(AppointmentRequest)
+            .where(AppointmentRequest.status == RequestStatus.CONFIRMED, AppointmentRequest.patient_told_at.is_(None))
+            .order_by(AppointmentRequest.handled_at, AppointmentRequest.id)
+        )
+    )
 
 
 def reject_request(session: Session, request: AppointmentRequest, staff: Staff) -> None:

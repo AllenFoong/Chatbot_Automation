@@ -330,7 +330,9 @@ select:disabled {
   cursor: not-allowed;
 }
 
-input[type="checkbox"] {
+input[type="checkbox"],
+input[type="radio"] {
+  flex: none;
   width: 16px;
   height: 16px;
   margin: 0;
@@ -338,7 +340,8 @@ input[type="checkbox"] {
   accent-color: var(--accent);
 }
 
-input[type="checkbox"]:focus {
+input[type="checkbox"]:focus,
+input[type="radio"]:focus {
   box-shadow: 0 0 0 3px var(--focus);
 }
 
@@ -1421,6 +1424,69 @@ ul.error {
 
 .confirm-form {
   align-self: stretch;
+}
+
+.confirm-date {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.confirm-date label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gpis-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.gpis-choices legend {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.gpis-choices label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.gpis-choices label.match {
+  border-color: var(--accent);
+}
+
+.gpis-choices label:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.gpis-choices .time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.choice-tags {
+  color: var(--accent-text);
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
 /* ---------- 对话 ---------- */

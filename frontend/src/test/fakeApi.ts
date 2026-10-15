@@ -1,7 +1,14 @@
 // 测试用的假后端：把 fetch 换掉，按 "方法 网址" 回传假资料。全部是假名字、假号码。
 
 import { vi } from "vitest";
-import type { AppointmentRequest, Conversation, ConversationDetail, ReminderList, StaffMember } from "../types";
+import type {
+  AppointmentRequest,
+  Conversation,
+  ConversationDetail,
+  GpisChoices,
+  ReminderList,
+  StaffMember,
+} from "../types";
 
 type Reply = { status: number; body?: unknown };
 type Handler = (body: unknown) => Reply;
@@ -58,9 +65,39 @@ export function fakeRequest(overrides: Partial<AppointmentRequest> = {}): Appoin
     notes: null,
     group_id: null,
     gpis_appointment_id: null,
+    confirmed_date: null,
+    confirmed_slot: null,
+    confirmed_doctor_id: null,
+    confirm_message: null,
+    patient_told_at: null,
+    patient_told_by: null,
+    notify_problem: null,
+    whatsapp_phone: "60120000001",
+    whatsapp_allowed: false,
     handled_by: null,
     handled_at: null,
     created_at: "2026-10-06T01:47:00Z",
+    ...overrides,
+  };
+}
+
+/** GPiS 那一天的预约（假名字）：和请求一样的排最上面，第三个已经确认了别的请求 */
+export function fakeChoices(overrides: Partial<GpisChoices> = {}): GpisChoices {
+  const choice = {
+    date: "2026-10-09",
+    contact_id: 5001,
+    same_patient: false,
+    used_by_request_id: null,
+  };
+  return {
+    date: "2026-10-09",
+    source: "Demo data",
+    can_notify: true,
+    choices: [
+      { ...choice, appointment_id: 101, time: "16:00", doctor_id: "PHANG", doctor_name: "PHANG", patient_name: "DEMO KID A", same_doctor: true, same_time: true },
+      { ...choice, appointment_id: 103, time: "10:00", doctor_id: "GOH", doctor_name: "GOH", patient_name: "SOMEONE ELSE", contact_id: 7777, same_doctor: false, same_time: false },
+      { ...choice, appointment_id: 102, time: "16:00", doctor_id: "PHANG", doctor_name: "PHANG", patient_name: "DEMO KID B", contact_id: 5002, same_doctor: true, same_time: true, used_by_request_id: 7 },
+    ],
     ...overrides,
   };
 }

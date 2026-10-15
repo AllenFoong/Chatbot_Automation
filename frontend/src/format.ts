@@ -61,3 +61,9 @@ export const HALF_HOURS: string[] = Array.from({ length: 48 }, (_, i) => {
   const h = String(Math.floor(i / 2)).padStart(2, "0");
   return `${h}:${i % 2 ? "30" : "00"}`;
 });
+
+/** 打开 WhatsApp Desktop 的对话，消息已经填好（D54）。
+ *  用 whatsapp:// 而不是 wa.me 网址：网址会留在浏览器的历史记录（有号码和名字，D31）。 */
+export function whatsappLink(phone: string, message: string): string {
+  return `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
+}

@@ -1,4 +1,4 @@
-# Backend（Phase 2：空档 API；Phase 3：本系统的 PostgreSQL；Phase 4a：Admin Platform 的 API；Phase 5a：WhatsApp；Phase 5b：预约提醒）
+# Backend（Phase 2：空档 API；Phase 3：本系统的 PostgreSQL；Phase 4a：Admin Platform 的 API；Phase 5a：WhatsApp；Phase 5b：预约提醒；Phase 6a：AI 之前的准备）
 
 - **Phase 2**：把 `sql/check_available_slots.sql` 的计算搬到 Python（FastAPI），让之后的 WhatsApp 和 AI Agent 可以调用。
   **只读** GPiS，计算规则和 SQL 完全一样；改规则时两边要一起改。
@@ -909,4 +909,72 @@ pytest                        # 应该 364 passed，没有 skipped
 - 第 7 项（用 2026-10-09 GOH OR 测）：`Requests=0`、没有 7d（PHANG 的请求不算到 GOH）。
 - 第 8、9 项（`/docs`）：`requests: 1`、`held_requests` 只有 `request_id: 2`、`time: 16:00`、`dur_slots: 1`，没有名字；`requests=false` → `requests: 0`、`held_requests: []`、16:00 `booked: 0`。
 - 没有改任何资料（id `2`、`3` 还是 `PENDING`，留给 6a-2b 测）。
+
+## Phase 6a-2b：员工按 *Entered in GPiS ✓*（D71 ①、D72）
+
+设计见 `docs/decisions.md` D71、D72，`docs/architecture.md` 11.6。
+
+- *Requests* → *Pending* 的卡片：**Entered in GPiS ✓**（取代以前的 *Confirm* + 自己填 AppointmentID）。
+  员工先在 GPiS 输入，再按：系统**当场只读查一次 GPiS**，列出那一天的预约（只有时间、名字、医生；没有 Remarks、号码），
+  和请求一样的排最上面（*Same patient* / *Same doctor* / *Same time*）。员工点选 → *Confirm this appointment*：
+  后端再读一次 GPiS，那个预约还在才确认。GPiS 里没有 = 不能确认。员工约成别的日期，改上面的 *GPiS date*。
+- 确认后系统**马上经 WhatsApp 发确认消息**（照 GPiS 的名字、日期、时间、医生；写法和提醒一样，等 W61、W68 再改）。
+  发不了的放在新的分页 ***To tell patient***，写原因；员工用 *Open in WhatsApp* / *Copy message* / 手机传了，按 ***Patient told ✓***。
+- 一个 GPiS 预约只能确认一个请求（已经用过的变灰）；新病人顺便记下 GPiS 的 `ContactID`。
+- **读 `GPiS_Dev` 时不发、也没有 *Open in WhatsApp***（黄色提醒）：名字是真的病人。要试真的发，用 `REMINDER_SOURCE=demo`（假资料）。
+- 选单 *Requests* 的数字 = 待确认 + 要通知。
+- 改表：migration **`0006`**（`appointment_requests` 多 7 栏 + 部分唯一 index；以前确认的当作已经通知）。
+- 电脑 B 还没有请求（没有 AI），**暂时不用更新**；下次更新 B 时要 `alembic upgrade head` 到 `0006`（照 `docs/deploy-pc-b.md` 第 9 节，改表前先备份）。
+- 测「确认后自动通知」：`python -m app.db.demo --request-for <自己的手机>`，给自己手机的那段对话加一个 PENDING 请求（Demo Self、S+P、PHANG、下一个星期五 10:00）。
+
+### 更新（开发电脑）
+
+```powershell
+# backend（先启用 venv）
+git pull
+alembic upgrade head          # 0005 -> 0006
+alembic current               # 0006 (head)
+pytest                        # 应该 390 passed，没有 skipped
+
+# frontend
+cd ..\frontend
+npm test                      # 应该 50 passed
+npm run build                 # ✓ built
+```
+
+### 6a-2b 完成的条件（在开发电脑上测试）
+
+视窗照「Phase 5a」的「使用」（视窗 1 Admin API、视窗 4 网页；B 部分还要视窗 2 webhook、视窗 3 cloudflared）。psql 用 `$psql`。
+**A 部分读 `GPiS_Dev`，画面上是真的病人名字：只数行数，不要截图、不要贴名字。**
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的「更新」 | `0006 (head)`；`pytest` 390 passed、没有 skipped；`npm test` 50 passed；`npm run build` 成功 |
+| 2 | `& $psql -h localhost -U chatbot -d chatbot_dev -c "SELECT id, status, patient_told_at IS NOT NULL AS told FROM appointment_requests ORDER BY id;"` | id `1`（Phase 4b 确认过的 Demo Kid A）`CONFIRMED`、`told = t`；`2`、`3` `PENDING`、`f`；`4` `CANCELLED`、`f` |
+| 3 | 开视窗 1、4，登入 → *Requests* | 分页 *Pending*、*To tell patient*、*Confirmed* …；选单 *Requests* 的数字是 `2`；*To tell patient* 没有数字（Demo Kid A 不在里面） |
+| **A** | **读 `GPiS_Dev`**（`.env` 没有 `REMINDER_SOURCE=demo`） | |
+| 4 | Demo Kid B → **Entered in GPiS ✓** | *GPiS date* 是 `2026-10-09`；黄色 *The list comes from GPiS_Dev: the patient will not be messaged automatically*；2 行：`11:30`、`13:00`，都是 Dr PHANG（= 6a-2a 第 4 项的 `Patients=2`）；*Confirm this appointment* 要点选之后才能按 |
+| 5 | *GPiS date* 改成 `2026-09-02` | Dr PHANG 的有 25 行（= T6 的 `Patients=25`），时间由早到晚 |
+| 6 | **Back** | 回到卡片，还是 *Pending*（什么都没改） |
+| **B** | **假资料 + 自己的手机**：`.env` 加 `REMINDER_SOURCE=demo` → 重开视窗 1；开视窗 2、3（*Callback URL* 改成新的网址） | |
+| 7 | 用**自己的手机**传一条 `test 6a-2b` 给 Meta 测试号码 → `python -m app.db.demo --request-for <自己的手机>` | `Added pending request N: Demo Self, S+P, PHANG, <下一个星期五> 10:00.` |
+| 8 | *Requests* → **Refresh** → Demo Self → **Entered in GPiS ✓** | 没有黄色提醒；6 行 Demo Patient A–F（取消的 G、`00:00` 的 H 不列）；第一行 `10:00 DEMO PATIENT A · Dr PHANG Same doctor · Same time` |
+| 9 | 点选第一行 → **Confirm this appointment** | 绿色 *Demo Self: confirmed, and the patient was sent the confirmation.*；手机收到 `预约确认✅`，`NAME: DEMO PATIENT A`、那天的日期、`TIME: 10:00 AM`、`DOCTOR: DR PHANG`；*Conversations* 那段对话最后一条是这则消息（员工接手的对话 → 算你发的） |
+| 10 | Demo Kid B → **Entered in GPiS ✓** → *GPiS date* `2026-10-09` → 点选 `11:00 DEMO PATIENT C` → **Confirm this appointment** | 黄色 *confirmed, but the patient was not messaged (More than 24 hours …)*；*To tell patient (1)*；选单数字 `2`（1 个待确认 + 1 个要通知） |
+| 11 | *To tell patient* | Demo Kid B 的卡片：黄色原因、*In GPiS* `Fri 09 Oct 2026 11:00 · Dr PHANG`、消息预览（`NAME: DEMO PATIENT C`）；没有 *Open in WhatsApp*（`60120000001` 不在允许名单），有 *Copy message*、*Patient told ✓* |
+| 12 | **Patient told ✓** | *Every confirmed patient has been told.*；*Confirmed* 分页的 Demo Kid B 有 *Patient told … (by staff)*，Demo Self 有 *(sent by the system)* |
+| 13 | Demo Patient → **Entered in GPiS ✓** → *GPiS date* `2026-10-09` | `11:00 DEMO PATIENT C` 那一行变灰、*already confirms request #<Demo Kid B 的 id>*，不能点选 → **Back** |
+| 14 | `& $psql -h localhost -U chatbot -d chatbot_dev -c "SELECT id, gpis_appointment_id, confirmed_date, confirmed_slot, confirmed_doctor_id, patient_told_by IS NOT NULL AS by_staff, notify_problem FROM appointment_requests WHERE status = 'CONFIRMED' ORDER BY id;"` | Demo Kid B：`2026-10-09`、`11:00:00`、`PHANG`、`by_staff = t`、原因是 *More than 24 hours …*；Demo Self：下一个星期五、`10:00:00`、`PHANG`、`by_staff = f`、原因空的 |
+| 15 | 清理：`.env` 拿掉 `REMINDER_SOURCE=demo` → 重开视窗 1；关掉视窗 3（cloudflared） | — |
+
+### 云端容器的测试记录（2026-10-15，PostgreSQL 16、Python 3.11 + `requirements-lock.txt`、Node 22、只用假资料）
+
+- `pytest` → 390 passed（新增 26 个）：点选名单（取消、`Postpone`、`00:00`、诊所联系人、OFF DAY、看不懂的时段都不列，同一个预约不重复，排序、`same_*`，没有 Remarks、号码）；
+  再读一次 GPiS 才确认（没有、已取消 → 409，请求还是 PENDING）；一个 GPiS 预约只确认一个请求；员工约成别的日期、医生、时间照点选的发；
+  ContactID 只在空的、别人没用的时候记；读 GPiS_Dev 不发、没有 *Open in WhatsApp*；不在允许名单、没设定 WhatsApp、WhatsApp 不接受、超过 24 小时、对话已结束、员工建的请求（没有对话）、发了但存不进去 → 都在 *To tell patient*；
+  AI 的对话算 AI 发、员工接手的算员工发；*Patient told* 两次 → 409；确认后取消就不在「要通知」；确认后不再算占用（A8）；
+  migration `0006` 把以前确认的当作已经通知；`python -m app.db.demo --request-for`。
+- `npm test` → 50 passed（新的流程：点选、换日期、已经用过的变灰、GPiS_Dev 的黄色提醒、没发出去的原因、读 GPiS 失败、*To tell patient* 的 *Open in WhatsApp* / *Patient told*）；`npm run build` 成功。
+- headless Chromium（假资料 `REMINDER_SOURCE=demo`、没设定 WhatsApp）照着点过：点选 → 确认 → 黄色 *not messaged (WhatsApp is not set up on this computer)* → *To tell patient (1)* 有 *Open in WhatsApp*（允许名单里的号码）→ *Patient told* → *Confirmed* 显示 *(by staff)*；1366 和 400 宽都排得下；已经用过的预约变灰。
+- 写的时候找到、已经改好：点选名单的圆点被全站的 `label` 样式排到文字上面 → 名单的 `label` 改成横排。
 
