@@ -896,3 +896,17 @@ pytest                        # 应该 364 passed，没有 skipped
   数据库只读 `PENDING`、这天、这位医生、有时段的请求（别的医生、别的日子、没有时段、没有医生、已确认、已拒绝、已取消都不算）；
   API 的 `requests`、`requests=false` 不读请求、`debug` 只有编号、读请求失败回 `503` 不露出密码；API 真的从测试数据库读到请求，回应没有病人名字）。
 - `python -m app.cli`（GPiS 换成假的：16:00 有 1 人；测试数据库有 2 个 16:00 的请求，一个 30 分钟、一个 60 分钟）：7a `Patients=1  Requests=2`；16:00 `Booked 3`、`Requests 2`，16:00、16:30 变成 `LONG APPT`；7d 列出 2 个请求。加 `--gpis-only`：16:00 `Booked 1`、`Can30 1`，没有 7d。
+
+### 开发电脑的测试记录（2026-10-15，`GPiS_Dev` = 2026-09-28 的快照、`chatbot_dev` 的假资料）
+
+- 第 1–9 项全部通过：`pytest` 364 passed、没有 skipped。
+- 第 2 项：`--gpis-only` 的 T6（2026-09-02 PHANG S+P：25 人；09:00、11:30、15:30 满 3 人；09:30、11:00、15:00、16:00 `Cap = 2`）、
+  T8（2026-09-09 PHANG S+P：25 人；16:00、16:30 `LONG APPT`；17:00 有 1 人）和「对照记录」一样，`Requests` 栏都是 `0`。
+- 第 3 项：`PENDING` 有 2 个：id `2`（PHANG、2026-10-09、16:00、30 分钟）、id `3`（GOH、2026-10-10、10:00、30 分钟）。
+- 第 4、5 项（2026-10-09 PHANG S+P）：`Patients=2  Requests=1`；16:00 `Booked 1`、`Requests 1`，7d 是 id `2`；15:30 的 `Can60` 变 `0`（下一格有请求）。
+  加 `--gpis-only`：16:00 `Booked 0`、15:30 和 16:00 `Can60 = 1`，其他时段一样。
+- 第 6 项（2026-10-10 GOH OR）：`Patients=1  Requests=1`；10:00 `Booked 1`、`Requests 1`，7d 是 id `3`；09:30 的 `Can60` 变 `0`。
+- 第 7 项（用 2026-10-09 GOH OR 测）：`Requests=0`、没有 7d（PHANG 的请求不算到 GOH）。
+- 第 8、9 项（`/docs`）：`requests: 1`、`held_requests` 只有 `request_id: 2`、`time: 16:00`、`dur_slots: 1`，没有名字；`requests=false` → `requests: 0`、`held_requests: []`、16:00 `booked: 0`。
+- 没有改任何资料（id `2`、`3` 还是 `PENDING`，留给 6a-2b 测）。
+
