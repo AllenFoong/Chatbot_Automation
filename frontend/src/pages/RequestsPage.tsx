@@ -6,6 +6,7 @@
 //   和请求一样的排在最上面（同一位病人、同医生、同时段），但还是要员工自己选。
 // - 确认后系统马上经 WhatsApp 通知病人；发不了的（超过 24 小时、读 GPiS_Dev …）放在 To tell patient，
 //   员工用 Open in WhatsApp 或手机传了，按 Patient told ✓。
+// - 自动确认（D71 ②）：上面一行写开了没有、上次成功查 GPiS 是几点；太久没查到就红字。系统确认的卡片写 Auto-confirm。
 // - Reject、Patient cancelled 按错了：在 Rejected / Cancelled 分页按 Back to pending 改回来（又算占用；
 //   确认过又取消的，要重新点选 GPiS 的预约）。
 
@@ -16,8 +17,8 @@ import * as api from "../api";
 import { Badge, Empty, ErrorBox, Loading, Notice, PageHeader, Tabs } from "../components";
 import { formatDate, formatDateTime, formatPhone, formatTime, whatsappLink } from "../format";
 import { useAction, useLoad } from "../hooks";
-import { CopyIcon, RefreshIcon, WhatsAppIcon } from "../icons";
-import type { AppointmentRequest, GpisChoice, RequestStatus } from "../types";
+import { AlertIcon, CopyIcon, RefreshIcon, WhatsAppIcon } from "../icons";
+import type { AppointmentRequest, AutoConfirmStatus, GpisChoice, RequestStatus } from "../types";
 
 type View = RequestStatus | "TO_TELL";
 
@@ -32,6 +33,45 @@ const STATUS_LABEL: Record<RequestStatus, string> = {
 function groupMates(r: AppointmentRequest, all: AppointmentRequest[]): string[] {
   if (!r.group_id) return [];
   return all.filter((o) => o.group_id === r.group_id && o.id !== r.id).map((o) => o.customer_name);
+}
+
+/** 自动确认（D71 ②）开了没有、上次成功查 GPiS 是几点；太久没查到就红字，员工就知道要自己按 */
+function AutoConfirmLine({ status }: { status: AutoConfirmStatus | undefined }) {
+  if (!status) return null;
+  const last = status.checked_at ? formatDateTime(status.checked_at) : "never";
+  if (!status.enabled) {
+    return (
+      <p className="muted small auto-confirm-line">
+        Auto-confirm is off: press Entered in GPiS for each request. An admin can turn it on in Settings.
+      </p>
+    );
+  }
+  if (!status.runs_here) {
+    return (
+      <Notice tone="warning">
+        Auto-confirm is on, but it does not run with {status.source ?? "this GPiS setting"} (test data with real
+        names). Press Entered in GPiS for each request.
+      </Notice>
+    );
+  }
+  if (status.stale) {
+    return (
+      <div className="error" role="status">
+        <AlertIcon />
+        <span>
+          Auto-confirm has not checked GPiS since {last}
+          {status.error ? ` (${status.error})` : ""}. Is this computer connected to the GPiS computer? Until it
+          works again, press Entered in GPiS for each request.
+        </span>
+      </div>
+    );
+  }
+  return (
+    <p className="muted small auto-confirm-line">
+      Auto-confirm is on: requests that match GPiS exactly are confirmed automatically
+      {status.in_business_hours ? "" : " (it checks GPiS 9:00–17:30)"}. Last checked GPiS: {last}.
+    </p>
+  );
 }
 
 /** 确认之后告诉员工：病人收到了没有 */
@@ -345,6 +385,12 @@ function RequestCard({
             <dd>{r.gpis_appointment_id}</dd>
           </>
         )}
+        {r.status === "CONFIRMED" && r.handled_by === null && (
+          <>
+            <dt>Confirmed by</dt>
+            <dd>Auto-confirm (matched GPiS)</dd>
+          </>
+        )}
         {r.status === "CONFIRMED" && r.patient_told_at && (
           <>
             <dt>Patient told</dt>
@@ -442,10 +488,12 @@ export default function RequestsPage() {
   const [notice, setNotice] = useState<{ tone: "success" | "warning"; text: string } | null>(null);
   const list = useLoad(() => (view === "TO_TELL" ? api.requests.toTell() : api.requests.list(view)), [view], 30_000);
   const toTell = useLoad(() => api.requests.toTell(), [], 30_000);
+  const auto = useLoad(() => api.requests.autoConfirm(), [], 30_000);
 
   function reload() {
     list.reload();
     toTell.reload();
+    auto.reload();
   }
 
   const tabs: { value: View; label: string }[] = [
@@ -477,6 +525,7 @@ export default function RequestsPage() {
           setNotice(null);
         }}
       />
+      <AutoConfirmLine status={auto.data} />
       {notice && <Notice tone={notice.tone}>{notice.text}</Notice>}
       <ErrorBox message={list.error} onRetry={list.reload} />
       {list.data === undefined ? (

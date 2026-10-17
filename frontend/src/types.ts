@@ -178,6 +178,22 @@ export interface ClinicSettings {
   max_per_slot: number;
   max_per_slot_for_ai: number;
   clinic_contact_id: number;
+  /** 自动确认（D71 ②）：只有 ADMIN 能改，默认关 */
+  auto_confirm: boolean;
+}
+
+/** Requests 页面上面那一行（GET /api/requests/auto-confirm） */
+export interface AutoConfirmStatus {
+  enabled: boolean;
+  /** 这台电脑的资料来源可以自动确认（主机的 GPiS 或假资料；GPiS_Dev 不行） */
+  runs_here: boolean;
+  source: string | null;
+  /** 上次成功查 GPiS */
+  checked_at: string | null;
+  error: string | null;
+  in_business_hours: boolean;
+  /** 打开了、营业时间，超过 15 分钟没成功查 GPiS */
+  stale: boolean;
 }
 
 // ---------- 预约提醒（app/api/reminders.py，Phase 5b） ----------

@@ -5,6 +5,7 @@
 
 import type {
   AppointmentRequest,
+  AutoConfirmStatus,
   GpisChoices,
   ClinicSettings,
   Closure,
@@ -155,6 +156,8 @@ export const conversations = {
 
 export const requests = {
   list: (status: RequestStatus) => request<AppointmentRequest[]>("GET", `/requests${query({ status })}`),
+  /** 自动确认开了没有、上次成功查 GPiS（D71 ②） */
+  autoConfirm: () => request<AutoConfirmStatus>("GET", "/requests/auto-confirm"),
   /** 「要通知」：确认了、病人还不知道的 */
   toTell: () => request<AppointmentRequest[]>("GET", "/requests?to_tell=true"),
   /** 当场查 GPiS 那一天的预约（不填日期 = 请求的日期） */

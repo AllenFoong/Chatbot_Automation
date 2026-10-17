@@ -19,6 +19,12 @@ from tests.database import PASSWORD, drop_all_tables, upgrade_to_head
 
 
 @pytest.fixture(autouse=True)
+def _no_auto_confirm_loop(monkeypatch):
+    """测试不开背景的自动确认（app/main.py 的 lifespan）。"""
+    monkeypatch.setenv("AUTO_CONFIRM_LOOP", "off")
+
+
+@pytest.fixture(autouse=True)
 def _never_use_dev_database(monkeypatch):
     """测试绝不能连 DATABASE_URL（开发用的数据库），只能用 TEST_DATABASE_URL。"""
 

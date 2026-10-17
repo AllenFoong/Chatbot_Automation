@@ -281,7 +281,7 @@ def test_saving_after_send_fails_keeps_it_in_tell_list(amy, whatsapp, monkeypatc
     def broken(*args, **kwargs):
         raise RuntimeError("disk full")
 
-    monkeypatch.setattr("app.api.requests.conv.record_outgoing_message", broken)
+    monkeypatch.setattr("app.confirming.conv.record_outgoing_message", broken)
     kid = pending(amy, "Demo Kid A")
     body = amy.post(f"/api/requests/{kid['id']}/confirm", json={"gpis_appointment_id": 101}).json()
     assert body["status"] == "CONFIRMED" and len(whatsapp.sent) == 1
