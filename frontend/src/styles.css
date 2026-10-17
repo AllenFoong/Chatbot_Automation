@@ -705,6 +705,10 @@ main {
   max-width: 360px;
 }
 
+.inline-form > label.check > input {
+  width: 16px;
+}
+
 .checks {
   display: flex;
   flex-wrap: wrap;
@@ -2050,5 +2054,10 @@ ul.error {
 
 .modal .gpis-choices label {
   padding: 10px 12px;
+}
+
+/* Requests 页面上面那一行：自动确认开了没有 */
+.auto-confirm-line {
+  margin: 0 0 14px;
 }
 

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from datetime import date
 from functools import lru_cache
 
@@ -13,6 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from . import auto_confirm
 from .api import auth as auth_api
 from .api import conversations, reminders, requests, settings, staff
 from .availability import HeldRequest, check_available_slots
@@ -26,7 +29,22 @@ from .gpis import AppointmentSource, GpisReader, WrongDatabaseError
 
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="Chatbot_Automation API", version="0.5.0")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Admin API 开着的时候，背景每 3 分钟跑一次自动确认（只有 Settings 打开了才真的做事，D71 ②）。
+
+    AUTO_CONFIRM_LOOP=off 可以关掉这个背景（测试用）。webhook 小程序（webhook_main.py）没有这个背景。
+    """
+    loop = None
+    if os.environ.get("AUTO_CONFIRM_LOOP", "on").strip().lower() != "off":
+        loop = auto_confirm.Loop()
+        loop.start()
+    yield
+    if loop is not None:
+        loop.stop()
+
+
+app = FastAPI(title="Chatbot_Automation API", version="0.6.0", lifespan=lifespan)
 for module in (auth_api, conversations, reminders, requests, settings, staff):
     app.include_router(module.router)
 

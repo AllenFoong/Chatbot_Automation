@@ -999,3 +999,70 @@ npm run build                 # ✓ built
 - 测试时改的：确认消息的写法、*Back to pending*（D73）、弹出视窗。
 - Meta 的 *Verify and save* 一次出现 *The callback URL or verify token couldn't be validated*：照「Phase 5a」的视窗顺序重开、网址加 `/webhook` 后通过（不是 access token 的问题）。
 
+## Phase 6a-2c：自动确认（D71 ②、D74）
+
+设计见 `docs/decisions.md` D71、D74，`docs/architecture.md` 11.6 第 3 项。
+
+- *Settings* → **Slots & auto-confirm** → **Confirm matching requests automatically**：**默认关、只有 ADMIN 能改**（STAFF 看得到，不能改）。
+- 打开后，Admin API（`uvicorn app.main:app`，电脑 B 上就是自动启动的那个）**营业时间 9:00–17:30 每 3 分钟**只读查一次 GPiS：
+  1. 只看还在 *Pending*、病人已经有 GPiS ContactID、有日期 / 时段 / 医生、日期还没过的请求。新病人第一次一定要员工按。
+  2. **第一次看到**一个请求时，只记下那天这位病人在 GPiS 已经有没有预约：已经有 → 这个请求只能员工按；没有 → 之后出现的才算。
+  3. 同一位病人、同一天、同一个时段、同一位医生、Remarks 有请求的疗程代码、时长一样（`1HOUR` ↔ 60 分钟），
+     而且只有一个预约对得上 → 自动 *Confirmed*、马上发确认消息（和员工按的一样；发不了的进 *To tell patient*）。
+  4. 对不上的照样留在 *Pending*，员工按 **Entered in GPiS ✓**。
+- *Requests* 页面上面一行：自动确认关了 / 开了、**上次成功查 GPiS 的时间**；打开、营业时间、超过 15 分钟没成功 → **红字**。
+  读 `GPiS_Dev` 时不跑（黄色提醒）。系统确认的卡片写 *Confirmed by: Auto-confirm (matched GPiS)*。
+- 改表：migration **`0007`**（`clinic_settings` 多 3 栏、`appointment_requests.gpis_same_day_before`）。
+- 电脑 B：下次更新要 `alembic upgrade head` 到 `0007`（`0006` 也还没装）；开关默认关，B 上**不要打开**（还没有 AI、没有请求）。
+- 测试用的指令（在 `backend` 里，先启用 venv；只印请求编号、日期、时间、医生，没有名字）：
+  - `python -m app.auto_confirm --dry-run`：读一次 GPiS，只印出会怎么做，不改资料（不管开关、营业时间）。
+  - `python -m app.auto_confirm --once`：马上真的跑一次（开关要打开；不管营业时间）。
+  - `python -m app.db.demo --auto-confirm-demo <自己的手机>`：给自己手机的对话加一个请求（Demo Auto、ContactID 990001、S+P、PHANG、下一个星期五 11:30），
+    用一个假的 GPiS 跑两次：第一次没有 → 假装员工输入了 11:30 → 第二次自动确认、发到自己的手机。
+
+### 更新（开发电脑）
+
+```powershell
+# backend（先启用 venv）
+git pull
+alembic upgrade head          # 0006 -> 0007
+alembic current               # 0007 (head)
+pytest                        # 应该 427 passed，没有 skipped
+
+# frontend
+cd ..\frontend
+npm test                      # 应该 58 passed
+npm run build                 # ✓ built
+```
+
+### 6a-2c 完成的条件（在开发电脑上测试）
+
+视窗照「Phase 5a」的「使用」（视窗 1 Admin API、视窗 4 网页；第 6 项还要视窗 2、3）。改了 `.env` 要重开视窗 1。
+**第 3、4 项读 `GPiS_Dev`：只看字，不要截图。**
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的「更新」 | `0007 (head)`；`pytest` 427 passed、没有 skipped；`npm test` 58 passed；`npm run build` 成功 |
+| 2 | 用 **STAFF** 帐号登入 → *Settings* → **Slots & auto-confirm** | 有 *Auto-confirm from GPiS*，勾选框没有勾、是灰的（不能改）；*Requests* 上面一行 *Auto-confirm is off: press Entered in GPiS for each request …* |
+| 3 | 用 **ADMIN** 帐号 → 勾 *Confirm matching requests automatically* → **Save**（`.env` 没有 `REMINDER_SOURCE=demo`，读 `GPiS_Dev`） | *Saved.*；*Requests* 上面是黄色 *Auto-confirm is on, but it does not run with GPiS_Dev …* |
+| 4 | 视窗 5：`python -m app.auto_confirm --dry-run` | `Auto-confirm does not run on GPiS_Dev: it has real patient names (D44). …` |
+| 5 | `.env` 加 `REMINDER_SOURCE=demo` → 重开视窗 1 → *Requests* → **Refresh** | 上面一行 *Auto-confirm is on: …*，现在不是 9:00–17:30 的话后面多 *(it checks GPiS 9:00–17:30)*，*Last checked GPiS: never*（或上次的时间） |
+| 6 | 用自己的手机传 `test 6a-2c` 给 Meta 测试号码 → 视窗 5：`python -m app.db.demo --auto-confirm-demo <你的手机>` | 印出 3 行：`Added pending request N: Demo Auto, S+P, PHANG, <下一个星期五> 11:30.`、`1) GPiS has nothing yet: first look recorded (… = False).`、`2) Staff entered 11:30 in GPiS: request N confirmed automatically, message sent to the phone.`；手机收到 `好的哟，已经帮你预约了哦😊`、`NAME: DEMO AUTO`、`TIME: 11:30 AM`、`DOCTOR: DR PHANG` |
+| 7 | *Requests* → **Refresh** → *Confirmed* | Demo Auto 的卡片：*In GPiS* `<下一个星期五> 11:30 · Dr PHANG`、*Confirmed by* **Auto-confirm (matched GPiS)**、*Patient told … (sent by the system)* |
+| 8 | 视窗 5：`python -m app.auto_confirm --once` → *Requests* → **Refresh** | 印出 `Source: Demo data. Pending requests looked at: …`（Demo Auto 已经确认了，不会再出现）；上面一行 *Last checked GPiS:* 变成现在的时间 |
+| 9 | （9:00–17:30 才能测）视窗 1 开着、开关打开，等 3–4 分钟 → **Refresh** | *Last checked GPiS* 自己变成刚才的时间（背景每 3 分钟） |
+| 10 | 清理：ADMIN 把勾拿掉 → **Save**；`.env` 拿掉 `REMINDER_SOURCE=demo` → 重开视窗 1；关掉视窗 3 | *Requests* 上面回到 *Auto-confirm is off …* |
+
+### 云端容器的测试记录（2026-10-17，PostgreSQL 16、Python 3.11 + `requirements-lock.txt` 和 3.13、Node 22、只用假资料）
+
+- `pytest` → 427 passed（新增 35 个）：疗程代码（`OR` 不配 `ORTHO`、`FOR`；`C/UP AFTER …`、`ISSUE CROWN`、`SCAN B`、`SC` 和 `SCAN B` 分得开）；
+  第一次看只记下来、不确认；全部一样才确认；时段 / 医生 / 疗程 / 时长 / 取消 / 诊所联系人 / 日期不一样都不确认；1 hour 要 `1HOUR`；
+  已经用过、第一次看就已经有、一个预约对两个请求、一个请求对两个预约都交给员工；营业时间（马来西亚时间 9:00–17:29）；
+  跑两次：第一次记下、员工输入后确认、发消息、`handled_by` 空、再跑不会重复；dry-run 不改资料；没有 ContactID、日期过了不看；
+  员工在两步之间改了请求就不确认；*Back to pending* 重新看；背景：开关关 / 下班不跑、记下上次成功和失败（不露出密码）、`GPiS_Dev` 不跑；
+  员工接手的对话记成员工发的；STAFF 不能开、页面状态（还没查过 / 5 分钟前 / 20 分钟前）；`--auto-confirm-demo`。
+- `npm test` → 58 passed（Settings 的开关 ADMIN 能改、STAFF 是灰的；Requests 上面一行的 4 种情况；*Auto-confirm (matched GPiS)*）；`npm run build` 成功。
+- 容器的 `chatbot_dev`（假资料）：`alembic upgrade head` → `0007`；`--dry-run`、`--once`（开关关 → 拒绝）、`--auto-confirm-demo`（确认了；假对话超过 24 小时 → 进 *To tell patient*）；
+  在「营业时间」跑一次背景的 `tick` → 记下上次查 GPiS 的时间、没有错误；uvicorn 启动时背景开始、日志没有错误。
+- headless Chromium：ADMIN 在 *Slots & auto-confirm* 打开 → *Saved.* → *Requests* 上面一行 *Auto-confirm is on … Last checked GPiS: …*；写的时候找到、已经改好：勾选框被表单的样式拉宽。
+

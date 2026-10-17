@@ -89,6 +89,75 @@ describe("roles", () => {
   });
 });
 
+describe("auto-confirm (D71 ②)", () => {
+  const settings = { max_per_slot: 3, max_per_slot_for_ai: 3, clinic_contact_id: 34094, auto_confirm: false };
+  const status = {
+    enabled: true,
+    runs_here: true,
+    source: "GPiS",
+    checked_at: "2026-10-19T03:00:00Z",
+    error: null,
+    in_business_hours: true,
+    stale: false,
+  };
+
+  it("only ADMIN can switch it on in Settings", async () => {
+    const { calls } = fakeApi({
+      "GET /api/auth/me": ok(ADMIN),
+      ...counts,
+      "GET /api/settings": ok(settings),
+      "PATCH /api/settings": (body) => ok({ ...settings, ...(body as object) }),
+    });
+    renderApp("/settings/clinic");
+    const user = userEvent.setup();
+    const box = await screen.findByRole("checkbox", { name: "Confirm matching requests automatically" });
+    expect(box).not.toBeChecked();
+    await user.click(box);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "PATCH")?.body).toMatchObject({ auto_confirm: true });
+  });
+
+  it("STAFF sees the switch but cannot change it", async () => {
+    fakeApi({ "GET /api/auth/me": ok(STAFF), ...counts, "GET /api/settings": ok({ ...settings, auto_confirm: true }) });
+    renderApp("/settings/clinic");
+    const box = await screen.findByRole("checkbox", { name: "Confirm matching requests automatically" });
+    expect(box).toBeChecked();
+    expect(box).toBeDisabled();
+  });
+
+  it.each([
+    [{ ...status, enabled: false }, /Auto-confirm is off: press Entered in GPiS/],
+    [status, /Auto-confirm is on: requests that match GPiS exactly are confirmed automatically\. Last checked GPiS/],
+    [{ ...status, runs_here: false, source: "GPiS_Dev" }, /does not run with GPiS_Dev/],
+    [{ ...status, stale: true, error: "Could not check GPiS (OperationalError)." }, /has not checked GPiS since/],
+  ])("shows whether it is working on the Requests page (%#)", async (s, text) => {
+    fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      ...counts,
+      "GET /api/requests?status=PENDING": ok([]),
+      "GET /api/requests/auto-confirm": ok(s),
+    });
+    renderApp("/requests");
+    expect(await screen.findByText(text)).toBeInTheDocument();
+  });
+
+  it("marks requests confirmed by auto-confirm", async () => {
+    fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      ...counts,
+      "GET /api/requests?status=PENDING": ok([]),
+      "GET /api/requests/auto-confirm": ok(status),
+      "GET /api/requests?status=CONFIRMED": ok([
+        fakeRequest({ status: "CONFIRMED", handled_by: null, patient_told_at: "2026-10-19T03:03:00Z" }),
+      ]),
+    });
+    renderApp("/requests");
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "Confirmed" }));
+    expect(await screen.findByText("Auto-confirm (matched GPiS)")).toBeInTheDocument();
+  });
+});
+
 describe("treatments", () => {
   const service = (code: string, treatment_group: string | null) => ({
     code, name: code, can_be_third: false, may_need_1h: false, ai_can_book: false, treatment_group, active: true,

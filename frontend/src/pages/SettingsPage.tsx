@@ -16,7 +16,7 @@ const SECTIONS = {
   services: { label: "Treatments", Component: ServicesSection },
   closures: { label: "Clinic closures", Component: ClosuresSection },
   leaves: { label: "Doctor leave", Component: LeavesSection },
-  clinic: { label: "Slot limits", Component: ClinicSection },
+  clinic: { label: "Slots & auto-confirm", Component: ClinicSection },
 } as const;
 
 type SectionKey = keyof typeof SECTIONS;

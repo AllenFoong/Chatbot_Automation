@@ -187,6 +187,10 @@ class ClinicSettings(Base):
     max_per_slot: Mapped[int] = mapped_column(SmallInteger, server_default=text("3"))           # 每格最多几人（W22）
     max_per_slot_for_ai: Mapped[int] = mapped_column(SmallInteger, server_default=text("3"))    # 改成 2 = AI 不用第 3 个名额
     clinic_contact_id: Mapped[int]          # GPiS 里诊所自己当联系人的 ContactID（统计 B6）
+    # 自动确认（D71 ②、6a-2c）：只有 ADMIN 能改，默认关。打开后营业时间每 3 分钟自己找 GPiS 的预约
+    auto_confirm: Mapped[bool] = mapped_column(server_default=false())
+    auto_confirm_checked_at: Mapped[datetime | None]              # 上次成功查 GPiS 的时间（页面显示，太久就红字）
+    auto_confirm_error: Mapped[str | None] = mapped_column(Text)  # 上次失败的原因（成功一次就清掉；不写连接字符串）
 
     __table_args__ = (
         CheckConstraint("id = 1", name="single_row"),
@@ -355,6 +359,9 @@ class AppointmentRequest(Base):
     confirmed_doctor_id: Mapped[str | None] = mapped_column(String(20))
     # 通知病人（D71）：确认消息的内容；系统发出去或员工按 Patient told ✓ 的时间。
     # CONFIRMED 而 patient_told_at 是空的 = 「要通知」；notify_problem = 系统为什么没发（给员工看）
+    # 自动确认（6a-2c）：系统第一次看这个请求那天时，这位病人在 GPiS 已经有没有预约。
+    # NULL = 还没看过；True = 已经有（可能是旧的预约）→ 这个请求只能员工按；False = 没有 → 之后出现的才算
+    gpis_same_day_before: Mapped[bool | None]
     confirm_message: Mapped[str | None] = mapped_column(Text)
     patient_told_at: Mapped[datetime | None]
     patient_told_by: Mapped[int | None] = mapped_column(ForeignKey("staff.id"))     # 空 = 系统自己发的

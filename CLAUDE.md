@@ -13,7 +13,7 @@
 | [`docs/decisions.md`](docs/decisions.md) | 做过的决定和原因、数据安全规则 |
 | [`docs/clinic-workflow.md`](docs/clinic-workflow.md) | 营业时间、医生排班、staff 如何使用 GPiS 预约、Remarks 治疗代码、待确认问题 |
 | [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
-| [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API；Phase 3：PostgreSQL（安装、建表、改表结构的步骤）；Phase 4a：员工登录、Admin API；Phase 5a：WhatsApp（Meta 测试 App、tunnel、测试清单）；Phase 5b：预约提醒（名单、Open in WhatsApp、测试清单）；资料保留（A10：提醒 90 天后删掉、测试清单）；Phase 6a-1（遮证件号码）、6a-2a（`PENDING` 的请求算占用）、6a-2b（*Entered in GPiS ✓*、*To tell patient*），各有测试清单；对照步骤 |
+| [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API；Phase 3：PostgreSQL（安装、建表、改表结构的步骤）；Phase 4a：员工登录、Admin API；Phase 5a：WhatsApp（Meta 测试 App、tunnel、测试清单）；Phase 5b：预约提醒（名单、Open in WhatsApp、测试清单）；资料保留（A10：提醒 90 天后删掉、测试清单）；Phase 6a-1（遮证件号码）、6a-2a（`PENDING` 的请求算占用）、6a-2b（*Entered in GPiS ✓*、*To tell patient*）、6a-2c（自动确认），各有测试清单；对照步骤 |
 | [`frontend/README.md`](frontend/README.md) | Phase 4b：Admin Platform 网页（React + TypeScript）：安装、启动、测试清单；画面整理（D66）的测试清单 |
 | [`docs/deploy-pc-b.md`](docs/deploy-pc-b.md) | 5b 试跑：装到柜台电脑 B（要准备什么、安装、自动启动、备份、检查、先在开发电脑演练和记录、更新、还原备份）；脚本在 `deploy/` |
 | [`docs/pc-b-checklist.md`](docs/pc-b-checklist.md) | 去诊所装电脑 B 的打勾清单：出发前、传档案（Google Drive，不用 USB）、到了先看先问、B 和 A 的步骤和时间、B 不合要求 / 连不上 A 怎么办、离开前 |
@@ -115,6 +115,8 @@
 - [x] Phase 6a-2a 和 D71 开 PR（PR #32）
 - [x] Phase 6a-2b 初版（D71 ①、D72）：*Requests* 的 **Entered in GPiS ✓** 当场只读查 GPiS 那一天的预约（只有时间、名字、医生，和请求一样的排最上面），员工点选 → 再读一次 GPiS 才确认（一个 GPiS 预约只确认一个请求；新病人记下 `ContactID`）→ 马上经 WhatsApp 发确认消息；发不了的在新分页 **To tell patient**（写原因、*Open in WhatsApp* / *Copy message* / **Patient told ✓**），不自动重发；读 `GPiS_Dev` 时不发；migration `0006`；`python -m app.db.demo --request-for <号码>`；B 暂时不用更新；云端 `pytest` 390 个、Vitest 50 个，headless Chromium 用假资料点过
 - [x] 6a-2b 开发电脑测试全部通过（2026-10-17，记录见 `backend/README.md`）：`pytest` 392 个、`npm test` 51 个；自己的手机收到确认消息；超过 24 小时 → *To tell patient* → *Patient told*；读 `GPiS_Dev` 不发、10-09 2 行、09-02 PHANG 25 行。测试时改（D73）：确认消息改成 `好的哟，已经帮你预约了哦😊` / `Okay, your appointment is booked 😊` + 预约资料；加 *Back to pending*（取消、拒绝按错可以改回）；名单改成画面中间的弹出视窗
+- [x] 6a-2a、6a-2b、D71–D73 合并进 `main`（PR #32）
+- [x] Phase 6a-2c 初版（D71 ②、D74）：*Settings → Slots & auto-confirm* 的开关（默认关、只有 ADMIN 能改）；Admin API 里背景每 3 分钟（9:00–17:30），系统第一次看到请求时记下那天有没有预约，之后同病人、同日、同时段、同医生、同疗程、同时长、只对上一个才自动确认 + 发消息；读 `GPiS_Dev` 不跑；*Requests* 上面一行显示上次查 GPiS，15 分钟没成功红字；migration `0007`；`python -m app.auto_confirm --dry-run / --once`、`python -m app.db.demo --auto-confirm-demo <号码>`；云端 `pytest` 427 个、Vitest 58 个，headless Chromium 用假资料点过
 
 ## 下一步
 
@@ -122,7 +124,7 @@
 2. 画面整理（D66，PR #23）：B 已经更新（2026-10-13）。和第 1 项一起，一两个星期后问员工新画面（卡片、☰）好不好用。画面还是英文（D24）。
 3. A10（D67）：B 已经是 `0005`（2026-10-14）。问诊所 W60（90 天可以吗）。B 2027-01-13 之前每次都是 `删了 0 条`；那之后看一次 `start.log`，确认第一次真的删了。
 4. 更新电脑 B：照 `docs/deploy-pc-b.md` 第 9 节（zip 经 Google Drive 链接、对 hash，D64）；更新前先在开发电脑跑过测试。B 上**不跑测试**，读的是主机 A 的正式资料。第一版模板没有按钮（D48）；真的用 Cloud API 发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
-5. Phase 6（AI）：6a-1（遮证件号码）已经合并（PR #31，不用更新 B）；6a-2a 开发电脑测试通过（PR #32）；6a-2b（*Entered in GPiS ✓* + *To tell patient*，D71 ①、D72、D73）开发电脑测试通过（2026-10-17），在 PR #32 等合并；接着 6a-2c（ADMIN 的自动确认开关，默认关，D71 ②）、6a-3（工具）。自动确认先关着，员工按一段时间、ADMIN 觉得对得上再打开。同时整理 W61–W72 的中英问卷请老板回答；6b（接 AI）要等 W62。提醒继续手动（D68）；5c 等 AI 要上线才接（BSP + Coexistence，老板签约）。
+5. Phase 6（AI）：6a-1（遮证件号码）已经合并（PR #31，不用更新 B）；6a-2a 开发电脑测试通过（PR #32）；6a-2a、6a-2b 已经合并（PR #32）；6a-2c（自动确认，D71 ②、D74）程序好了，要在开发电脑照 `backend/README.md`「6a-2c 完成的条件」测 10 项（要升到 `0007`）；接着 6a-3（工具）。自动确认先关着，员工按一段时间、ADMIN 觉得对得上再打开；B 下次更新要升到 `0007`。同时整理 W61–W72 的中英问卷请老板回答；6b（接 AI）要等 W62。提醒继续手动（D68）；5c 等 AI 要上线才接（BSP + Coexistence，老板签约）。
 6. A1：B 经局域网用只读帐号读 A，已经通了（2026-10-13）。B 下班有时候关（W54）：Phase 6 之前决定长期放哪里（`docs/architecture.md` 9.4）。
 7. 假期：B 已经导入 2026、2027 年（2026-10-13）。2028 年的在 2027 年底前导入、核对回教节日的日期（D61）；诊所临时休息的日子 `admin` 自己加。
 8. A8（还没录入 GPiS 的请求要算占用）是 Phase 6 的第一步（6a），建议的做法在 `docs/architecture.md` 11.6。
