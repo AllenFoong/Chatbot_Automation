@@ -6,6 +6,8 @@
 //   和请求一样的排在最上面（同一位病人、同医生、同时段），但还是要员工自己选。
 // - 确认后系统马上经 WhatsApp 通知病人；发不了的（超过 24 小时、读 GPiS_Dev …）放在 To tell patient，
 //   员工用 Open in WhatsApp 或手机传了，按 Patient told ✓。
+// - Reject、Patient cancelled 按错了：在 Rejected / Cancelled 分页按 Back to pending 改回来（又算占用；
+//   确认过又取消的，要重新点选 GPiS 的预约）。
 
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
@@ -320,6 +322,22 @@ function RequestCard({
           }}
           onCancel={() => setConfirming(false)}
         />
+      ) : r.status === "REJECTED" || r.status === "CANCELLED" ? (
+        <div className="card-actions actions">
+          <button
+            type="button"
+            disabled={action.busy}
+            onClick={() =>
+              change(
+                `Move the request for ${r.customer_name} back to Pending?` +
+                  (r.gpis_appointment_id !== null ? " You will need to pick the GPiS appointment again." : ""),
+                api.requests.reopen,
+              )
+            }
+          >
+            Back to pending
+          </button>
+        </div>
       ) : (
         (r.status === "PENDING" || r.status === "CONFIRMED") && (
           <div className="card-actions actions">

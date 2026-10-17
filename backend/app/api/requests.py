@@ -398,6 +398,17 @@ def reject(
     return _change(session, request_id, lambda r: reqs.reject_request(session, r, staff), source, wa)
 
 
+@router.post("/{request_id}/reopen", response_model=RequestOut)
+def reopen(
+    request_id: int,
+    session: Session = Depends(get_session),
+    source: ReminderSource | None = Depends(get_confirm_source),
+    wa: WhatsAppSettings = Depends(get_whatsapp_settings),
+) -> RequestOut:
+    """拒绝、取消按错了：改回 Pending（Back to pending）。确认过又取消的，要重新点选 GPiS 的预约。"""
+    return _change(session, request_id, lambda r: reqs.reopen_request(session, r), source, wa)
+
+
 @router.post("/{request_id}/cancel", response_model=RequestOut)
 def cancel(
     request_id: int,

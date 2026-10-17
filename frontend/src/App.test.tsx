@@ -268,6 +268,26 @@ describe("requests", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("cannot be changed");
   });
 
+  it("moves a cancelled request back to pending", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let reopened = false;
+    const { calls } = fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      ...counts,
+      "GET /api/requests?status=CANCELLED": () => ok(reopened ? [] : [fakeRequest({ status: "CANCELLED" })]),
+      "POST /api/requests/1/reopen": () => {
+        reopened = true;
+        return ok(fakeRequest());
+      },
+    });
+    renderApp("/requests");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Cancelled" }));
+    await user.click(await screen.findByRole("button", { name: "Back to pending" }));
+    await waitFor(() => expect(screen.getByText("No cancelled requests.")).toBeInTheDocument());
+    expect(calls.some((c) => c.method === "POST" && c.path === "/api/requests/1/reopen")).toBe(true);
+  });
+
   it("does nothing when the staff member says no", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     const { calls } = fakeApi({

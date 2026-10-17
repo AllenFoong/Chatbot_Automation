@@ -167,6 +167,8 @@ export const requests = {
   patientTold: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/patient-told`),
   reject: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/reject`),
   cancel: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/cancel`),
+  /** 拒绝、取消按错了：改回 Pending */
+  reopen: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/reopen`),
 };
 
 // ---------- 预约提醒（名单每次都重新读 GPiS；员工做过的事记在本系统） ----------

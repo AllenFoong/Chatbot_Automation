@@ -323,3 +323,35 @@ def test_demo_request_for_own_phone(session):
     rows = session.scalars(select(AppointmentRequest).where(AppointmentRequest.id.in_([first, second]))).all()
     assert {r.customer_id for r in rows} == {rows[0].customer_id}
     assert rows[0].doctor_id == "PHANG" and rows[0].preferred_date == FRI and rows[0].conversation_id is not None
+
+
+def test_back_to_pending_after_a_wrong_cancel_or_reject(amy, session):
+    """按错了 Cancel / Reject：Back to pending 改回来，又算占用（A8）。"""
+    from app.db.appointment_requests import held_requests
+
+    use(FakeSource(ROWS))
+    kid_a, kid_b = pending(amy, "Demo Kid A"), pending(amy, "Demo Kid B")
+    assert amy.post(f"/api/requests/{kid_a['id']}/cancel").json()["status"] == "CANCELLED"
+    assert amy.post(f"/api/requests/{kid_b['id']}/reject").json()["status"] == "REJECTED"
+    assert held_requests(session, FRI, "PHANG") == []
+    for kid in (kid_a, kid_b):
+        r = amy.post(f"/api/requests/{kid['id']}/reopen")
+        assert r.status_code == 200
+        assert r.json()["status"] == "PENDING" and r.json()["handled_at"] is None
+    assert len(held_requests(session, FRI, "PHANG")) == 2
+    assert amy.post(f"/api/requests/{kid_a['id']}/reopen").status_code == 409     # 已经是 PENDING
+
+
+def test_back_to_pending_after_confirm_and_cancel_clears_the_confirmation(amy, whatsapp):
+    use(FakeSource(ROWS))
+    kid = pending(amy, "Demo Kid A")
+    amy.post(f"/api/requests/{kid['id']}/confirm", json={"gpis_appointment_id": 101})
+    assert amy.post(f"/api/requests/{kid['id']}/reopen").status_code == 409      # CONFIRMED 要先取消
+    amy.post(f"/api/requests/{kid['id']}/cancel")
+    body = amy.post(f"/api/requests/{kid['id']}/reopen").json()
+    assert body["status"] == "PENDING"
+    assert body["gpis_appointment_id"] is None and body["confirmed_date"] is None
+    assert body["confirm_message"] is None and body["patient_told_at"] is None and body["notify_problem"] is None
+    # 可以再确认一次（同一个 GPiS 预约），再发一次确认
+    assert amy.post(f"/api/requests/{kid['id']}/confirm", json={"gpis_appointment_id": 101}).status_code == 200
+    assert len(whatsapp.sent) == 2

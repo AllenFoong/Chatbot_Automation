@@ -918,9 +918,10 @@ pytest                        # 应该 364 passed，没有 skipped
   员工先在 GPiS 输入，再按：系统**当场只读查一次 GPiS**，列出那一天的预约（只有时间、名字、医生；没有 Remarks、号码），
   和请求一样的排最上面（*Same patient* / *Same doctor* / *Same time*）。员工点选 → *Confirm this appointment*：
   后端再读一次 GPiS，那个预约还在才确认。GPiS 里没有 = 不能确认。员工约成别的日期，改上面的 *GPiS date*。
-- 确认后系统**马上经 WhatsApp 发确认消息**（照 GPiS 的名字、日期、时间、医生；写法和提醒一样，等 W61、W68 再改）。
+- 确认后系统**马上经 WhatsApp 发确认消息**：`好的哟，已经帮你预约了哦😊` / `Okay, your appointment is booked 😊`，下面列 GPiS 的名字、日期、时间、医生、分行（D73）。
   发不了的放在新的分页 ***To tell patient***，写原因；员工用 *Open in WhatsApp* / *Copy message* / 手机传了，按 ***Patient told ✓***。
 - 一个 GPiS 预约只能确认一个请求（已经用过的变灰）；新病人顺便记下 GPiS 的 `ContactID`。
+- *Reject*、*Patient cancelled* 按错了：*Rejected* / *Cancelled* 分页按 **Back to pending** 改回来（D73）；确认过又取消的要重新点选。
 - **读 `GPiS_Dev` 时不发、也没有 *Open in WhatsApp***（黄色提醒）：名字是真的病人。要试真的发，用 `REMINDER_SOURCE=demo`（假资料）。
 - 选单 *Requests* 的数字 = 待确认 + 要通知。
 - 改表：migration **`0006`**（`appointment_requests` 多 7 栏 + 部分唯一 index；以前确认的当作已经通知）。
@@ -942,14 +943,14 @@ npm test                      # 应该 50 passed
 npm run build                 # ✓ built
 ```
 
-### 6a-2b 完成的条件（在开发电脑上测试）
+### 6a-2b 完成的条件（在开发电脑上测试，16 项）
 
 视窗照「Phase 5a」的「使用」（视窗 1 Admin API、视窗 4 网页；B 部分还要视窗 2 webhook、视窗 3 cloudflared）。psql 用 `$psql`。
 **A 部分读 `GPiS_Dev`，画面上是真的病人名字：只数行数，不要截图、不要贴名字。**
 
 | # | 做什么 | 应该看到 |
 |---|---|---|
-| 1 | 上面的「更新」 | `0006 (head)`；`pytest` 390 passed、没有 skipped；`npm test` 50 passed；`npm run build` 成功 |
+| 1 | 上面的「更新」 | `0006 (head)`；`pytest` 392 passed、没有 skipped；`npm test` 51 passed；`npm run build` 成功 |
 | 2 | `& $psql -h localhost -U chatbot -d chatbot_dev -c "SELECT id, status, patient_told_at IS NOT NULL AS told FROM appointment_requests ORDER BY id;"` | id `1`（Phase 4b 确认过的 Demo Kid A）`CONFIRMED`、`told = t`；`2`、`3` `PENDING`、`f`；`4` `CANCELLED`、`f` |
 | 3 | 开视窗 1、4，登入 → *Requests* | 分页 *Pending*、*To tell patient*、*Confirmed* …；选单 *Requests* 的数字是 `2`；*To tell patient* 没有数字（Demo Kid A 不在里面） |
 | **A** | **读 `GPiS_Dev`**（`.env` 没有 `REMINDER_SOURCE=demo`） | |
@@ -959,13 +960,14 @@ npm run build                 # ✓ built
 | **B** | **假资料 + 自己的手机**：`.env` 加 `REMINDER_SOURCE=demo` → 重开视窗 1；开视窗 2、3（*Callback URL* 改成新的网址） | |
 | 7 | 用**自己的手机**传一条 `test 6a-2b` 给 Meta 测试号码 → `python -m app.db.demo --request-for <自己的手机>` | `Added pending request N: Demo Self, S+P, PHANG, <下一个星期五> 10:00.` |
 | 8 | *Requests* → **Refresh** → Demo Self → **Entered in GPiS ✓** | 没有黄色提醒；6 行 Demo Patient A–F（取消的 G、`00:00` 的 H 不列）；第一行 `10:00 DEMO PATIENT A · Dr PHANG Same doctor · Same time` |
-| 9 | 点选第一行 → **Confirm this appointment** | 绿色 *Demo Self: confirmed, and the patient was sent the confirmation.*；手机收到 `预约确认✅`，`NAME: DEMO PATIENT A`、那天的日期、`TIME: 10:00 AM`、`DOCTOR: DR PHANG`；*Conversations* 那段对话最后一条是这则消息（员工接手的对话 → 算你发的） |
+| 9 | 点选第一行 → **Confirm this appointment** | 绿色 *Demo Self: confirmed, and the patient was sent the confirmation.*；手机收到 `好的哟，已经帮你预约了哦😊`、`Okay, your appointment is booked 😊`，下面 `NAME: DEMO PATIENT A`、那天的日期、`TIME: 10:00 AM`、`DOCTOR: DR PHANG`；*Conversations* 那段对话最后一条是这则消息（员工接手的对话 → 算你发的） |
 | 10 | Demo Kid B → **Entered in GPiS ✓** → *GPiS date* `2026-10-09` → 点选 `11:00 DEMO PATIENT C` → **Confirm this appointment** | 黄色 *confirmed, but the patient was not messaged (More than 24 hours …)*；*To tell patient (1)*；选单数字 `2`（1 个待确认 + 1 个要通知） |
 | 11 | *To tell patient* | Demo Kid B 的卡片：黄色原因、*In GPiS* `Fri 09 Oct 2026 11:00 · Dr PHANG`、消息预览（`NAME: DEMO PATIENT C`）；没有 *Open in WhatsApp*（`60120000001` 不在允许名单），有 *Copy message*、*Patient told ✓* |
 | 12 | **Patient told ✓** | *Every confirmed patient has been told.*；*Confirmed* 分页的 Demo Kid B 有 *Patient told … (by staff)*，Demo Self 有 *(sent by the system)* |
 | 13 | Demo Patient → **Entered in GPiS ✓** → *GPiS date* `2026-10-09` | `11:00 DEMO PATIENT C` 那一行变灰、*already confirms request #<Demo Kid B 的 id>*，不能点选 → **Back** |
-| 14 | `& $psql -h localhost -U chatbot -d chatbot_dev -c "SELECT id, gpis_appointment_id, confirmed_date, confirmed_slot, confirmed_doctor_id, patient_told_by IS NOT NULL AS by_staff, notify_problem FROM appointment_requests WHERE status = 'CONFIRMED' ORDER BY id;"` | Demo Kid B：`2026-10-09`、`11:00:00`、`PHANG`、`by_staff = t`、原因是 *More than 24 hours …*；Demo Self：下一个星期五、`10:00:00`、`PHANG`、`by_staff = f`、原因空的 |
-| 15 | 清理：`.env` 拿掉 `REMINDER_SOURCE=demo` → 重开视窗 1；关掉视窗 3（cloudflared） | — |
+| 14 | Demo Patient → **Patient cancelled** → OK → *Cancelled* 分页 → Demo Patient → **Back to pending** → OK | Demo Patient 回到 *Pending*，还是 `GOH`、`Sat 10 Oct 2026 10:00`；选单数字多 1 |
+| 15 | `& $psql -h localhost -U chatbot -d chatbot_dev -c "SELECT id, gpis_appointment_id, confirmed_date, confirmed_slot, confirmed_doctor_id, patient_told_by IS NOT NULL AS by_staff, notify_problem FROM appointment_requests WHERE status = 'CONFIRMED' ORDER BY id;"` | Demo Kid B：`2026-10-09`、`11:00:00`、`PHANG`、`by_staff = t`、原因是 *More than 24 hours …*；Demo Self：下一个星期五、`10:00:00`、`PHANG`、`by_staff = f`、原因空的 |
+| 16 | 清理：`.env` 拿掉 `REMINDER_SOURCE=demo` → 重开视窗 1；关掉视窗 3（cloudflared） | — |
 
 ### 云端容器的测试记录（2026-10-15，PostgreSQL 16、Python 3.11 + `requirements-lock.txt`、Node 22、只用假资料）
 
@@ -977,4 +979,10 @@ npm run build                 # ✓ built
 - `npm test` → 50 passed（新的流程：点选、换日期、已经用过的变灰、GPiS_Dev 的黄色提醒、没发出去的原因、读 GPiS 失败、*To tell patient* 的 *Open in WhatsApp* / *Patient told*）；`npm run build` 成功。
 - headless Chromium（假资料 `REMINDER_SOURCE=demo`、没设定 WhatsApp）照着点过：点选 → 确认 → 黄色 *not messaged (WhatsApp is not set up on this computer)* → *To tell patient (1)* 有 *Open in WhatsApp*（允许名单里的号码）→ *Patient told* → *Confirmed* 显示 *(by staff)*；1366 和 400 宽都排得下；已经用过的预约变灰。
 - 写的时候找到、已经改好：点选名单的圆点被全站的 `label` 样式排到文字上面 → 名单的 `label` 改成横排。
+
+### 开发电脑测试时改的（2026-10-17，D73）
+
+- 确认消息改成 `好的哟，已经帮你预约了哦😊` / `Okay, your appointment is booked 😊` + 预约资料（开发者定的）。
+- 测试时按错 *Patient cancelled*，请求回不到 *Pending* → 加 **Back to pending**（*Rejected*、*Cancelled* 分页；`POST /api/requests/{id}/reopen`）。
+- 云端：`pytest` 392 passed（新增 2 个：取消 / 拒绝之后改回来又算占用、已经是 Pending 或 Confirmed 不能改回；确认过又取消再改回，旧的确认资料清掉、可以再确认一次）；`npm test` 51 passed、`npm run build` 成功。
 

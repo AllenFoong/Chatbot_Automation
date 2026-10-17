@@ -3,7 +3,7 @@
 状态只能这样改：
   PENDING   → CONFIRMED / REJECTED / CANCELLED
   CONFIRMED → CANCELLED（确认之后病人又取消：员工也要在 GPiS 改成 Canceled）
-REJECTED、CANCELLED 之后不能再改。
+  REJECTED / CANCELLED → PENDING（按错了：Back to pending，reopen_request）
 
 这里只 flush，不 commit。
 """
@@ -103,6 +103,24 @@ def confirm_request(
     request.confirmed_slot = confirmed_slot
     request.confirmed_doctor_id = confirmed_doctor_id
     request.confirm_message = confirm_message
+    request.patient_told_at = None
+    request.patient_told_by = None
+    request.notify_problem = None
+    session.flush()
+
+
+def reopen_request(session: Session, request: AppointmentRequest) -> None:
+    """拒绝、取消按错了：改回 PENDING（又算占用，A8），确认留下的资料全部清掉，重新确认时再点选 GPiS 的预约。"""
+    if request.status not in (RequestStatus.REJECTED, RequestStatus.CANCELLED):
+        raise InvalidTransition(f"{request.status} 不能改回 PENDING")
+    request.status = RequestStatus.PENDING
+    request.handled_by = None
+    request.handled_at = None
+    request.gpis_appointment_id = None
+    request.confirmed_date = None
+    request.confirmed_slot = None
+    request.confirmed_doctor_id = None
+    request.confirm_message = None
     request.patient_told_at = None
     request.patient_told_by = None
     request.notify_problem = None

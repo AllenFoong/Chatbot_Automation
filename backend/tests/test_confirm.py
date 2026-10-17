@@ -60,4 +60,4 @@ def test_confirmation_uses_gpis_values():
     text = render_confirmation(c, "Phang", ReminderText("诊所", "Clinic", "Branch"))
     assert "NAME: DEMO KID B" in text and "DATE: 09/10/26" in text and "TIME: 4:30 PM" in text
     assert "DOCTOR: DR PHANG" in text and "BRANCH：Branch" in text
-    assert "你好 这里是诊所" in text and "Hello, we are Clinic" in text
+    assert text.startswith("好的哟，已经帮你预约了哦😊\nOkay, your appointment is booked 😊\n")

@@ -87,20 +87,17 @@ def may_send(source: ReminderSource) -> bool:
 
 
 def render_confirmation(choice: GpisChoice, doctor_name: str, text: ReminderText) -> str:
-    """确认消息：照 GPiS 的名字、日期、时间、医生（不是病人原来要的）。写法和提醒一样（W32），等 W61、W68 再改。"""
+    """确认消息（开发者 2026-10-17 定的写法，中英两句）：照 GPiS 的名字、日期、时间、医生（不是病人原来要的）。
+
+    在病人刚传过消息的对话里回（24 小时内），所以不再自我介绍；预约资料照提醒的写法（W32）。
+    """
     return (
-        "预约确认✅\n"
+        "好的哟，已经帮你预约了哦😊\n"
+        "Okay, your appointment is booked 😊\n"
         "\n"
-        f"你好 这里是{text.clinic_name} 🦷\n"
         f"NAME: {choice.patient_name}\n"
         f"DATE: {choice.day:%d/%m/%y}\n"
         f"TIME: {_time_12h(choice.slot)}\n"
         f"DOCTOR: DR {doctor_name.upper()}\n"
-        f"BRANCH：{text.branch}\n"
-        "你的预约已经确定了，到时见😊 如果需要改期或取消，请通知我们哦，谢谢你💕\n"
-        "\n"
-        "Appointment confirmed✅\n"
-        "\n"
-        f"Hello, we are {text.clinic_name_en} 🦷 Your appointment above is confirmed 😊\n"
-        "If you need to change or cancel it, pls contact us😊 Thank you 💕 See you!"
+        f"BRANCH：{text.branch}"
     )
