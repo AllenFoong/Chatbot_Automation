@@ -1,6 +1,6 @@
 """API 测试：用假的 GPiS 资料、固定的诊所设置代替数据库。"""
 
-from datetime import date
+from datetime import date, time
 
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
@@ -9,7 +9,8 @@ from app.availability import GpisAppointment
 from app.db.rules import RulesNotConfigured
 from app.db.session import get_session
 from app.gpis import WrongDatabaseError, ensure_expected_database
-from app.main import app, get_appointment_source, get_rules
+from app.availability import HeldRequest
+from app.main import app, get_appointment_source, get_held_requests, get_rules
 from tests.rules import RULES
 
 import pytest
@@ -32,6 +33,7 @@ class FakeSource:
 @pytest.fixture
 def client():
     app.dependency_overrides[get_rules] = lambda: RULES     # 不连 PostgreSQL
+    app.dependency_overrides[get_held_requests] = lambda: lambda day, doctor: []
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -81,6 +83,58 @@ def test_wrong_database_is_refused(client):
     use(FakeSource(error=WrongDatabaseError("连接到的数据库是 'GPiS'")))
     r = client.get("/availability", params={"date": "2026-09-02", "doctor": "PHANG", "service": "S+P"})
     assert r.status_code == 503
+
+
+def use_held(held=(), error=None):
+    calls = []
+
+    def read(day, doctor):
+        calls.append((day, doctor))
+        if error:
+            raise error
+        return list(held)
+
+    app.dependency_overrides[get_held_requests] = lambda: read
+    return calls
+
+
+def test_pending_requests_count_as_booked(client):
+    """A8：GPiS 10:00 有 2 人 + 本系统 1 个 PENDING 的请求 → 10:00 满了。"""
+    use(FakeSource([GpisAppointment(1, "10:00", "Booked", 1, "S+P"), GpisAppointment(2, "10:00", "Booked", 2, "S+P")]))
+    calls = use_held([HeldRequest(41, time(10), 30)])
+    body = client.get("/availability", params=PARAMS).json()
+    assert calls == [(date(2026, 9, 2), "PHANG")]
+    assert body["patients"] == 2 and body["requests"] == 1
+    ten = next(s for s in body["slots"] if s["time"] == "10:00")
+    assert ten["booked"] == 3 and ten["requests"] == 1 and ten["remaining"] == 0
+    assert "10:00" not in body["available_30"]
+    assert body["held_requests"] is None
+
+
+def test_requests_false_reads_gpis_only(client):
+    """和 sql/check_available_slots.sql 对照时用：不读本系统的请求。"""
+    use(FakeSource([GpisAppointment(1, "10:00", "Booked", 1, "S+P")]))
+    calls = use_held([HeldRequest(41, time(10), 30)])
+    body = client.get("/availability", params={**PARAMS, "requests": "false"}).json()
+    assert calls == []
+    assert body["requests"] == 0
+    assert next(s for s in body["slots"] if s["time"] == "10:00")["booked"] == 1
+
+
+def test_debug_lists_held_requests_without_patient_data(client):
+    use(FakeSource())
+    use_held([HeldRequest(41, time(15, 30), 60)])
+    body = client.get("/availability", params={**PARAMS, "debug": "true"}).json()
+    assert body["held_requests"] == [{"request_id": 41, "time": "15:30", "dur_slots": 2}]
+
+
+def test_request_database_error_hides_details(client):
+    use(FakeSource())
+    use_held(error=OperationalError("SELECT 1", {}, Exception("password=hunter2")))
+    r = client.get("/availability", params=PARAMS)
+    assert r.status_code == 503
+    assert "预约请求" in r.json()["detail"]
+    assert "hunter2" not in r.text
 
 
 def test_bad_date_is_rejected(client):

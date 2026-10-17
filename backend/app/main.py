@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import date
 from functools import lru_cache
 
@@ -14,9 +15,10 @@ from sqlalchemy.orm import Session
 
 from .api import auth as auth_api
 from .api import conversations, reminders, requests, settings, staff
-from .availability import check_available_slots
+from .availability import HeldRequest, check_available_slots
 from .clinic_rules import ClinicRules
 from .config import get_settings
+from .db.appointment_requests import held_requests
 from .db.rules import RulesNotConfigured, load_clinic_rules
 from .db.session import get_session
 from .frontend_files import frontend_dist, mount_frontend
@@ -51,7 +53,8 @@ def database_rule_violated(request: Request, exc: IntegrityError) -> JSONRespons
 class SlotOut(BaseModel):
     time: str
     kind: str
-    booked: int
+    booked: int               # GPiS 的病人 + 本系统 PENDING 的请求
+    requests: int             # booked 里面有几个是请求
     cap: int | None
     remaining: int
     can_30: bool
@@ -69,6 +72,12 @@ class AppointmentOut(BaseModel):
     occupies: bool
 
 
+class HeldRequestOut(BaseModel):
+    request_id: int
+    time: str
+    dur_slots: int
+
+
 class AvailabilityOut(BaseModel):
     date: date
     weekday: str
@@ -77,11 +86,13 @@ class AvailabilityOut(BaseModel):
     day_status: str
     note: str | None
     bookable: bool
-    patients: int
+    patients: int             # GPiS 里算病人的预约（和 SQL 一样）
+    requests: int             # 本系统 PENDING 的请求，算进了 booked（A8）
     available_30: list[str]
     available_60: list[str]
     slots: list[SlotOut]
     appointments: list[AppointmentOut] | None = None
+    held_requests: list[HeldRequestOut] | None = None
 
 
 @lru_cache
@@ -105,6 +116,14 @@ def get_rules(session: Session = Depends(get_session)) -> ClinicRules:
         raise HTTPException(status_code=503, detail="读取本系统设置失败，请看服务器日志") from e
 
 
+HeldRequestReader = Callable[[date, str], list[HeldRequest]]
+
+
+def get_held_requests(session: Session = Depends(get_session)) -> HeldRequestReader:
+    """本系统还在 PENDING 的请求（A8）：从 PostgreSQL 读。"""
+    return lambda day, doctor: held_requests(session, day, doctor)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -116,8 +135,13 @@ def availability(
     doctor: str = Query(..., description="PHANG / GOH"),
     service: str = Query(..., description="疗程代码，例：S+P、C/UP、OR"),
     debug: bool = Query(False, description="加上每条预约怎么被解读（只有 ID，没有名字和 Remarks）"),
+    requests: bool = Query(
+        True,
+        description="把本系统还没录入 GPiS 的请求（PENDING）也算占用（A8）；false = 只看 GPiS，和 sql/check_available_slots.sql 对照用",
+    ),
     source: AppointmentSource = Depends(get_appointment_source),
     rules: ClinicRules = Depends(get_rules),
+    read_held: HeldRequestReader = Depends(get_held_requests),
 ) -> AvailabilityOut:
     try:
         rows = source.appointments_for(date_, doctor)
@@ -127,7 +151,15 @@ def availability(
         log.exception("读取 GPiS 失败")
         raise HTTPException(status_code=503, detail="读取 GPiS 失败，请看服务器日志") from e
 
-    r = check_available_slots(date_, doctor, service, rows, rules)
+    held: list[HeldRequest] = []
+    if requests:
+        try:
+            held = read_held(date_, doctor)
+        except SQLAlchemyError as e:
+            log.exception("读取本系统的预约请求失败")
+            raise HTTPException(status_code=503, detail="读取本系统的预约请求失败，请看服务器日志") from e
+
+    r = check_available_slots(date_, doctor, service, rows, rules, held)
     return AvailabilityOut(
         date=r.date,
         weekday=r.weekday,
@@ -137,6 +169,7 @@ def availability(
         note=r.note,
         bookable=r.bookable,
         patients=r.patients,
+        requests=r.requests,
         available_30=[s.time for s in r.slots if s.can_30],
         available_60=[s.time for s in r.slots if s.can_60],
         slots=[SlotOut(**s.__dict__) for s in r.slots],
@@ -152,6 +185,12 @@ def availability(
                 occupies=a.occupies,
             )
             for a in r.appointments
+        ]
+        if debug
+        else None,
+        held_requests=[
+            HeldRequestOut(request_id=h.request_id, time=h.slot.strftime("%H:%M"), dur_slots=h.dur_slots)
+            for h in r.held_requests
         ]
         if debug
         else None,

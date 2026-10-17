@@ -5,6 +5,7 @@
 
 import type {
   AppointmentRequest,
+  GpisChoices,
   ClinicSettings,
   Closure,
   Conversation,
@@ -154,12 +155,20 @@ export const conversations = {
 
 export const requests = {
   list: (status: RequestStatus) => request<AppointmentRequest[]>("GET", `/requests${query({ status })}`),
-  confirm: (id: number, gpisAppointmentId: number | null) =>
+  /** 「要通知」：确认了、病人还不知道的 */
+  toTell: () => request<AppointmentRequest[]>("GET", "/requests?to_tell=true"),
+  /** 当场查 GPiS 那一天的预约（不填日期 = 请求的日期） */
+  gpis: (id: number, date?: string) => request<GpisChoices>("GET", `/requests/${seg(id)}/gpis${query({ date })}`),
+  confirm: (id: number, gpisAppointmentId: number, date: string) =>
     request<AppointmentRequest>("POST", `/requests/${seg(id)}/confirm`, {
       gpis_appointment_id: gpisAppointmentId,
+      date,
     }),
+  patientTold: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/patient-told`),
   reject: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/reject`),
   cancel: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/cancel`),
+  /** 拒绝、取消按错了：改回 Pending */
+  reopen: (id: number) => request<AppointmentRequest>("POST", `/requests/${seg(id)}/reopen`),
 };
 
 // ---------- 预约提醒（名单每次都重新读 GPiS；员工做过的事记在本系统） ----------

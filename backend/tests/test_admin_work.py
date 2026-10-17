@@ -60,14 +60,13 @@ def test_pending_requests_oldest_first(amy):
         == ["Demo Cancel"]
 
 
-def test_confirm_reject_and_invalid_change(amy):
+def test_reject_cancel_and_invalid_change(amy):
+    """确认要先点选 GPiS 的预约：见 test_admin_confirm.py。"""
     kid_a, kid_b, _ = amy.get("/api/requests").json()
-    r = amy.post(f"/api/requests/{kid_a['id']}/confirm", json={"gpis_appointment_id": 123456})
-    assert r.status_code == 200
-    assert r.json()["status"] == "CONFIRMED" and r.json()["gpis_appointment_id"] == 123456
-    assert r.json()["handled_at"] is not None
-    assert amy.post(f"/api/requests/{kid_b['id']}/confirm").json()["gpis_appointment_id"] is None   # 可以不填
-    assert amy.post(f"/api/requests/{kid_a['id']}/reject").status_code == 409     # 已确认不能再拒绝
-    assert amy.post(f"/api/requests/{kid_a['id']}/cancel").json()["status"] == "CANCELLED"
+    r = amy.post(f"/api/requests/{kid_a['id']}/reject")
+    assert r.status_code == 200 and r.json()["status"] == "REJECTED" and r.json()["handled_at"] is not None
+    assert amy.post(f"/api/requests/{kid_a['id']}/cancel").status_code == 409     # 已拒绝不能再取消
+    assert amy.post(f"/api/requests/{kid_b['id']}/cancel").json()["status"] == "CANCELLED"
     assert amy.post("/api/requests/999999/reject").status_code == 404
+    assert amy.post(f"/api/requests/{kid_b['id']}/confirm", json={"gpis_appointment_id": 1}).status_code == 409
     assert [r["customer_name"] for r in amy.get("/api/requests").json()] == ["Demo Patient"]

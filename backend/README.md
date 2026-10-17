@@ -1,4 +1,4 @@
-# Backend（Phase 2：空档 API；Phase 3：本系统的 PostgreSQL；Phase 4a：Admin Platform 的 API；Phase 5a：WhatsApp；Phase 5b：预约提醒）
+# Backend（Phase 2：空档 API；Phase 3：本系统的 PostgreSQL；Phase 4a：Admin Platform 的 API；Phase 5a：WhatsApp；Phase 5b：预约提醒；Phase 6a：AI 之前的准备）
 
 - **Phase 2**：把 `sql/check_available_slots.sql` 的计算搬到 Python（FastAPI），让之后的 WhatsApp 和 AI Agent 可以调用。
   **只读** GPiS，计算规则和 SQL 完全一样；改规则时两边要一起改。
@@ -13,7 +13,7 @@
 | 文件 | 内容 |
 |---|---|
 | `app/clinic_rules.py` | 诊所设置在程序里的样子（`ClinicRules`）；设置本身存在 PostgreSQL |
-| `app/availability.py` | 空档计算（= SQL 第 3–7 节），不连接数据库 |
+| `app/availability.py` | 空档计算（= SQL 第 3–7 节），不连接数据库；本系统 `PENDING` 的请求也算占用（A8，Phase 6a-2a） |
 | `app/gpis.py` | 读 `Tbl_CAH_Appointment`：只有一条 `SELECT`；数据库名字不是 `GPIS_EXPECTED_DATABASE` 就拒绝 |
 | `app/main.py` | API 入口：`GET /availability`、`GET /health`，加上 `app/api/` 的 Admin API |
 | `app/auth.py` | 员工登录：Argon2 加密密码、session cookie、ADMIN / STAFF 权限 |
@@ -30,7 +30,7 @@
 | `app/webhook.py`、`app/webhook_main.py` | 收 WhatsApp webhook 的小程序（port 8001），开发时只有它经 tunnel 放上网 |
 | `app/db/create_staff.py` | 建员工账号（第一个 ADMIN 用这个建） |
 | `app/db/demo.py` | 放假资料到 `chatbot_dev`，方便看画面（只能用在 `_dev` 数据库） |
-| `app/cli.py` | 在终端印出和 SQL 7a / 7b / 7c 一样格式的结果，方便对照 |
+| `app/cli.py` | 在终端印出和 SQL 7a / 7b / 7c 一样格式的结果，方便对照；`PENDING` 的请求印在 7d，`--gpis-only` 只看 GPiS |
 | `app/phone.py` | 手机号转成国际格式（例 `60123456789`），WhatsApp 的号码和员工输入的号码才能比对 |
 | `app/db/models.py` | 本系统的 15 张表（表结构以这里为准；Phase 4 加了 `staff_sessions`，Phase 5 加了消息的送达状态、`reminders`，A10 加了 `reminder_stats`） |
 | `app/db/seed.py` | 设置的初始值（= SQL 第 2 节 + 疗程代码）；`python -m app.db.seed` 写入 |
@@ -125,10 +125,12 @@ uvicorn app.main:app --reload
 |---|---|
 | `day_status` | 和 SQL 一样：`OK`、`NEEDS_REVIEW`、`DOCTOR_NOT_WORKING`、`CLINIC_CLOSED`、`DOCTOR_ON_LEAVE`、`OFFDAY_IN_GPIS`、`UNKNOWN_DOCTOR` |
 | `bookable` | `day_status = OK` 才是 `true`；`NEEDS_REVIEW` 空档照算，但 AI 不自动推荐 |
-| `patients` | 这天已约的病人数 |
+| `patients` | 这天 GPiS 里已约的病人数（和 SQL 一样，不含本系统的请求） |
+| `requests` | 这天这位医生本系统还在 `PENDING` 的请求，算进了 `booked`（A8）；加 `requests=false` 只看 GPiS（和 SQL 对照用），这里是 `0` |
 | `available_30` / `available_60` | 30 分钟 / 1 hour 预约可以开始的时段 |
-| `slots` | 每个时段，栏位和 SQL 7b 一样（`booked`、`cap`、`remaining`、`can_30`、`can_60`） |
+| `slots` | 每个时段，栏位和 SQL 7b 一样（`booked`、`cap`、`remaining`、`can_30`、`can_60`），多一栏 `requests`（`booked` 里面有几个是请求） |
 | `appointments` | 只有加 `debug=true` 才有：每条预约怎么被解读（= SQL 7c，只有 ID，没有名字和 Remarks） |
+| `held_requests` | 只有加 `debug=true` 才有：算进去的请求（请求编号、时段、几格），没有病人资料 |
 
 读 GPiS 或本系统的 PostgreSQL 失败时回 `503`，不会把连接字符串或错误细节回给调用方（细节在终端日志里）。
 
@@ -200,7 +202,8 @@ python -m app.db.demo                    # 放假资料（4 段对话、4 个预
 
 ## 对照 Phase 1（Phase 2 完成的条件）
 
-用 `sql/README.md` 测试记录里的日期，同一天分别跑 SQL 和 `python -m app.cli`，两边的 7a、7b、7c 必须完全一样：
+用 `sql/README.md` 测试记录里的日期，同一天分别跑 SQL 和 `python -m app.cli`，两边的 7a、7b、7c 必须完全一样
+（Phase 6a-2a 之后：SQL 只读 GPiS，所以对照时在指令后面加 `--gpis-only`，7b 最后一栏 `Requests` 都是 `0`）：
 
 | # | 指令 |
 |---|---|
@@ -845,3 +848,154 @@ pytest                        # 应该 351 passed，没有 skipped
 
 - 第 1–5 项全部通过：`pytest` 351 passed、没有 skipped；手机传 `我的IC是 900101-01-1234，passport A12345678` → 视窗 2 `webhook：1 条新消息`、`POST /webhook … 200`；
   *Conversations* 显示 `我的IC是 900101-**-****，passport A12******`；数据库找不到完整的号码（`0`）；webhook 的日志没有消息内容、号码。
+
+## Phase 6a-2a：还没录入 GPiS 的请求算占用（A8）
+
+设计见 `docs/architecture.md` 11.6（第 1 项）、`docs/decisions.md` D71。
+
+- 查空档（`GET /availability`、`python -m app.cli`）时，本系统还在 **`PENDING`** 的请求也当作那一格有人，和 GPiS 的预约一起算人数。
+  例：PHANG 10:00 GPiS 有 2 人 + 1 个 `PENDING` 的请求 = 3 人（满了），AI 不会再把 10:00 推荐给别人。
+- 只算**有医生、有日期、有时段**的请求；60 分钟的请求和 GPiS 的 `1HOUR` 一样，把下一格也封住。
+- 变成 `CONFIRMED`、`REJECTED`、`CANCELLED` 就不算。员工在 GPiS 输入之后、按确认之前，同一位病人会被算两次：只是少推荐，不会约重。
+- `patients` 还是只算 GPiS（和 SQL 一样）；多了 `requests`。`requests=false`（API）/ `--gpis-only`（终端）= 只看 GPiS，和 SQL 对照时用。
+- 输出只有请求编号、时段、几格，**没有病人资料**。
+- 没有改表、没有改网页；电脑 B 的提醒名单不受影响（只看 GPiS，D41），**不用更新 B**。
+- 还没做的（6a-2b、6a-2c、6a-3）：员工按 *Entered in GPiS ✓* 时当场查 GPiS、ADMIN 的自动确认开关、AI 建请求时锁住再查一次。
+
+### 更新（开发电脑）
+
+在 `backend` 里（先启用 venv）：
+
+```powershell
+git fetch origin claude/dazzling-wozniak-xqaz84
+git checkout claude/dazzling-wozniak-xqaz84
+git pull
+pytest                        # 应该 364 passed，没有 skipped
+```
+
+### 6a-2a 完成的条件（在开发电脑上测试）
+
+预约读 `GPiS_Dev`，请求读 `chatbot_dev`（里面的请求都是 `python -m app.db.demo` 的假资料）。输出没有病人资料，可以直接贴回来。
+**不会改任何资料**（假资料的请求留给 6a-2b 测）。psql 用 `$psql`（见「资料保留完成的条件」）。
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的「更新」 | 364 passed、没有 skipped |
+| 2 | `python -m app.cli 2026-09-02 PHANG S+P --gpis-only`、`python -m app.cli 2026-09-09 PHANG S+P --gpis-only` | 7a、7b、7c 和「对照记录」的 T6、T8 一样（7a 后面多 `(GPiS only)`，7b 多一栏 `Requests` 都是 `0`） |
+| 3 | `& $psql -h localhost -U chatbot -d chatbot_dev -c "SELECT id, doctor_id, preferred_date, preferred_slot, duration_minutes FROM appointment_requests WHERE status = 'PENDING' ORDER BY id;"` | 还在 `PENDING` 的请求（没有名字）。通常有 PHANG 16:00 一个（Demo Kid B；Demo Kid A 在 Phase 4b 测试时已经确认了）、GOH 10:00 一个（Demo Patient）。PHANG 那一行的日期下面叫 `D`、GOH 的叫 `E`，记下 `id` |
+| 4 | `python -m app.cli D PHANG S+P`（`D` 写成 `2026-10-09` 这样） | 7a `Requests=` 第 3 项 PHANG、`D` 那天的行数；7b 16:00 的 `Requests` 一样多；7d 的请求编号和第 3 项的 `id` 一样、`16:00`、`1` |
+| 5 | `python -m app.cli D PHANG S+P --gpis-only` | 7a `(GPiS only)`、没有 7d；16:00 的 `Booked` 比第 4 项少了第 4 项的 `Requests` 那么多，其他时段一样 |
+| 6 | `python -m app.cli E GOH OR` | 7a `Requests=1`；10:00 的 `Requests` 是 `1`；7d 是 GOH 那一行的 `id` |
+| 7 | `python -m app.cli D GOH S+P`（PHANG 的日子查 GOH） | `Requests=0`、没有 7d（别的医生的请求不算） |
+| 8 | `uvicorn app.main:app --reload` → <http://127.0.0.1:8000/docs> → `GET /availability`：`date` = `D`、`doctor` = `PHANG`、`service` = `S+P`、`debug` = `true` → *Execute* | `requests` 和第 4 项一样；`held_requests` 只有 `request_id`、`time`、`dur_slots`；整个回应没有 `Demo` |
+| 9 | 同上，再把 `requests` 改成 `false` → *Execute* | `requests: 0`、`held_requests: []`，16:00 的 `booked` 和第 5 项一样 |
+
+### 云端容器的测试记录（2026-10-15，PostgreSQL 16、Python 3.11 + `requirements-lock.txt` 和 3.13、只用假资料、没有 GPiS）
+
+- `pytest` → 364 passed（新增 13 个：请求占一个名额、architecture.md 11.6 的例子、60 分钟的请求封住两格、前后一格 3 人时上限 2、医生休息的日子不受影响、没有请求时结果不变；
+  数据库只读 `PENDING`、这天、这位医生、有时段的请求（别的医生、别的日子、没有时段、没有医生、已确认、已拒绝、已取消都不算）；
+  API 的 `requests`、`requests=false` 不读请求、`debug` 只有编号、读请求失败回 `503` 不露出密码；API 真的从测试数据库读到请求，回应没有病人名字）。
+- `python -m app.cli`（GPiS 换成假的：16:00 有 1 人；测试数据库有 2 个 16:00 的请求，一个 30 分钟、一个 60 分钟）：7a `Patients=1  Requests=2`；16:00 `Booked 3`、`Requests 2`，16:00、16:30 变成 `LONG APPT`；7d 列出 2 个请求。加 `--gpis-only`：16:00 `Booked 1`、`Can30 1`，没有 7d。
+
+### 开发电脑的测试记录（2026-10-15，`GPiS_Dev` = 2026-09-28 的快照、`chatbot_dev` 的假资料）
+
+- 第 1–9 项全部通过：`pytest` 364 passed、没有 skipped。
+- 第 2 项：`--gpis-only` 的 T6（2026-09-02 PHANG S+P：25 人；09:00、11:30、15:30 满 3 人；09:30、11:00、15:00、16:00 `Cap = 2`）、
+  T8（2026-09-09 PHANG S+P：25 人；16:00、16:30 `LONG APPT`；17:00 有 1 人）和「对照记录」一样，`Requests` 栏都是 `0`。
+- 第 3 项：`PENDING` 有 2 个：id `2`（PHANG、2026-10-09、16:00、30 分钟）、id `3`（GOH、2026-10-10、10:00、30 分钟）。
+- 第 4、5 项（2026-10-09 PHANG S+P）：`Patients=2  Requests=1`；16:00 `Booked 1`、`Requests 1`，7d 是 id `2`；15:30 的 `Can60` 变 `0`（下一格有请求）。
+  加 `--gpis-only`：16:00 `Booked 0`、15:30 和 16:00 `Can60 = 1`，其他时段一样。
+- 第 6 项（2026-10-10 GOH OR）：`Patients=1  Requests=1`；10:00 `Booked 1`、`Requests 1`，7d 是 id `3`；09:30 的 `Can60` 变 `0`。
+- 第 7 项（用 2026-10-09 GOH OR 测）：`Requests=0`、没有 7d（PHANG 的请求不算到 GOH）。
+- 第 8、9 项（`/docs`）：`requests: 1`、`held_requests` 只有 `request_id: 2`、`time: 16:00`、`dur_slots: 1`，没有名字；`requests=false` → `requests: 0`、`held_requests: []`、16:00 `booked: 0`。
+- 没有改任何资料（id `2`、`3` 还是 `PENDING`，留给 6a-2b 测）。
+
+## Phase 6a-2b：员工按 *Entered in GPiS ✓*（D71 ①、D72）
+
+设计见 `docs/decisions.md` D71、D72，`docs/architecture.md` 11.6。
+
+- *Requests* → *Pending* 的卡片：**Entered in GPiS ✓**（取代以前的 *Confirm* + 自己填 AppointmentID），在**画面中间弹出视窗**（不是新分页；卡片只放主要资料）。名单长的话只有视窗中间那一块上下拉；*Back*、`×`、Esc、点视窗外面都是关掉，什么都不改。
+  员工先在 GPiS 输入，再按：系统**当场只读查一次 GPiS**，列出那一天的预约（只有时间、名字、医生；没有 Remarks、号码），
+  和请求一样的排最上面（*Same patient* / *Same doctor* / *Same time*）。员工点选 → *Confirm this appointment*：
+  后端再读一次 GPiS，那个预约还在才确认。GPiS 里没有 = 不能确认。员工约成别的日期，改上面的 *GPiS date*。
+- 确认后系统**马上经 WhatsApp 发确认消息**：`好的哟，已经帮你预约了哦😊` / `Okay, your appointment is booked 😊`，下面列 GPiS 的名字、日期、时间、医生、分行（D73）。
+  发不了的放在新的分页 ***To tell patient***，写原因；员工用 *Open in WhatsApp* / *Copy message* / 手机传了，按 ***Patient told ✓***。
+- 一个 GPiS 预约只能确认一个请求（已经用过的变灰）；新病人顺便记下 GPiS 的 `ContactID`。
+- *Reject*、*Patient cancelled* 按错了：*Rejected* / *Cancelled* 分页按 **Back to pending** 改回来（D73）；确认过又取消的要重新点选。
+- **读 `GPiS_Dev` 时不发、也没有 *Open in WhatsApp***（黄色提醒）：名字是真的病人。要试真的发，用 `REMINDER_SOURCE=demo`（假资料）。
+- 选单 *Requests* 的数字 = 待确认 + 要通知。
+- 改表：migration **`0006`**（`appointment_requests` 多 7 栏 + 部分唯一 index；以前确认的当作已经通知）。
+- 电脑 B 还没有请求（没有 AI），**暂时不用更新**；下次更新 B 时要 `alembic upgrade head` 到 `0006`（照 `docs/deploy-pc-b.md` 第 9 节，改表前先备份）。
+- 测「确认后自动通知」：`python -m app.db.demo --request-for <自己的手机>`，给自己手机的那段对话加一个 PENDING 请求（Demo Self、S+P、PHANG、下一个星期五 10:00）。
+
+### 更新（开发电脑）
+
+```powershell
+# backend（先启用 venv）
+git pull
+alembic upgrade head          # 0005 -> 0006
+alembic current               # 0006 (head)
+pytest                        # 应该 390 passed，没有 skipped
+
+# frontend
+cd ..\frontend
+npm test                      # 应该 50 passed
+npm run build                 # ✓ built
+```
+
+### 6a-2b 完成的条件（在开发电脑上测试，16 项）
+
+视窗照「Phase 5a」的「使用」（视窗 1 Admin API、视窗 4 网页；B 部分还要视窗 2 webhook、视窗 3 cloudflared）。psql 用 `$psql`。
+**A 部分读 `GPiS_Dev`，画面上是真的病人名字：只数行数，不要截图、不要贴名字。**
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的「更新」 | `0006 (head)`；`pytest` 392 passed、没有 skipped；`npm test` 51 passed；`npm run build` 成功 |
+| 2 | `& $psql -h localhost -U chatbot -d chatbot_dev -c "SELECT id, status, patient_told_at IS NOT NULL AS told FROM appointment_requests ORDER BY id;"` | id `1`（Phase 4b 确认过的 Demo Kid A）`CONFIRMED`、`told = t`；`2`、`3` `PENDING`、`f`；`4` `CANCELLED`、`f` |
+| 3 | 开视窗 1、4，登入 → *Requests* | 分页 *Pending*、*To tell patient*、*Confirmed* …；选单 *Requests* 的数字是 `2`；*To tell patient* 没有数字（Demo Kid A 不在里面） |
+| **A** | **读 `GPiS_Dev`**（`.env` 没有 `REMINDER_SOURCE=demo`） | |
+| 4 | Demo Kid B → **Entered in GPiS ✓** | *GPiS date* 是 `2026-10-09`；黄色 *The list comes from GPiS_Dev: the patient will not be messaged automatically*；2 行：`11:30`、`13:00`，都是 Dr PHANG（= 6a-2a 第 4 项的 `Patients=2`）；*Confirm this appointment* 要点选之后才能按 |
+| 5 | *GPiS date* 改成 `2026-09-02` | Dr PHANG 的有 25 行（= T6 的 `Patients=25`），时间由早到晚 |
+| 6 | **Back** | 回到卡片，还是 *Pending*（什么都没改） |
+| **B** | **假资料 + 自己的手机**：`.env` 加 `REMINDER_SOURCE=demo` → 重开视窗 1；开视窗 2、3（*Callback URL* 改成新的网址） | |
+| 7 | 用**自己的手机**传一条 `test 6a-2b` 给 Meta 测试号码 → `python -m app.db.demo --request-for <自己的手机>` | `Added pending request N: Demo Self, S+P, PHANG, <下一个星期五> 10:00.` |
+| 8 | *Requests* → **Refresh** → Demo Self → **Entered in GPiS ✓** | 没有黄色提醒；6 行 Demo Patient A–F（取消的 G、`00:00` 的 H 不列）；第一行 `10:00 DEMO PATIENT A · Dr PHANG Same doctor · Same time` |
+| 9 | 点选第一行 → **Confirm this appointment** | 绿色 *Demo Self: confirmed, and the patient was sent the confirmation.*；手机收到 `好的哟，已经帮你预约了哦😊`、`Okay, your appointment is booked 😊`，下面 `NAME: DEMO PATIENT A`、那天的日期、`TIME: 10:00 AM`、`DOCTOR: DR PHANG`；*Conversations* 那段对话最后一条是这则消息（员工接手的对话 → 算你发的） |
+| 10 | Demo Kid B → **Entered in GPiS ✓** → *GPiS date* `2026-10-09` → 点选 `11:00 DEMO PATIENT C` → **Confirm this appointment** | 黄色 *confirmed, but the patient was not messaged (More than 24 hours …)*；*To tell patient (1)*；选单数字 `2`（1 个待确认 + 1 个要通知） |
+| 11 | *To tell patient* | Demo Kid B 的卡片：黄色原因、*In GPiS* `Fri 09 Oct 2026 11:00 · Dr PHANG`、消息预览（`NAME: DEMO PATIENT C`）；没有 *Open in WhatsApp*（`60120000001` 不在允许名单），有 *Copy message*、*Patient told ✓* |
+| 12 | **Patient told ✓** | *Every confirmed patient has been told.*；*Confirmed* 分页的 Demo Kid B 有 *Patient told … (by staff)*，Demo Self 有 *(sent by the system)* |
+| 13 | Demo Patient → **Entered in GPiS ✓** → *GPiS date* `2026-10-09` | `11:00 DEMO PATIENT C` 那一行变灰、*already confirms request #<Demo Kid B 的 id>*，不能点选 → **Back** |
+| 14 | Demo Patient → **Patient cancelled** → OK → *Cancelled* 分页 → Demo Patient → **Back to pending** → OK | Demo Patient 回到 *Pending*，还是 `GOH`、`Sat 10 Oct 2026 10:00`；选单数字多 1 |
+| 15 | `& $psql -h localhost -U chatbot -d chatbot_dev -c "SELECT id, gpis_appointment_id, confirmed_date, confirmed_slot, confirmed_doctor_id, patient_told_by IS NOT NULL AS by_staff, notify_problem FROM appointment_requests WHERE status = 'CONFIRMED' ORDER BY id;"` | Demo Kid B：`2026-10-09`、`11:00:00`、`PHANG`、`by_staff = t`、原因是 *More than 24 hours …*；Demo Self：下一个星期五、`10:00:00`、`PHANG`、`by_staff = f`、原因空的 |
+| 16 | 清理：`.env` 拿掉 `REMINDER_SOURCE=demo` → 重开视窗 1；关掉视窗 3（cloudflared） | — |
+
+### 云端容器的测试记录（2026-10-15，PostgreSQL 16、Python 3.11 + `requirements-lock.txt`、Node 22、只用假资料）
+
+- `pytest` → 390 passed（新增 26 个）：点选名单（取消、`Postpone`、`00:00`、诊所联系人、OFF DAY、看不懂的时段都不列，同一个预约不重复，排序、`same_*`，没有 Remarks、号码）；
+  再读一次 GPiS 才确认（没有、已取消 → 409，请求还是 PENDING）；一个 GPiS 预约只确认一个请求；员工约成别的日期、医生、时间照点选的发；
+  ContactID 只在空的、别人没用的时候记；读 GPiS_Dev 不发、没有 *Open in WhatsApp*；不在允许名单、没设定 WhatsApp、WhatsApp 不接受、超过 24 小时、对话已结束、员工建的请求（没有对话）、发了但存不进去 → 都在 *To tell patient*；
+  AI 的对话算 AI 发、员工接手的算员工发；*Patient told* 两次 → 409；确认后取消就不在「要通知」；确认后不再算占用（A8）；
+  migration `0006` 把以前确认的当作已经通知；`python -m app.db.demo --request-for`。
+- `npm test` → 50 passed（新的流程：点选、换日期、已经用过的变灰、GPiS_Dev 的黄色提醒、没发出去的原因、读 GPiS 失败、*To tell patient* 的 *Open in WhatsApp* / *Patient told*）；`npm run build` 成功。
+- headless Chromium（假资料 `REMINDER_SOURCE=demo`、没设定 WhatsApp）照着点过：点选 → 确认 → 黄色 *not messaged (WhatsApp is not set up on this computer)* → *To tell patient (1)* 有 *Open in WhatsApp*（允许名单里的号码）→ *Patient told* → *Confirmed* 显示 *(by staff)*；1366 和 400 宽都排得下；已经用过的预约变灰。
+- 写的时候找到、已经改好：点选名单的圆点被全站的 `label` 样式排到文字上面 → 名单的 `label` 改成横排。
+
+### 开发电脑测试时改的（2026-10-17，D73）
+
+- 确认消息改成 `好的哟，已经帮你预约了哦😊` / `Okay, your appointment is booked 😊` + 预约资料（开发者定的）。
+- 测试时按错 *Patient cancelled*，请求回不到 *Pending* → 加 **Back to pending**（*Rejected*、*Cancelled* 分页；`POST /api/requests/{id}/reopen`）。
+- 云端：`pytest` 392 passed（新增 2 个：取消 / 拒绝之后改回来又算占用、已经是 Pending 或 Confirmed 不能改回；确认过又取消再改回，旧的确认资料清掉、可以再确认一次）；`npm test` 51 passed、`npm run build` 成功。
+- 弹出视窗（开发者 2026-10-17 要的）：*Entered in GPiS ✓* 不再把名单塞在卡片里，改成画面中间的视窗（标题有病人、疗程、医生、想要的时间），名单在视窗里面卷动，*Same doctor* 这些标签放在名字下一行。
+  云端：`npm test` 51 passed（多测：视窗不在卡片里、Esc 关掉）；headless Chromium 1366 × 768、400 × 760 截图：视窗置中、400 宽时只有中间卷动、Esc 关掉。
+
+### 开发电脑的测试记录（2026-10-17，`GPiS_Dev` = 2026-09-28 的快照、`chatbot_dev` 的假资料、Meta 测试号码 + 自己的手机）
+
+- 全部通过：`0006 (head)`；`pytest` 392 passed；`npm test` 51 passed；`npm run build` 成功。
+- 第 2 项：id 1（Demo Kid A，Phase 4b 确认过）`CONFIRMED`、`told = t`；2、3 `PENDING`；4 `CANCELLED`。
+- 假资料 + 自己的手机：Demo Self（2026-10-23 10:00）点选 `10:00 DEMO PATIENT A` → 手机收到 `好的哟，已经帮你预约了哦😊` / `Okay, your appointment is booked 😊` + 预约资料；
+  Demo Kid B 点选 `15:00 DEMO PATIENT F` → *More than 24 hours* → *To tell patient* → *Patient told ✓*；Demo Patient 看 10-09 时 `15:00 DEMO PATIENT F` 变灰。
+- 测试时按错，把确认过的 Demo Kid B 取消了 → 用 *Back to pending* 改回来：`PENDING`、旧的确认资料清掉（D73）。
+- 读 `GPiS_Dev`（只看、没有确认）：黄色 *The list comes from GPiS_Dev …*；2026-10-09 有 2 行（`11:30`、`13:00`，都是 Dr PHANG）；2026-09-02 Dr PHANG 25 行（= T6）；按 *Back* 什么都没改。
+- 测试时改的：确认消息的写法、*Back to pending*（D73）、弹出视窗。
+- Meta 的 *Verify and save* 一次出现 *The callback URL or verify token couldn't be validated*：照「Phase 5a」的视窗顺序重开、网址加 `/webhook` 后通过（不是 access token 的问题）。
+

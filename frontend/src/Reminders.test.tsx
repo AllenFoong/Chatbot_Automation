@@ -16,6 +16,7 @@ const OPENED: ReminderRecord = {
 const base = {
   "GET /api/auth/me": ok(STAFF),
   "GET /api/conversations?mode=HUMAN": ok([]),
+  "GET /api/requests?to_tell=true": ok([]),
   "GET /api/requests?status=PENDING": ok([]),
 };
 

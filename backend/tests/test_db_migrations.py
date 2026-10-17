@@ -32,3 +32,22 @@ def test_downgrade_and_upgrade_again(db_engine):
         assert inspect(conn).get_table_names() == ["alembic_version"]
         command.upgrade(alembic_config(conn), "head")
         assert set(inspect(conn).get_table_names()) == set(Base.metadata.tables) | {"alembic_version"}
+
+
+def test_0006_requests_confirmed_before_count_as_told(db_engine):
+    """6a-2b 之前确认的请求没有通知的功能：升级后当作已经通知，不会跑进「要通知」。"""
+    with db_engine.connect() as conn:
+        trans = conn.begin()
+        try:
+            command.downgrade(alembic_config(conn), "0005")
+            conn.execute(text("INSERT INTO services (code, name) VALUES ('S+P', 'Scaling')"))
+            conn.execute(text("INSERT INTO customers (id, name) VALUES (1, 'Demo Old')"))
+            conn.execute(text(
+                "INSERT INTO appointment_requests (id, customer_id, service_code, status, handled_at) VALUES "
+                "(1, 1, 'S+P', 'CONFIRMED', '2026-10-05 10:00+08'), (2, 1, 'S+P', 'PENDING', NULL)"))
+            command.upgrade(alembic_config(conn), "head")
+            rows = conn.execute(text("SELECT id, patient_told_at = handled_at FROM appointment_requests "
+                                     "ORDER BY id")).all()
+            assert [tuple(r) for r in rows] == [(1, True), (2, None)]
+        finally:
+            trans.rollback()

@@ -330,7 +330,9 @@ select:disabled {
   cursor: not-allowed;
 }
 
-input[type="checkbox"] {
+input[type="checkbox"],
+input[type="radio"] {
+  flex: none;
   width: 16px;
   height: 16px;
   margin: 0;
@@ -338,7 +340,8 @@ input[type="checkbox"] {
   accent-color: var(--accent);
 }
 
-input[type="checkbox"]:focus {
+input[type="checkbox"]:focus,
+input[type="radio"]:focus {
   box-shadow: 0 0 0 3px var(--focus);
 }
 
@@ -1423,6 +1426,71 @@ ul.error {
   align-self: stretch;
 }
 
+.confirm-date {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.confirm-date label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gpis-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.gpis-choices legend {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.gpis-choices label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.gpis-choices label.match {
+  border-color: var(--accent);
+}
+
+.gpis-choices label:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.gpis-choices .time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.choice-tags {
+  display: block;
+  margin-top: 2px;
+  color: var(--accent-text);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
 /* ---------- 对话 ---------- */
 
 .split {
@@ -1902,3 +1970,85 @@ ul.error {
     animation-duration: 2.4s;
   }
 }
+
+/* ---------- 弹出视窗（Entered in GPiS） ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  background: var(--surface, #fff);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+  outline: none;
+}
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-head h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.modal-head p {
+  margin: 0;
+}
+
+.modal-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* 名单很长时只有中间这一块上下拉，标题和按钮一直看得到 */
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.modal-body p {
+  margin: 0;
+}
+
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+}
+
+.modal .gpis-choices {
+  gap: 8px;
+}
+
+.modal .gpis-choices label {
+  padding: 10px 12px;
+}
+

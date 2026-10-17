@@ -10,6 +10,7 @@ from app.db.appointment_requests import (
     cancel_request,
     confirm_request,
     create_appointment_request,
+    held_requests,
     list_pending_requests,
     new_group_id,
     reject_request,
@@ -114,3 +115,57 @@ def test_family_coming_together_share_group_id(db):
     b = create_appointment_request(db, kid, "S+P", preferred_date=FRI, preferred_slot=time(16), group_id=group)
     db.expire_all()
     assert a.group_id == b.group_id == group
+
+
+def test_held_requests_are_pending_with_doctor_and_slot(db):
+    """A8：只有 PENDING、这天、这位医生、有时段的请求算占用；没有病人资料。"""
+    staff = add_staff(db, "amy")
+    p = create_customer(db, "Test Patient", "0123456789")
+
+    def req(doctor="PHANG", day=FRI, slot=time(10), **kw):
+        return create_appointment_request(db, p, "S+P", doctor_id=doctor, preferred_date=day, preferred_slot=slot, **kw)
+
+    a = req()
+    b = req(slot=time(9, 30), duration_minutes=60)
+    req(doctor="GOH")                          # 别的医生
+    req(day=date(2026, 10, 10))                # 别的日子
+    req(slot=None)                             # 没有时段
+    create_appointment_request(db, p, "S+P", preferred_date=FRI, preferred_slot=time(10))   # 没有医生
+    confirm_request(db, req(), staff, 123456)  # 已经确认（GPiS 里有了）
+    reject_request(db, req(), staff)
+    cancel_request(db, req())
+
+    held = held_requests(db, FRI, " phang ")
+    assert [(h.request_id, h.slot, h.duration_minutes) for h in held] == [
+        (b.id, time(9, 30), 60),
+        (a.id, time(10), 30),
+    ]
+    assert held[0].dur_slots == 2
+
+
+def test_availability_api_counts_pending_requests_from_database(db):
+    """/availability 真的从本系统的数据库读 PENDING 的请求（GPiS 用假的）。"""
+    from fastapi.testclient import TestClient
+
+    from app.availability import GpisAppointment
+    from app.db.session import get_session
+    from app.main import app, get_appointment_source
+
+    class TwoAtTen:
+        def appointments_for(self, day, doctor_id):
+            return [GpisAppointment(1, "10:00", "Booked", 1, "S+P"), GpisAppointment(2, "10:00", "Booked", 2, "S+P")]
+
+    p = create_customer(db, "Test Patient", "0123456789")
+    create_appointment_request(db, p, "S+P", doctor_id="PHANG", preferred_date=FRI, preferred_slot=time(10))
+    app.dependency_overrides[get_session] = lambda: db
+    app.dependency_overrides[get_appointment_source] = lambda: TwoAtTen()
+    try:
+        client = TestClient(app)
+        params = {"date": FRI.isoformat(), "doctor": "PHANG", "service": "S+P"}
+        body = client.get("/availability", params=params).json()
+        gpis_only = client.get("/availability", params={**params, "requests": "false"}).json()
+    finally:
+        app.dependency_overrides.clear()
+    assert body["requests"] == 1 and "10:00" not in body["available_30"]
+    assert gpis_only["requests"] == 0 and "10:00" in gpis_only["available_30"]
+    assert "Test Patient" not in str(body)

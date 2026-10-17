@@ -12,7 +12,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import * as api from "../api";
 import { Badge, Empty, ErrorBox, Loading, Notice, PageHeader, Tabs } from "../components";
-import { formatDate, formatDateTime, formatPhone } from "../format";
+import { formatDate, formatDateTime, formatPhone, whatsappLink } from "../format";
 import { useAction, useLoad } from "../hooks";
 import { AlertIcon, CopyIcon, RefreshIcon, WhatsAppIcon } from "../icons";
 import type { PhoneKind, ReminderGroup, ReminderList, ReminderRecord } from "../types";
@@ -27,10 +27,7 @@ const KIND_LABEL: Record<PhoneKind, string | null> = {
   MISSING: "No number",
 };
 
-/** 打开 WhatsApp Desktop 的对话，消息已经填好（D54） */
-export function whatsappLink(phone: string, message: string): string {
-  return `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
-}
+export { whatsappLink };
 
 function names(g: ReminderGroup): string {
   return [...new Set(g.lines.map((l) => l.patient_name))].join(" & ");

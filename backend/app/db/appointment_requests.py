@@ -3,7 +3,7 @@
 状态只能这样改：
   PENDING   → CONFIRMED / REJECTED / CANCELLED
   CONFIRMED → CANCELLED（确认之后病人又取消：员工也要在 GPiS 改成 Canceled）
-REJECTED、CANCELLED 之后不能再改。
+  REJECTED / CANCELLED → PENDING（按错了：Back to pending，reopen_request）
 
 这里只 flush，不 commit。
 """
@@ -16,6 +16,7 @@ from datetime import date, time
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..availability import HeldRequest
 from .models import AppointmentRequest, Conversation, Customer, Doctor, RequestStatus, Service, Staff
 
 _ALLOWED = {
@@ -82,13 +83,82 @@ def _change_status(request: AppointmentRequest, new: RequestStatus, staff: Staff
 
 
 def confirm_request(
-    session: Session, request: AppointmentRequest, staff: Staff, gpis_appointment_id: int | None = None
+    session: Session,
+    request: AppointmentRequest,
+    staff: Staff | None,
+    gpis_appointment_id: int | None = None,
+    *,
+    confirmed_date: date | None = None,
+    confirmed_slot: time | None = None,
+    confirmed_doctor_id: str | None = None,
+    confirm_message: str | None = None,
 ) -> None:
-    """员工确认（录入 GPiS）。gpis_appointment_id 可以不填：GPiS 画面不显示 AppointmentID。"""
+    """确认：员工在 GPiS 录入后点选了那个预约（D71 ①）；staff = None 是系统自动确认（D71 ②，6a-2c）。
+
+    之后这个请求在「要通知」，直到系统发出确认消息（patient_notified）或员工按 Patient told ✓（patient_told）。
+    """
     _change_status(request, RequestStatus.CONFIRMED, staff)
-    if gpis_appointment_id is not None:
-        request.gpis_appointment_id = gpis_appointment_id
+    request.gpis_appointment_id = gpis_appointment_id
+    request.confirmed_date = confirmed_date
+    request.confirmed_slot = confirmed_slot
+    request.confirmed_doctor_id = confirmed_doctor_id
+    request.confirm_message = confirm_message
+    request.patient_told_at = None
+    request.patient_told_by = None
+    request.notify_problem = None
     session.flush()
+
+
+def reopen_request(session: Session, request: AppointmentRequest) -> None:
+    """拒绝、取消按错了：改回 PENDING（又算占用，A8），确认留下的资料全部清掉，重新确认时再点选 GPiS 的预约。"""
+    if request.status not in (RequestStatus.REJECTED, RequestStatus.CANCELLED):
+        raise InvalidTransition(f"{request.status} 不能改回 PENDING")
+    request.status = RequestStatus.PENDING
+    request.handled_by = None
+    request.handled_at = None
+    request.gpis_appointment_id = None
+    request.confirmed_date = None
+    request.confirmed_slot = None
+    request.confirmed_doctor_id = None
+    request.confirm_message = None
+    request.patient_told_at = None
+    request.patient_told_by = None
+    request.notify_problem = None
+    session.flush()
+
+
+def patient_notified(session: Session, request: AppointmentRequest) -> None:
+    """系统经 WhatsApp 发出了确认消息。"""
+    request.patient_told_at = func.now()
+    request.patient_told_by = None
+    request.notify_problem = None
+    session.flush()
+
+
+def notify_failed(session: Session, request: AppointmentRequest, problem: str) -> None:
+    """系统没有发确认消息：留在「要通知」，写原因给员工看。"""
+    request.notify_problem = problem
+    session.flush()
+
+
+def patient_told(session: Session, request: AppointmentRequest, staff: Staff) -> None:
+    """员工自己通知了病人（Open in WhatsApp、手机），按 Patient told ✓。"""
+    if request.status != RequestStatus.CONFIRMED or request.patient_told_at is not None:
+        raise InvalidTransition("只有还没通知的 CONFIRMED 请求可以按 Patient told")
+    request.patient_told_at = func.now()
+    request.patient_told_by = staff.id
+    session.flush()
+
+
+def list_to_tell(session: Session) -> list[AppointmentRequest]:
+    """「要通知」：确认了、病人还不知道的，先确认的排前面。"""
+    return list(
+        session.scalars(
+            select(AppointmentRequest)
+            .where(AppointmentRequest.status == RequestStatus.CONFIRMED, AppointmentRequest.patient_told_at.is_(None))
+            .order_by(AppointmentRequest.handled_at, AppointmentRequest.id)
+        )
+    )
 
 
 def reject_request(session: Session, request: AppointmentRequest, staff: Staff) -> None:
@@ -111,3 +181,22 @@ def list_pending_requests(session: Session) -> list[AppointmentRequest]:
             .order_by(AppointmentRequest.created_at, AppointmentRequest.id)
         )
     )
+
+
+def held_requests(session: Session, day: date, doctor_id: str) -> list[HeldRequest]:
+    """这天这位医生还在 PENDING 的请求：查空档时算占用（A8，architecture.md 11.6）。
+
+    没有医生或没有时段的请求不算（不知道占哪一格）；CONFIRMED 之后不算（GPiS 里已经有了）。
+    只回请求编号、时段、时长，没有病人资料。
+    """
+    rows = session.execute(
+        select(AppointmentRequest.id, AppointmentRequest.preferred_slot, AppointmentRequest.duration_minutes)
+        .where(
+            AppointmentRequest.status == RequestStatus.PENDING,
+            AppointmentRequest.preferred_date == day,
+            AppointmentRequest.doctor_id == doctor_id.strip().upper(),
+            AppointmentRequest.preferred_slot.is_not(None),
+        )
+        .order_by(AppointmentRequest.preferred_slot, AppointmentRequest.id)
+    )
+    return [HeldRequest(request_id, slot, minutes) for request_id, slot, minutes in rows]

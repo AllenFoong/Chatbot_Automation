@@ -30,12 +30,16 @@ import RequestsPage from "./pages/RequestsPage";
 import SettingsPage from "./pages/SettingsPage";
 import StaffPage from "./pages/StaffPage";
 
-/** 选单上的数字：要员工处理的对话、待确认的请求。每 30 秒更新；员工改了资料（例如接手）也马上更新。 */
+/** 选单上的数字：要员工处理的对话、待确认 + 要通知病人的请求。每 30 秒更新；员工改了资料（例如接手）也马上更新。 */
 function useCounts() {
   const { data, reload } = useLoad(
     async () => {
-      const [human, pending] = await Promise.all([api.conversations.list("HUMAN"), api.requests.list("PENDING")]);
-      return { human: human.length, pending: pending.length };
+      const [human, pending, toTell] = await Promise.all([
+        api.conversations.list("HUMAN"),
+        api.requests.list("PENDING"),
+        api.requests.toTell(),
+      ]);
+      return { human: human.length, pending: pending.length + toTell.length };
     },
     [],
     30_000,

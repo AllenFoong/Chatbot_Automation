@@ -1,12 +1,14 @@
 """空档计算：sql/check_available_slots.sql 的 Python 版本。
 
 这里只做计算，不连接数据库：输入是 GPiS 当天的预约（由 gpis.py 读出），
+加上本系统还没录入 GPiS 的请求（PENDING，由 db/appointment_requests.py 读出，A8），
 输出是每个时段还能不能约。Remarks 只在内存里用来判断时长、OFF DAY，不会出现在输出里。
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, time
 
@@ -36,6 +38,23 @@ class GpisAppointment:
 
 
 @dataclass(frozen=True)
+class HeldRequest:
+    """本系统的预约请求，还在 PENDING（员工还没录入 GPiS）：和 GPiS 的预约一样占那一格（A8，architecture.md 11.6）。
+
+    只有指定了医生、日期、时段的请求才算（没有的不知道占哪一格）。员工录入 GPiS 之后、请求变成 CONFIRMED 之前，
+    同一位病人会被算两次：只是少推荐，不会约重。
+    """
+
+    request_id: int
+    slot: time
+    duration_minutes: int     # 30 / 60（和 GPiS 的 1HOUR 一样，60 分钟会把下一格也封住）
+
+    @property
+    def dur_slots(self) -> int:
+        return max(self.duration_minutes // SLOT_MINUTES, 1)
+
+
+@dataclass(frozen=True)
 class ParsedAppointment:
     """一条预约怎么被解读（对应 SQL 输出 7c）。没有名字和 Remarks。"""
 
@@ -60,7 +79,8 @@ class SlotResult:
 
     time: str
     kind: str                 # "" / "BREAK" / "LONG APPT" / "AFTER HOURS"
-    booked: int
+    booked: int               # GPiS 的病人 + 本系统 PENDING 的请求
+    requests: int             # booked 里面有几个是 PENDING 的请求（只看 GPiS 时一定是 0）
     cap: int | None
     remaining: int
     can_30: bool
@@ -77,9 +97,11 @@ class DayAvailability:
     service: str
     day_status: str
     note: str | None
-    patients: int
+    patients: int             # GPiS 里算病人的预约（和 SQL 的 Patients 一样，不含请求）
+    requests: int             # 这天这位医生 PENDING 的请求，算进了 booked
     slots: list[SlotResult]
     appointments: list[ParsedAppointment]
+    held_requests: list[HeldRequest]
 
     @property
     def bookable(self) -> bool:
@@ -144,7 +166,9 @@ def check_available_slots(
     service: str,
     gpis_appointments: list[GpisAppointment],
     rules: ClinicRules,
+    held_requests: Sequence[HeldRequest] = (),
 ) -> DayAvailability:
+    """held_requests 不给 = 只看 GPiS，结果和 sql/check_available_slots.sql 一样。"""
     doctor_id = doctor_id.strip().upper()
     service = service.strip().upper()
 
@@ -177,27 +201,33 @@ def check_available_slots(
         day_status, note = "OK", None
 
     occupying = [a for a in appts if a.occupies]
+    held = sorted(held_requests, key=lambda h: (h.slot, h.request_id))
+    # 每个占位：(从哪一格开始, 占几格, 是不是请求)。请求和 GPiS 的预约一样算人数、一样封住 1 hour 的下一格
+    occupants = [(a.slot, a.dur_slots, False) for a in occupying] + [
+        (_minutes(h.slot), h.dur_slots, True) for h in held
+    ]
 
     # ---------- 时段表：营业时段 + 最后一格之后的一格（给 1 hour 从最后一格开始用） ----------
-    grid: list[tuple[int, bool, bool, int, bool]] = []  # (slot, is_break, after_hours, booked, long_blocked)
+    grid: list[tuple[int, bool, bool, int, bool, int]] = []  # (slot, is_break, after_hours, booked, long_blocked, requests)
     if schedule is not None:
         start, last = _minutes(schedule.start), _minutes(schedule.last_slot)
         b_start = _minutes(schedule.break_start) if schedule.break_start else None
         b_end = _minutes(schedule.break_end) if schedule.break_end else None
         for s in range(start, last + SLOT_MINUTES + 1, SLOT_MINUTES):
             is_break = b_start is not None and b_end is not None and b_start <= s < b_end
-            booked = sum(1 for a in occupying if a.slot == s)
+            booked = sum(1 for start_at, _, _ in occupants if start_at == s)
+            requests = sum(1 for start_at, _, is_request in occupants if is_request and start_at == s)
             long_blocked = any(
-                a.dur_slots >= 2 and a.slot <= s < a.slot + SLOT_MINUTES * a.dur_slots
-                for a in occupying
+                dur >= 2 and start_at <= s < start_at + SLOT_MINUTES * dur
+                for start_at, dur, _ in occupants
             )
-            grid.append((s, is_break, s > last, booked, long_blocked))
+            grid.append((s, is_break, s > last, booked, long_blocked, requests))
 
     can_count = day_status in ("OK", "NEEDS_REVIEW")
     can_be_third = service in rules.can_be_third
 
     slots: list[SlotResult] = []
-    for i, (s, is_break, after_hours, booked, long_blocked) in enumerate(grid):
+    for i, (s, is_break, after_hours, booked, long_blocked, requests) in enumerate(grid):
         prev_booked = grid[i - 1][3] if i > 0 else 0
         has_next = i + 1 < len(grid)
         next_booked = grid[i + 1][3] if has_next else 0
@@ -225,6 +255,7 @@ def check_available_slots(
                 time=_hhmm(s),
                 kind=kind,
                 booked=booked,
+                requests=requests,
                 cap=None if closed else cap,
                 remaining=max(cap - booked, 0) if open_slot else 0,
                 can_30=open_slot and booked < cap,
@@ -243,6 +274,8 @@ def check_available_slots(
         day_status=day_status,
         note=note,
         patients=len(occupying),
+        requests=len(held),
         slots=slots,
         appointments=sorted(appts, key=lambda a: ((a.time_slot or ""), a.appointment_id)),
+        held_requests=held,
     )
