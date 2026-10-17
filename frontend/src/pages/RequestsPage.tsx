@@ -9,7 +9,8 @@
 // - Reject、Patient cancelled 按错了：在 Rejected / Cancelled 分页按 Back to pending 改回来（又算占用；
 //   确认过又取消的，要重新点选 GPiS 的预约）。
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router";
 import * as api from "../api";
 import { Badge, Empty, ErrorBox, Loading, Notice, PageHeader, Tabs } from "../components";
@@ -53,7 +54,7 @@ function ChoiceLine({ c }: { c: GpisChoice }) {
     <span className="choice-text">
       <span className="time">{c.time}</span> {c.patient_name || "(no name)"}{" "}
       <span className="muted">· Dr {c.doctor_name}</span>
-      {tags.length > 0 && <span className="choice-tags"> {tags.join(" · ")}</span>}
+      {tags.length > 0 && <span className="choice-tags">{tags.join(" · ")}</span>}
       {c.used_by_request_id !== null && (
         <span className="muted"> · already confirms request #{c.used_by_request_id}</span>
       )}
@@ -61,8 +62,9 @@ function ChoiceLine({ c }: { c: GpisChoice }) {
   );
 }
 
-/** 员工按 Entered in GPiS ✓：当场查 GPiS，点选是哪一个预约 */
-function ConfirmPanel({
+/** 员工按 Entered in GPiS ✓：在画面中间弹出视窗（不是新分页），当场查 GPiS，点选是哪一个预约。
+ *  名单很长时只在视窗里面上下拉；Esc、点视窗外面、Back 都是关掉（什么都不改）。 */
+function ConfirmDialog({
   request,
   onDone,
   onCancel,
@@ -79,6 +81,22 @@ function ConfirmPanel({
   );
   const action = useAction();
   const choices = list.data?.choices ?? [];
+  const titleId = `confirm-title-${request.id}`;
+  const dialogRef = useRef<HTMLFormElement>(null);
+
+  // 打开时：后面的页面不跟着卷动、焦点移到视窗；Esc 关掉
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
+  function close() {
+    if (!action.busy) onCancel();
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -89,76 +107,116 @@ function ConfirmPanel({
     }
   }
 
-  return (
-    <form className="inline-form confirm-form" onSubmit={submit}>
-      <p className="small">
-        Enter the appointment in GPiS first. Then pick it below: the system checks GPiS again and messages the
-        patient the GPiS date, time and doctor.
-      </p>
-      <div className="confirm-date">
-        <label>
-          GPiS date
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setPicked(null);
-            }}
-          />
-        </label>
-        <button type="button" className="small" onClick={list.reload} disabled={!date || list.loading}>
-          <RefreshIcon />
-          Read GPiS again
-        </button>
-      </div>
-
-      {!date ? (
-        <p className="muted small">This request has no date: choose the date you booked in GPiS.</p>
-      ) : list.data === undefined ? (
-        list.loading && <Loading />
-      ) : (
-        <>
-          {!list.data.can_notify && (
-            <Notice tone="warning">
-              The list comes from {list.data.source}: the patient will not be messaged automatically.
-            </Notice>
-          )}
-          {choices.length === 0 ? (
+  return createPortal(
+    <div
+      className="modal-backdrop"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) close();
+      }}
+    >
+      <form
+        ref={dialogRef}
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        onSubmit={submit}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") close();
+        }}
+      >
+        <header className="modal-head">
+          <div>
+            <h2 id={titleId}>Entered in GPiS – {request.customer_name}</h2>
             <p className="muted small">
-              GPiS has no appointments on {formatDate(date)}. Enter it in GPiS first, then press Read GPiS again.
+              {request.service_code} · {request.doctor_id ? `Dr ${request.doctor_id}` : "Any doctor"} · wants{" "}
+              {request.preferred_date ? formatDate(request.preferred_date) : "no date yet"}
+              {request.preferred_slot && ` ${formatTime(request.preferred_slot)}`}
             </p>
-          ) : (
-            <fieldset className="gpis-choices">
-              <legend>Appointments in GPiS on {formatDate(list.data.date)}</legend>
-              {choices.map((c) => (
-                <label key={c.appointment_id} className={c.same_patient || (c.same_doctor && c.same_time) ? "match" : ""}>
-                  <input
-                    type="radio"
-                    name={`gpis-${request.id}`}
-                    value={c.appointment_id}
-                    checked={picked === c.appointment_id}
-                    disabled={c.used_by_request_id !== null}
-                    onChange={() => setPicked(c.appointment_id)}
-                  />
-                  <ChoiceLine c={c} />
-                </label>
-              ))}
-            </fieldset>
-          )}
-        </>
-      )}
+          </div>
+          <button type="button" className="ghost modal-close" aria-label="Close" onClick={close}>
+            ×
+          </button>
+        </header>
 
-      <ErrorBox message={list.error ?? action.error} onRetry={list.error ? list.reload : undefined} />
-      <div className="actions">
-        <button type="submit" className="primary" disabled={picked === null || action.busy}>
-          Confirm this appointment
-        </button>
-        <button type="button" onClick={onCancel} disabled={action.busy}>
-          Back
-        </button>
-      </div>
-    </form>
+        <div className="modal-body">
+          <p className="small">
+            Enter the appointment in GPiS first. Then pick it below: the system checks GPiS again and messages the
+            patient the GPiS date, time and doctor.
+          </p>
+          <div className="confirm-date">
+            <label>
+              GPiS date
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  setPicked(null);
+                }}
+              />
+            </label>
+            <button type="button" className="small" onClick={list.reload} disabled={!date || list.loading}>
+              <RefreshIcon />
+              Read GPiS again
+            </button>
+          </div>
+
+          {!date ? (
+            <p className="muted small">This request has no date: choose the date you booked in GPiS.</p>
+          ) : list.data === undefined ? (
+            list.loading && <Loading />
+          ) : (
+            <>
+              {!list.data.can_notify && (
+                <Notice tone="warning">
+                  The list comes from {list.data.source}: the patient will not be messaged automatically.
+                </Notice>
+              )}
+              {choices.length === 0 ? (
+                <p className="muted small">
+                  GPiS has no appointments on {formatDate(date)}. Enter it in GPiS first, then press Read GPiS again.
+                </p>
+              ) : (
+                <fieldset className="gpis-choices">
+                  <legend>
+                    Appointments in GPiS on {formatDate(list.data.date)} ({choices.length})
+                  </legend>
+                  {choices.map((c) => (
+                    <label
+                      key={c.appointment_id}
+                      className={c.same_patient || (c.same_doctor && c.same_time) ? "match" : ""}
+                    >
+                      <input
+                        type="radio"
+                        name={`gpis-${request.id}`}
+                        value={c.appointment_id}
+                        checked={picked === c.appointment_id}
+                        disabled={c.used_by_request_id !== null}
+                        onChange={() => setPicked(c.appointment_id)}
+                      />
+                      <ChoiceLine c={c} />
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+            </>
+          )}
+          <ErrorBox message={list.error ?? action.error} onRetry={list.error ? list.reload : undefined} />
+        </div>
+
+        <footer className="modal-foot">
+          <button type="button" onClick={close} disabled={action.busy}>
+            Back
+          </button>
+          <button type="submit" className="primary" disabled={picked === null || action.busy}>
+            Confirm this appointment
+          </button>
+        </footer>
+      </form>
+    </div>,
+    document.body,
   );
 }
 
@@ -313,8 +371,8 @@ function RequestCard({
 
       <ErrorBox message={action.error} />
 
-      {confirming ? (
-        <ConfirmPanel
+      {confirming && (
+        <ConfirmDialog
           request={r}
           onDone={(result) => {
             setConfirming(false);
@@ -322,7 +380,9 @@ function RequestCard({
           }}
           onCancel={() => setConfirming(false)}
         />
-      ) : r.status === "REJECTED" || r.status === "CANCELLED" ? (
+      )}
+
+      {r.status === "REJECTED" || r.status === "CANCELLED" ? (
         <div className="card-actions actions">
           <button
             type="button"

@@ -142,25 +142,28 @@ describe("requests", () => {
     expect(within(card).getByText("Fri 09 Oct 2026 16:00")).toBeInTheDocument();
 
     await user.click(within(card).getByRole("button", { name: "Entered in GPiS ✓" }));
-    const pick = within(card).getByRole("button", { name: "Confirm this appointment" });
+    // 在画面中间弹出视窗（不在卡片里）
+    const dialog = await screen.findByRole("dialog", { name: "Entered in GPiS – Demo Kid A" });
+    expect(card).not.toContainElement(dialog);
+    const pick = within(dialog).getByRole("button", { name: "Confirm this appointment" });
     expect(pick).toBeDisabled(); // 要先点选
-    const radios = await within(card).findAllByRole("radio");
+    const radios = await within(dialog).findAllByRole("radio");
     expect(radios.map((r) => r.closest("label")!.textContent)).toEqual([
-      "16:00 DEMO KID A · Dr PHANG Same doctor · Same time",
+      "16:00 DEMO KID A · Dr PHANGSame doctor · Same time",
       "10:00 SOMEONE ELSE · Dr GOH",
-      "16:00 DEMO KID B · Dr PHANG Same doctor · Same time · already confirms request #7",
+      "16:00 DEMO KID B · Dr PHANGSame doctor · Same time · already confirms request #7",
     ]);
     expect(radios[2]!).toBeDisabled(); // 已经确认了别的请求
 
     // 换日期 → 重新读 GPiS；那天没有就说要先在 GPiS 输入
-    const date = within(card).getByLabelText("GPiS date");
+    const date = within(dialog).getByLabelText("GPiS date");
     await user.clear(date);
     await user.type(date, "2026-10-10");
-    expect(await within(card).findByText(/GPiS has no appointments on/)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/GPiS has no appointments on/)).toBeInTheDocument();
     await user.clear(date);
     await user.type(date, "2026-10-09");
 
-    await user.click((await within(card).findAllByRole("radio"))[0]!);
+    await user.click((await within(dialog).findAllByRole("radio"))[0]!);
     await user.click(pick);
     expect(await screen.findByText(/confirmed, and the patient was sent the confirmation/)).toBeInTheDocument();
     expect(calls.find((c) => c.method === "POST")?.body).toEqual({ gpis_appointment_id: 101, date: "2026-10-09" });
@@ -200,7 +203,12 @@ describe("requests", () => {
     await user.click(await screen.findByRole("button", { name: "Entered in GPiS ✓" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not read GPiS");
     await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByRole("button", { name: "Entered in GPiS ✓" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // Esc 也是关掉
+    await user.click(screen.getByRole("button", { name: "Entered in GPiS ✓" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 

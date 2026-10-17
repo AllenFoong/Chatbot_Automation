@@ -914,7 +914,7 @@ pytest                        # 应该 364 passed，没有 skipped
 
 设计见 `docs/decisions.md` D71、D72，`docs/architecture.md` 11.6。
 
-- *Requests* → *Pending* 的卡片：**Entered in GPiS ✓**（取代以前的 *Confirm* + 自己填 AppointmentID）。
+- *Requests* → *Pending* 的卡片：**Entered in GPiS ✓**（取代以前的 *Confirm* + 自己填 AppointmentID），在**画面中间弹出视窗**（不是新分页；卡片只放主要资料）。名单长的话只有视窗中间那一块上下拉；*Back*、`×`、Esc、点视窗外面都是关掉，什么都不改。
   员工先在 GPiS 输入，再按：系统**当场只读查一次 GPiS**，列出那一天的预约（只有时间、名字、医生；没有 Remarks、号码），
   和请求一样的排最上面（*Same patient* / *Same doctor* / *Same time*）。员工点选 → *Confirm this appointment*：
   后端再读一次 GPiS，那个预约还在才确认。GPiS 里没有 = 不能确认。员工约成别的日期，改上面的 *GPiS date*。
@@ -985,4 +985,17 @@ npm run build                 # ✓ built
 - 确认消息改成 `好的哟，已经帮你预约了哦😊` / `Okay, your appointment is booked 😊` + 预约资料（开发者定的）。
 - 测试时按错 *Patient cancelled*，请求回不到 *Pending* → 加 **Back to pending**（*Rejected*、*Cancelled* 分页；`POST /api/requests/{id}/reopen`）。
 - 云端：`pytest` 392 passed（新增 2 个：取消 / 拒绝之后改回来又算占用、已经是 Pending 或 Confirmed 不能改回；确认过又取消再改回，旧的确认资料清掉、可以再确认一次）；`npm test` 51 passed、`npm run build` 成功。
+- 弹出视窗（开发者 2026-10-17 要的）：*Entered in GPiS ✓* 不再把名单塞在卡片里，改成画面中间的视窗（标题有病人、疗程、医生、想要的时间），名单在视窗里面卷动，*Same doctor* 这些标签放在名字下一行。
+  云端：`npm test` 51 passed（多测：视窗不在卡片里、Esc 关掉）；headless Chromium 1366 × 768、400 × 760 截图：视窗置中、400 宽时只有中间卷动、Esc 关掉。
+
+### 开发电脑的测试记录（2026-10-17，`GPiS_Dev` = 2026-09-28 的快照、`chatbot_dev` 的假资料、Meta 测试号码 + 自己的手机）
+
+- 全部通过：`0006 (head)`；`pytest` 392 passed；`npm test` 51 passed；`npm run build` 成功。
+- 第 2 项：id 1（Demo Kid A，Phase 4b 确认过）`CONFIRMED`、`told = t`；2、3 `PENDING`；4 `CANCELLED`。
+- 假资料 + 自己的手机：Demo Self（2026-10-23 10:00）点选 `10:00 DEMO PATIENT A` → 手机收到 `好的哟，已经帮你预约了哦😊` / `Okay, your appointment is booked 😊` + 预约资料；
+  Demo Kid B 点选 `15:00 DEMO PATIENT F` → *More than 24 hours* → *To tell patient* → *Patient told ✓*；Demo Patient 看 10-09 时 `15:00 DEMO PATIENT F` 变灰。
+- 测试时按错，把确认过的 Demo Kid B 取消了 → 用 *Back to pending* 改回来：`PENDING`、旧的确认资料清掉（D73）。
+- 读 `GPiS_Dev`（只看、没有确认）：黄色 *The list comes from GPiS_Dev …*；2026-10-09 有 2 行（`11:30`、`13:00`，都是 Dr PHANG）；2026-09-02 Dr PHANG 25 行（= T6）；按 *Back* 什么都没改。
+- 测试时改的：确认消息的写法、*Back to pending*（D73）、弹出视窗。
+- Meta 的 *Verify and save* 一次出现 *The callback URL or verify token couldn't be validated*：照「Phase 5a」的视窗顺序重开、网址加 `/webhook` 后通过（不是 access token 的问题）。
 
