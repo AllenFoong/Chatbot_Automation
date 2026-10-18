@@ -1065,5 +1065,5 @@ npm run build                 # ✓ built
 - 容器的 `chatbot_dev`（假资料）：`alembic upgrade head` → `0007`；`--dry-run`、`--once`（开关关 → 拒绝）、`--auto-confirm-demo`（确认了；假对话超过 24 小时 → 进 *To tell patient*）；
   在「营业时间」跑一次背景的 `tick` → 记下上次查 GPiS 的时间、没有错误；uvicorn 启动时背景开始、日志没有错误。
 - headless Chromium：ADMIN 在 *Slots & auto-confirm* 打开 → *Saved.* → *Requests* 上面一行 *Auto-confirm is on … Last checked GPiS: …*；写的时候找到、已经改好：勾选框被表单的样式拉宽。
-- 开发者测试时要的（2026-10-18）：勾选框改成 **on / off 开关**（开是绿色、关是灰色，旁边写 *On* / *Off*；拨了还是要按 **Save**，和上面三个设定一样）。底下还是 checkbox，读屏软件念成 switch；Vitest 60 个；headless Chromium：滑鼠、空白键、点 *On* 字都能切换，STAFF 的变淡、拨不动。
+- 开发者测试时要的（2026-10-18）：勾选框改成 **on / off 开关**（开是绿色、关是灰色，旁边写 *On* / *Off*；照 iOS 设定的排法：名字在左边、开关在右边，点整行都能切换；拨了还是要按 **Save**，和上面三个设定一样）。底下还是 checkbox，读屏软件念成 switch；Vitest 60 个；headless Chromium：滑鼠、空白键、点 *On* 字都能切换，STAFF 的变淡、拨不动。
 

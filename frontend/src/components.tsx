@@ -184,7 +184,8 @@ export function PasswordInput({
   );
 }
 
-/** On / off 开关（开是绿色、关是灰色）。底下还是 checkbox，读屏软件念成 switch；旁边的 On / Off 只是给眼睛看的。 */
+/** On / off 开关（开是绿色、关是灰色），照 iOS 设定的排法：名字在左边，开关在右边。
+ *  底下还是 checkbox，读屏软件念成 switch；旁边的 On / Off 只是给眼睛看的。 */
 export function Switch({
   label,
   checked,
@@ -198,7 +199,7 @@ export function Switch({
 }) {
   return (
     <label className="switch-field">
-      {label}
+      <span className="switch-label">{label}</span>
       <span className="switch">
         <span className="switch-control">
           <input

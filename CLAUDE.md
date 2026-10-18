@@ -119,7 +119,7 @@
 - [x] Phase 6a-2c 初版（D71 ②、D74）：*Settings → Slots & auto-confirm* 的开关（默认关、只有 ADMIN 能改）；Admin API 里背景每 3 分钟（9:00–17:30），系统第一次看到请求时记下那天有没有预约，之后同病人、同日、同时段、同医生、同疗程、同时长、只对上一个才自动确认 + 发消息；读 `GPiS_Dev` 不跑；*Requests* 上面一行显示上次查 GPiS，15 分钟没成功红字；migration `0007`；`python -m app.auto_confirm --dry-run / --once`、`python -m app.db.demo --auto-confirm-demo <号码>`；云端 `pytest` 427 个、Vitest 58 个，headless Chromium 用假资料点过
 - [x] 员工账号（D75）：所有密码栏加看密码的眼睛；*Staff accounts* 加 **Delete**（只删没用过的账号，用过的写原因、请改用停用；自己、最后一个 ADMIN 不能删）；云端 `pytest` 429 个、Vitest 60 个，headless Chromium 点过；和 6a-2c 一起在 PR #33
 - [x] *To tell patient* 的卡片只放主要资料，原因、消息、*Open in WhatsApp* / *Copy message* / *Patient told ✓* 改放在弹出视窗（按 **Tell the patient**，和 *Entered in GPiS ✓* 共用 `Modal`，D73 ③）；Vitest 60 个，headless Chromium 1366 / 400 宽看过；在 PR #33
-- [x] *Settings → Slots & auto-confirm* 的勾选框改成 on / off 开关（绿色 / 灰色，`Switch` 元件；拨了还是要按 **Save**）；`backend/README.md` 6a-2c 清单第 2、3、10 项照着改；在 PR #33
+- [x] *Settings → Slots & auto-confirm* 的勾选框改成 on / off 开关（绿色 / 灰色，照 iOS 设定的排法：名字在左、开关在右；`Switch` 元件；拨了还是要按 **Save**）；`backend/README.md` 6a-2c 清单第 2、3、10 项照着改；在 PR #33
 
 ## 下一步
 

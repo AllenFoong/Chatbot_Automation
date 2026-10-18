@@ -1975,13 +1975,32 @@ ul.error {
   }
 }
 
-/* ---------- On / off 开关（Settings 的自动确认） ---------- */
+/* ---------- On / off 开关（Settings 的自动确认；照 iOS 设定：名字在左、开关在右） ---------- */
+
+label.switch-field {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+label.switch-field:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+.switch-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
 
 .switch {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 10px;
-  width: fit-content;
 }
 
 .switch-control {
@@ -2044,7 +2063,9 @@ label .switch-control > input[type="checkbox"] {
   opacity: 0.5;
 }
 
+/* On 和 Off 一样宽，切换时开关不会左右跳 */
 .switch-state {
+  min-width: 2em;
   font-size: 13.5px;
   font-weight: 600;
   color: var(--muted);
