@@ -10,11 +10,15 @@ import type { ClinicSettings } from "../../types";
 export default function ClinicSection({ canEdit }: { canEdit: boolean }) {
   const settings = useLoad(() => api.settings.clinic(), []);
   const [form, setForm] = useState<ClinicSettings | null>(null);
+  const [stored, setStored] = useState<ClinicSettings | null>(null); // 数据库里现在的设定（拨了还没 Save 的要提醒）
   const [saved, setSaved] = useState(false);
   const action = useAction();
 
   useEffect(() => {
-    if (settings.data) setForm(settings.data);
+    if (settings.data) {
+      setForm(settings.data);
+      setStored(settings.data);
+    }
   }, [settings.data]);
 
   function change(patch: Partial<ClinicSettings>) {
@@ -25,7 +29,12 @@ export default function ClinicSection({ canEdit }: { canEdit: boolean }) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!form) return;
-    if (await action.run(async () => setForm(await api.settings.updateClinic(form)))) setSaved(true);
+    let result: ClinicSettings | undefined;
+    if (await action.run(async () => (result = await api.settings.updateClinic(form)))) {
+      setForm(result!);
+      setStored(result!);
+      setSaved(true);
+    }
   }
 
   if (!form) {
@@ -81,10 +90,16 @@ export default function ClinicSection({ canEdit }: { canEdit: boolean }) {
         disabled={!canEdit}
         onChange={(on) => change({ auto_confirm: on })}
       />
-      <p className="help">
-        Off by default. Turn it on after staff have used Entered in GPiS for a while and the requests match GPiS.
-        New patients are never confirmed automatically the first time.{canEdit && " Press Save to apply."}
-      </p>
+      {/* 关的时候不写说明（开发者 2026-10-18 要的）；拨了还没 Save 的才写 Press Save to apply. */}
+      {form.auto_confirm && (
+        <p className="help">
+          Off by default. Turn it on after staff have used Entered in GPiS for a while and the requests match GPiS.
+          New patients are never confirmed automatically the first time.
+        </p>
+      )}
+      {canEdit && stored && form.auto_confirm !== stored.auto_confirm && (
+        <p className="help">Press Save to apply.</p>
+      )}
 
       <ErrorBox message={action.error} />
       {canEdit && (

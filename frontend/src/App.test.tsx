@@ -126,11 +126,21 @@ describe("auto-confirm (D71 ②)", () => {
     const box = await screen.findByRole("switch", { name: "Confirm matching requests automatically" });
     expect(box).not.toBeChecked();
     expect(screen.getByText("Off")).toBeInTheDocument();
+    // 关的时候没有说明
+    expect(screen.queryByText(/Off by default/)).toBeNull();
+    expect(screen.queryByText("Press Save to apply.")).toBeNull();
     await user.click(box);
     expect(screen.getByText("On")).toBeInTheDocument();
+    expect(screen.getByText(/Off by default/)).toBeInTheDocument();
+    expect(screen.getByText("Press Save to apply.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(screen.queryByText("Press Save to apply.")).toBeNull();
     expect(calls.find((c) => c.method === "PATCH")?.body).toMatchObject({ auto_confirm: true });
+    // 拨回关、还没 Save：说明不见了，但还是提醒要 Save
+    await user.click(box);
+    expect(screen.queryByText(/Off by default/)).toBeNull();
+    expect(screen.getByText("Press Save to apply.")).toBeInTheDocument();
   });
 
   it("STAFF sees the switch but cannot change it", async () => {
@@ -139,6 +149,8 @@ describe("auto-confirm (D71 ②)", () => {
     const box = await screen.findByRole("switch", { name: "Confirm matching requests automatically" });
     expect(box).toBeChecked();
     expect(box).toBeDisabled();
+    expect(screen.getByText(/Off by default/)).toBeInTheDocument();
+    expect(screen.queryByText("Press Save to apply.")).toBeNull();
   });
 
   it.each([
