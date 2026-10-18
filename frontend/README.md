@@ -177,6 +177,27 @@ CREATE DATABASE chatbot_dev OWNER chatbot;
 headless Chromium 点过：登入的密码栏按眼睛看得到；新增再删掉 `typo`；做过事的 `amy` 删不掉、原因整排显示。
 找到、已经改好：眼睛按钮放在 `<label>` 里，密码栏的名字变成「Password Show password」（读屏软件会念错）→ 按钮放到 label 外面。
 
+## *To tell patient* 的弹出视窗（D73 ③）：在开发电脑上测试
+
+- *To tell patient* 的卡片和别的分页一样，只放主要资料（疗程、医生、*In GPiS* 的日期 / 时间 / 医生）；下面只有 **Tell the patient** 和 *Patient cancelled*。
+- 按 **Tell the patient** → 画面中间弹出视窗（和 *Entered in GPiS ✓* 同一种）：标题有病人名字，下面一行是 GPiS 的日期、时间、医生、号码；
+  里面是黄色的原因（*Not sent by the system: …*）和消息；下面是 *Back*、*Copy message*、*Open in WhatsApp*（号码在允许名单才有）、**Patient told ✓**。
+- *Back*、右上角 ×、Esc、点视窗外面都是关掉，什么都不改。窄的萤幕按钮会换行。
+
+用 6a-2c 第 6 项第一次跑留下的 Demo Auto（AppointmentID `990001006`，当时号码不在允许名单）测，或任何一个在 *To tell patient* 的请求：
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | `git pull` → `npm test` 60 passed；`npm run build` 成功 | — |
+| 2 | *Requests* → *To tell patient* | 卡片里**没有**黄色原因、消息、*Patient told ✓*；有 **Tell the patient** |
+| 3 | **Tell the patient** → Esc；再按一次 → 点视窗外面 | 视窗打开、关掉，请求还在 *To tell patient* |
+| 4 | 再按 **Tell the patient** | 黄色 *Not sent by the system: This number is not in WHATSAPP_ALLOWED_RECIPIENTS (development). …*、消息 `好的哟，已经帮你预约了哦😊 …`、*Copy message*；号码现在在允许名单的话也有 *Open in WhatsApp* |
+| 5 | **Patient told ✓** | 视窗关掉；*Every confirmed patient has been told.*；*Confirmed* 分页的卡片有 *Patient told … (by staff)* |
+
+云端（2026-10-18，只用假资料）：`npm test` 60 passed（卡片里没有原因和按钮；视窗里有原因、*Open in WhatsApp* 的链接、*Patient told ✓*；
+*Back* 关掉不送任何请求）；`npm run build` 成功；headless Chromium 1366 / 400 宽截图、Esc 和点视窗外面都关得掉；
+*Entered in GPiS ✓* 的视窗改成共用同一个 `Modal` 之后照旧。找到、已经改好：400 宽时视窗下面 3 个按钮挤出视窗 → 按钮会换行。
+
 ## 上线
 
 `npm run build` 产生的 `dist\` 是普通的 HTML / JS / CSS 文件，要和 `/api` 放在**同一个网址**下，cookie 才会带上。

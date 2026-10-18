@@ -329,7 +329,7 @@ describe("requests", () => {
     expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 
-  it("lists patients to tell, with Open in WhatsApp and Patient told", async () => {
+  it("lists patients to tell; the reason, message and Patient told are in a pop-up", async () => {
     let told = false;
     const message = "预约确认✅\nNAME: DEMO KID A";
     const { calls } = fakeApi({
@@ -362,18 +362,33 @@ describe("requests", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("tab", { name: "To tell patient (2)" }));
     const card = (await screen.findByText("Demo Kid A", { selector: "strong" })).closest("li")!;
-    expect(within(card).getByText(/More than 24 hours/)).toBeInTheDocument();
+    // 卡片只有重要的资讯：GPiS 的日期、时间、医生；原因、消息、按钮都在弹出视窗
     expect(within(card).getByText("Fri 09 Oct 2026 16:30 · Dr PHANG")).toBeInTheDocument();
-    expect(within(card).getByRole("link", { name: "Open in WhatsApp" })).toHaveAttribute(
+    expect(within(card).queryByText(/More than 24 hours/)).toBeNull();
+    expect(within(card).queryByRole("link", { name: "Open in WhatsApp" })).toBeNull();
+    expect(within(card).queryByRole("button", { name: "Patient told ✓" })).toBeNull();
+
+    // 不能 Open in WhatsApp 的（读 GPiS_Dev）：视窗里只有 Patient told；Back 关掉、什么都不改
+    const other = screen.getByText("Demo Kid B", { selector: "strong" }).closest("li")!;
+    await user.click(within(other).getByRole("button", { name: "Tell the patient" }));
+    let dialog = await screen.findByRole("dialog", { name: "Tell the patient – Demo Kid B" });
+    expect(within(dialog).getByText(/the system stopped before sending/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole("link", { name: "Open in WhatsApp" })).toBeNull();
+    await user.click(within(dialog).getByRole("button", { name: "Back" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await user.click(within(card).getByRole("button", { name: "Tell the patient" }));
+    dialog = await screen.findByRole("dialog", { name: "Tell the patient – Demo Kid A" });
+    expect(within(dialog).getByText(/More than 24 hours/)).toBeInTheDocument();
+    expect(within(dialog).getByText("In GPiS: Fri 09 Oct 2026 16:30 · Dr PHANG · +60120000001")).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Open in WhatsApp" })).toHaveAttribute(
       "href",
       "whatsapp://send?phone=60120000001&text=%E9%A2%84%E7%BA%A6%E7%A1%AE%E8%AE%A4%E2%9C%85%0ANAME%3A%20DEMO%20KID%20A",
     );
-    // 不能 Open in WhatsApp 的（读 GPiS_Dev）：只有 Patient told
-    const other = screen.getByText("Demo Kid B", { selector: "strong" }).closest("li")!;
-    expect(within(other).queryByRole("link", { name: "Open in WhatsApp" })).toBeNull();
-    expect(within(other).getByText(/the system stopped before sending/)).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
 
-    await user.click(within(card).getByRole("button", { name: "Patient told ✓" }));
+    await user.click(within(dialog).getByRole("button", { name: "Patient told ✓" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(screen.getByText("Every confirmed patient has been told.")).toBeInTheDocument());
     expect(calls.some((c) => c.method === "POST" && c.path === "/api/requests/1/patient-told")).toBe(true);
     expect(screen.getByRole("tab", { name: "To tell patient" })).toBeInTheDocument();

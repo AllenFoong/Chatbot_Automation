@@ -14,7 +14,7 @@
 | [`docs/clinic-workflow.md`](docs/clinic-workflow.md) | 营业时间、医生排班、staff 如何使用 GPiS 预约、Remarks 治疗代码、待确认问题 |
 | [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
 | [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API；Phase 3：PostgreSQL（安装、建表、改表结构的步骤）；Phase 4a：员工登录、Admin API；Phase 5a：WhatsApp（Meta 测试 App、tunnel、测试清单）；Phase 5b：预约提醒（名单、Open in WhatsApp、测试清单）；资料保留（A10：提醒 90 天后删掉、测试清单）；Phase 6a-1（遮证件号码）、6a-2a（`PENDING` 的请求算占用）、6a-2b（*Entered in GPiS ✓*、*To tell patient*）、6a-2c（自动确认），各有测试清单；对照步骤 |
-| [`frontend/README.md`](frontend/README.md) | Phase 4b：Admin Platform 网页（React + TypeScript）：安装、启动、测试清单；画面整理（D66）的测试清单；员工账号的删除和看密码的眼睛（D75）的测试清单 |
+| [`frontend/README.md`](frontend/README.md) | Phase 4b：Admin Platform 网页（React + TypeScript）：安装、启动、测试清单；画面整理（D66）的测试清单；员工账号的删除和看密码的眼睛（D75）、*To tell patient* 弹出视窗的测试清单 |
 | [`docs/deploy-pc-b.md`](docs/deploy-pc-b.md) | 5b 试跑：装到柜台电脑 B（要准备什么、安装、自动启动、备份、检查、先在开发电脑演练和记录、更新、还原备份）；脚本在 `deploy/` |
 | [`docs/pc-b-checklist.md`](docs/pc-b-checklist.md) | 去诊所装电脑 B 的打勾清单：出发前、传档案（Google Drive，不用 USB）、到了先看先问、B 和 A 的步骤和时间、B 不合要求 / 连不上 A 怎么办、离开前 |
 
@@ -118,6 +118,7 @@
 - [x] 6a-2a、6a-2b、D71–D73 合并进 `main`（PR #32）
 - [x] Phase 6a-2c 初版（D71 ②、D74）：*Settings → Slots & auto-confirm* 的开关（默认关、只有 ADMIN 能改）；Admin API 里背景每 3 分钟（9:00–17:30），系统第一次看到请求时记下那天有没有预约，之后同病人、同日、同时段、同医生、同疗程、同时长、只对上一个才自动确认 + 发消息；读 `GPiS_Dev` 不跑；*Requests* 上面一行显示上次查 GPiS，15 分钟没成功红字；migration `0007`；`python -m app.auto_confirm --dry-run / --once`、`python -m app.db.demo --auto-confirm-demo <号码>`；云端 `pytest` 427 个、Vitest 58 个，headless Chromium 用假资料点过
 - [x] 员工账号（D75）：所有密码栏加看密码的眼睛；*Staff accounts* 加 **Delete**（只删没用过的账号，用过的写原因、请改用停用；自己、最后一个 ADMIN 不能删）；云端 `pytest` 429 个、Vitest 60 个，headless Chromium 点过；和 6a-2c 一起在 PR #33
+- [x] *To tell patient* 的卡片只放主要资料，原因、消息、*Open in WhatsApp* / *Copy message* / *Patient told ✓* 改放在弹出视窗（按 **Tell the patient**，和 *Entered in GPiS ✓* 共用 `Modal`，D73 ③）；Vitest 60 个，headless Chromium 1366 / 400 宽看过；在 PR #33
 
 ## 下一步
 

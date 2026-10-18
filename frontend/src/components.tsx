@@ -1,6 +1,16 @@
 // 小的共用画面元件。
 
-import { useEffect, useId, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type InputHTMLAttributes,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import { AlertIcon, CheckIcon, EyeIcon, EyeOffIcon, InboxIcon, InfoIcon } from "./icons";
 
 export const APP_NAME = "Clinic Admin";
@@ -173,3 +183,89 @@ export function PasswordInput({
     </div>
   );
 }
+
+/** 画面中间的弹出视窗（不是新分页）。后面的页面变暗、不跟着卷动；内容长的话只有中间那一块上下拉。
+ *  Esc、点视窗外面、右上角 × 都是关掉（busy 的时候不能关）。onSubmit 给了，整个视窗是一个 form。 */
+export function Modal({
+  title,
+  subtitle,
+  busy = false,
+  onClose,
+  onSubmit,
+  footer,
+  children,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  busy?: boolean;
+  onClose: () => void;
+  onSubmit?: (e: FormEvent) => void;
+  footer: ReactNode;
+  children: ReactNode;
+}) {
+  const titleId = useId();
+  const ref = useRef<HTMLElement | null>(null);
+  const setRef = (el: HTMLElement | null) => {
+    ref.current = el;
+  };
+
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    ref.current?.focus();
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
+  function close() {
+    if (!busy) onClose();
+  }
+
+  const content = (
+    <>
+      <header className="modal-head">
+        <div>
+          <h2 id={titleId}>{title}</h2>
+          {subtitle && <p className="muted small">{subtitle}</p>}
+        </div>
+        <button type="button" className="ghost modal-close" aria-label="Close" onClick={close}>
+          ×
+        </button>
+      </header>
+      <div className="modal-body">{children}</div>
+      <footer className="modal-foot">{footer}</footer>
+    </>
+  );
+  const common = {
+    className: "modal",
+    role: "dialog",
+    "aria-modal": true,
+    "aria-labelledby": titleId,
+    tabIndex: -1,
+    onKeyDown: (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    },
+  } as const;
+
+  return createPortal(
+    <div
+      className="modal-backdrop"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) close();
+      }}
+    >
+      {onSubmit ? (
+        <form {...common} ref={setRef} onSubmit={onSubmit}>
+          {content}
+        </form>
+      ) : (
+        <div {...common} ref={setRef}>
+          {content}
+        </div>
+      )}
+    </div>,
+    document.body,
+  );
+}
+
