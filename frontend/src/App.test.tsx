@@ -123,9 +123,11 @@ describe("auto-confirm (D71 ②)", () => {
     });
     renderApp("/settings/clinic");
     const user = userEvent.setup();
-    const box = await screen.findByRole("checkbox", { name: "Confirm matching requests automatically" });
+    const box = await screen.findByRole("switch", { name: "Confirm matching requests automatically" });
     expect(box).not.toBeChecked();
+    expect(screen.getByText("Off")).toBeInTheDocument();
     await user.click(box);
+    expect(screen.getByText("On")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
     expect(calls.find((c) => c.method === "PATCH")?.body).toMatchObject({ auto_confirm: true });
@@ -134,7 +136,7 @@ describe("auto-confirm (D71 ②)", () => {
   it("STAFF sees the switch but cannot change it", async () => {
     fakeApi({ "GET /api/auth/me": ok(STAFF), ...counts, "GET /api/settings": ok({ ...settings, auto_confirm: true }) });
     renderApp("/settings/clinic");
-    const box = await screen.findByRole("checkbox", { name: "Confirm matching requests automatically" });
+    const box = await screen.findByRole("switch", { name: "Confirm matching requests automatically" });
     expect(box).toBeChecked();
     expect(box).toBeDisabled();
   });

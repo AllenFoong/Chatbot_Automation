@@ -3,7 +3,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import * as api from "../../api";
-import { ErrorBox, Loading } from "../../components";
+import { ErrorBox, Loading, Switch } from "../../components";
 import { useAction, useLoad } from "../../hooks";
 import type { ClinicSettings } from "../../types";
 
@@ -75,14 +75,15 @@ export default function ClinicSection({ canEdit }: { canEdit: boolean }) {
           treatment and length. Everything else still waits for <em>Entered in GPiS</em>.
         </p>
       </div>
-      <label className="check">
-        <input type="checkbox" checked={form.auto_confirm} disabled={!canEdit}
-          onChange={(e) => change({ auto_confirm: e.target.checked })} />
-        Confirm matching requests automatically
-      </label>
+      <Switch
+        label="Confirm matching requests automatically"
+        checked={form.auto_confirm}
+        disabled={!canEdit}
+        onChange={(on) => change({ auto_confirm: on })}
+      />
       <p className="help">
         Off by default. Turn it on after staff have used Entered in GPiS for a while and the requests match GPiS.
-        New patients are never confirmed automatically the first time.
+        New patients are never confirmed automatically the first time.{canEdit && " Press Save to apply."}
       </p>
 
       <ErrorBox message={action.error} />

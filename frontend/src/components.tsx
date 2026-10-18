@@ -184,6 +184,40 @@ export function PasswordInput({
   );
 }
 
+/** On / off 开关（开是绿色、关是灰色）。底下还是 checkbox，读屏软件念成 switch；旁边的 On / Off 只是给眼睛看的。 */
+export function Switch({
+  label,
+  checked,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="switch-field">
+      {label}
+      <span className="switch">
+        <span className="switch-control">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={checked}
+            disabled={disabled}
+            onChange={(e) => onChange(e.target.checked)}
+          />
+          <span className="switch-track" aria-hidden="true" />
+        </span>
+        <span className={checked ? "switch-state on" : "switch-state"} aria-hidden="true">
+          {checked ? "On" : "Off"}
+        </span>
+      </span>
+    </label>
+  );
+}
+
 /** 画面中间的弹出视窗（不是新分页）。后面的页面变暗、不跟着卷动；内容长的话只有中间那一块上下拉。
  *  Esc、点视窗外面、右上角 × 都是关掉（busy 的时候不能关）。onSubmit 给了，整个视窗是一个 form。 */
 export function Modal({

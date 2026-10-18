@@ -1027,11 +1027,11 @@ npm run build                 # ✓ built
 git pull
 alembic upgrade head          # 0006 -> 0007
 alembic current               # 0007 (head)
-pytest                        # 应该 427 passed，没有 skipped
+pytest                        # 应该 429 passed，没有 skipped（6a-2c 427 个 + D75 2 个）
 
 # frontend
 cd ..\frontend
-npm test                      # 应该 58 passed
+npm test                      # 应该 60 passed
 npm run build                 # ✓ built
 ```
 
@@ -1042,16 +1042,16 @@ npm run build                 # ✓ built
 
 | # | 做什么 | 应该看到 |
 |---|---|---|
-| 1 | 上面的「更新」 | `0007 (head)`；`pytest` 427 passed、没有 skipped；`npm test` 58 passed；`npm run build` 成功 |
-| 2 | 用 **STAFF** 帐号登入 → *Settings* → **Slots & auto-confirm** | 有 *Auto-confirm from GPiS*，勾选框没有勾、是灰的（不能改）；*Requests* 上面一行 *Auto-confirm is off: press Entered in GPiS for each request …* |
-| 3 | 用 **ADMIN** 帐号 → 勾 *Confirm matching requests automatically* → **Save**（`.env` 没有 `REMINDER_SOURCE=demo`，读 `GPiS_Dev`） | *Saved.*；*Requests* 上面是黄色 *Auto-confirm is on, but it does not run with GPiS_Dev …* |
+| 1 | 上面的「更新」 | `0007 (head)`；`pytest` 429 passed、没有 skipped；`npm test` 60 passed；`npm run build` 成功 |
+| 2 | 用 **STAFF** 帐号登入 → *Settings* → **Slots & auto-confirm** | 有 *Auto-confirm from GPiS*，开关在 **Off**（灰色、变淡，拨不动）；*Requests* 上面一行 *Auto-confirm is off: press Entered in GPiS for each request …* |
+| 3 | 用 **ADMIN** 帐号 → *Confirm matching requests automatically* 的开关拨到 **On**（变绿色）→ **Save**（`.env` 没有 `REMINDER_SOURCE=demo`，读 `GPiS_Dev`） | *Saved.*；*Requests* 上面是黄色 *Auto-confirm is on, but it does not run with GPiS_Dev …* |
 | 4 | 视窗 5：`python -m app.auto_confirm --dry-run` | `Auto-confirm does not run on GPiS_Dev: it has real patient names (D44). …` |
 | 5 | `.env` 加 `REMINDER_SOURCE=demo` → 重开视窗 1 → *Requests* → **Refresh** | 上面一行 *Auto-confirm is on: …*，现在不是 9:00–17:30 的话后面多 *(it checks GPiS 9:00–17:30)*，*Last checked GPiS: never*（或上次的时间） |
 | 6 | 用自己的手机传 `test 6a-2c` 给 Meta 测试号码 → 视窗 5：`python -m app.db.demo --auto-confirm-demo <你的手机>` | 印出 3 行：`Added pending request N: Demo Auto, S+P, PHANG, <下一个星期五> 11:30.`、`1) GPiS has nothing yet: first look recorded (… = False).`、`2) Staff entered 11:30 in GPiS: request N confirmed automatically, message sent to the phone.`；手机收到 `好的哟，已经帮你预约了哦😊`、`NAME: DEMO AUTO`、`TIME: 11:30 AM`、`DOCTOR: DR PHANG` |
 | 7 | *Requests* → **Refresh** → *Confirmed* | Demo Auto 的卡片：*In GPiS* `<下一个星期五> 11:30 · Dr PHANG`、*Confirmed by* **Auto-confirm (matched GPiS)**、*Patient told … (sent by the system)* |
 | 8 | 视窗 5：`python -m app.auto_confirm --once` → *Requests* → **Refresh** | 印出 `Source: Demo data. Pending requests looked at: …`（Demo Auto 已经确认了，不会再出现）；上面一行 *Last checked GPiS:* 变成现在的时间 |
 | 9 | （9:00–17:30 才能测）视窗 1 开着、开关打开，等 3–4 分钟 → **Refresh** | *Last checked GPiS* 自己变成刚才的时间（背景每 3 分钟） |
-| 10 | 清理：ADMIN 把勾拿掉 → **Save**；`.env` 拿掉 `REMINDER_SOURCE=demo` → 重开视窗 1；关掉视窗 3 | *Requests* 上面回到 *Auto-confirm is off …* |
+| 10 | 清理：ADMIN 把开关拨回 **Off** → **Save**；`.env` 拿掉 `REMINDER_SOURCE=demo` → 重开视窗 1；关掉视窗 3 | *Requests* 上面回到 *Auto-confirm is off …* |
 
 ### 云端容器的测试记录（2026-10-17，PostgreSQL 16、Python 3.11 + `requirements-lock.txt` 和 3.13、Node 22、只用假资料）
 
@@ -1065,4 +1065,5 @@ npm run build                 # ✓ built
 - 容器的 `chatbot_dev`（假资料）：`alembic upgrade head` → `0007`；`--dry-run`、`--once`（开关关 → 拒绝）、`--auto-confirm-demo`（确认了；假对话超过 24 小时 → 进 *To tell patient*）；
   在「营业时间」跑一次背景的 `tick` → 记下上次查 GPiS 的时间、没有错误；uvicorn 启动时背景开始、日志没有错误。
 - headless Chromium：ADMIN 在 *Slots & auto-confirm* 打开 → *Saved.* → *Requests* 上面一行 *Auto-confirm is on … Last checked GPiS: …*；写的时候找到、已经改好：勾选框被表单的样式拉宽。
+- 开发者测试时要的（2026-10-18）：勾选框改成 **on / off 开关**（开是绿色、关是灰色，旁边写 *On* / *Off*；拨了还是要按 **Save**，和上面三个设定一样）。底下还是 checkbox，读屏软件念成 switch；Vitest 60 个；headless Chromium：滑鼠、空白键、点 *On* 字都能切换，STAFF 的变淡、拨不动。
 
