@@ -27,6 +27,19 @@ describe("login", () => {
     expect(calls.at(-1)?.body).toEqual({ username: "boss", password: "wrong-pass" });
   });
 
+  it("shows the password only while the eye is pressed", async () => {
+    fakeApi({ "GET /api/auth/me": err(401, "Please log in") });
+    renderApp("/requests");
+    const user = userEvent.setup();
+    const password = await screen.findByLabelText("Password");
+    await user.type(password, "secret-123");
+    expect(password).toHaveAttribute("type", "password");
+    await user.click(screen.getByRole("button", { name: "Show password" }));
+    expect(password).toHaveAttribute("type", "text");
+    await user.click(screen.getByRole("button", { name: "Hide password" }));
+    expect(password).toHaveAttribute("type", "password");
+  });
+
   it("opens the page after logging in", async () => {
     fakeApi({
       "GET /api/auth/me": err(401, "Please log in"),
@@ -155,6 +168,41 @@ describe("auto-confirm (D71 ②)", () => {
     renderApp("/requests");
     await userEvent.setup().click(await screen.findByRole("tab", { name: "Confirmed" }));
     expect(await screen.findByText("Auto-confirm (matched GPiS)")).toBeInTheDocument();
+  });
+});
+
+describe("staff accounts", () => {
+  const boss = { ...ADMIN };
+  const typo = { id: 9, username: "typo", name: "Typo", role: "STAFF" as const, active: true };
+  const amy = { ...STAFF };
+
+  it("deletes an unused account and explains why a used one cannot be deleted", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let deleted = false;
+    const { calls } = fakeApi({
+      "GET /api/auth/me": ok(ADMIN),
+      ...counts,
+      "GET /api/staff": () => ok(deleted ? [boss, amy] : [boss, amy, typo]),
+      "DELETE /api/staff/9": () => {
+        deleted = true;
+        return { status: 204 };
+      },
+      "DELETE /api/staff/2": err(409, "amy has sent messages. Deactivate the account instead, so the history still shows who did it."),
+    });
+    renderApp("/staff");
+    const user = userEvent.setup();
+    const typoRow = (await screen.findByText("typo")).closest("tr")!;
+    const bossRow = screen.getByText("boss").closest("tr")!;
+    expect(within(bossRow).queryByRole("button", { name: "Delete" })).toBeNull(); // 自己的不能删
+    await user.click(within(typoRow).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByText("typo")).toBeNull());
+    expect(calls.some((c) => c.method === "DELETE" && c.path === "/api/staff/9")).toBe(true);
+
+    const amyRow = screen.getByText("amy").closest("tr")!;
+    await user.click(within(amyRow).getByRole("button", { name: "Delete" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Deactivate the account instead");
+    expect(alert.closest("tr")?.previousElementSibling).toBe(amyRow); // 在 amy 那一行的下面
   });
 });
 

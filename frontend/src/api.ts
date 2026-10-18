@@ -225,4 +225,6 @@ export const staff = {
   list: () => request<StaffMember[]>("GET", "/staff"),
   add: (body: StaffIn) => request<StaffMember>("POST", "/staff", body),
   update: (id: number, body: StaffPatch) => request<StaffMember>("PATCH", `/staff/${seg(id)}`, body),
+  /** 只删得掉没用过的账号（建错、重复的）；用过的后端回 409，请改用停用 */
+  remove: (id: number) => request<void>("DELETE", `/staff/${seg(id)}`),
 };

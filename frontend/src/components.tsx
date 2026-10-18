@@ -1,7 +1,7 @@
 // 小的共用画面元件。
 
-import { useEffect, type ReactNode } from "react";
-import { AlertIcon, CheckIcon, InboxIcon, InfoIcon } from "./icons";
+import { useEffect, useId, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import { AlertIcon, CheckIcon, EyeIcon, EyeOffIcon, InboxIcon, InfoIcon } from "./icons";
 
 export const APP_NAME = "Clinic Admin";
 
@@ -137,6 +137,39 @@ export function Tabs<T extends string>({
           )}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** 密码栏：右边的眼睛按一下看得到打的字，再按一下藏起来（只在这台电脑的画面上，不会送出去）。
+ *  label 给了就自己画标题（眼睛按钮在 <label> 外面，读屏软件才不会把密码栏念成「Password Show password」）；
+ *  没有标题的（例：重设密码那一栏）用 aria-label。 */
+export function PasswordInput({
+  label,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label?: ReactNode }) {
+  const [shown, setShown] = useState(false);
+  const id = useId();
+  const field = (
+    <span className="password-field">
+      <input {...props} id={props.id ?? id} type={shown ? "text" : "password"} />
+      <button
+        type="button"
+        className="ghost password-eye"
+        aria-label={shown ? "Hide password" : "Show password"}
+        aria-pressed={shown}
+        title={shown ? "Hide password" : "Show password"}
+        onClick={() => setShown((v) => !v)}
+      >
+        {shown ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+      </button>
+    </span>
+  );
+  if (label === undefined) return field;
+  return (
+    <div className="password-label">
+      <label htmlFor={props.id ?? id}>{label}</label>
+      {field}
     </div>
   );
 }

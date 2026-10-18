@@ -160,3 +160,18 @@ export const CloseIcon = ({ size }: P) => (
     <path d="M6 6l12 12M18 6L6 18" />
   </Icon>
 );
+
+export const EyeIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </Icon>
+);
+
+export const EyeOffIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M10.6 5.6c.46-.07.93-.1 1.4-.1 6 0 9.5 6.5 9.5 6.5a17.6 17.6 0 0 1-2.6 3.4M6.6 6.6C3.9 8.3 2.5 12 2.5 12S6 18.5 12 18.5c1.9 0 3.5-.6 4.8-1.5" />
+    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
+  </Icon>
+);
+

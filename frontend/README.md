@@ -154,6 +154,29 @@ CREATE DATABASE chatbot_dev OWNER chatbot;
 
 测完把结果记在下面「测试记录」。B 要等开发电脑测过，再照 [`docs/deploy-pc-b.md`](../docs/deploy-pc-b.md) 第 9 节更新。
 
+## 员工账号：看密码的眼睛、删除账号（D75）：在开发电脑上测试
+
+- 所有密码栏（登入、*My account* 改密码、*Staff accounts* 新增 / 重设）右边有**眼睛**：按一下看得到打的字，再按一下藏起来。只在这台电脑的画面上，不会送出去。
+- *Staff accounts* 每一行（自己那一行除外）多了 **Delete**：只删得掉**没在系统里做过事**的账号（建错、重复的）。
+  做过事的（回过消息、负责过对话、确认过请求、通知过病人、按过提醒、标记过 NO WA）会在那一行下面写原因，请改用 **Deactivate**：
+  删了的话，旧的记录就不知道是谁做的。自己的账号、最后一个 ADMIN 不能删。
+- 后端：`DELETE /api/staff/{id}`（只有 ADMIN），删掉时那个人登录中的 session 一起删。
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | `pytest` 429 passed；`npm test` 60 passed；`npm run build` 成功 | — |
+| 2 | 登入画面打密码 → 按密码栏右边的眼睛 → 再按一次 | 看得到打的字 → 又变回圆点 |
+| 3 | ADMIN → *Staff accounts* → 新增 `typo`（随便的名字、密码，按眼睛看一下）→ **Add account** | 表格多了 `typo`；下面的密码栏清空、回到隐藏 |
+| 4 | `typo` 那一行 → **Delete** → OK | `typo` 不见了 |
+| 5 | 做过事的账号（例 Phase 4b 测试用过的 STAFF）→ **Delete** → OK | 那一行下面红字 *… has … Deactivate the account instead …*，账号还在 |
+| 6 | 自己那一行 | 没有 *Delete* |
+| 7 | 用 STAFF 登入 → *My account* → 三个密码栏都有眼睛 | 按了看得到、再按藏起来 |
+
+云端（2026-10-18，只用假资料）：`pytest` 429 passed（新增 2 个：没用过的删得掉、STAFF 不能删、删了以后它的 session 不能用；
+用过的、自己的删不掉）；`npm test` 60 passed（眼睛、删除 / 删不掉的原因在那一行下面、自己那一行没有 Delete）；
+headless Chromium 点过：登入的密码栏按眼睛看得到；新增再删掉 `typo`；做过事的 `amy` 删不掉、原因整排显示。
+找到、已经改好：眼睛按钮放在 `<label>` 里，密码栏的名字变成「Password Show password」（读屏软件会念错）→ 按钮放到 label 外面。
+
 ## 上线
 
 `npm run build` 产生的 `dist\` 是普通的 HTML / JS / CSS 文件，要和 `/api` 放在**同一个网址**下，cookie 才会带上。

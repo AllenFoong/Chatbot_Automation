@@ -2061,3 +2061,48 @@ ul.error {
   margin: 0 0 14px;
 }
 
+/* 密码栏 + 右边的眼睛（PasswordInput） */
+.password-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inline-form > .password-label {
+  align-self: stretch;
+}
+
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 360px;
+}
+
+.password-field > input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding-right: 38px;
+}
+
+.password-field > .password-eye {
+  position: absolute;
+  right: 4px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--muted);
+}
+
+form.inline .password-field {
+  width: auto;
+}
+
+/* 表格里某一行的错误：另起一整行（StaffPage） */
+tr.row-error > td {
+  padding-top: 0;
+  border-top: 0;
+}
+
