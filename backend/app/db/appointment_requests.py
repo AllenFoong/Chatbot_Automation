@@ -116,6 +116,7 @@ def reopen_request(session: Session, request: AppointmentRequest) -> None:
     request.status = RequestStatus.PENDING
     request.handled_by = None
     request.handled_at = None
+    request.gpis_same_day_before = None      # GPiS 里可能已经有这个预约：自动确认重新看一次（之后多半只能员工按）
     request.gpis_appointment_id = None
     request.confirmed_date = None
     request.confirmed_slot = None

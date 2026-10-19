@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth";
-import { APP_NAME, ErrorBox, usePageTitle } from "../components";
+import { APP_NAME, ErrorBox, PasswordInput, usePageTitle } from "../components";
 import { useAction } from "../hooks";
 import { ToothIcon } from "../icons";
 
@@ -39,16 +39,13 @@ export default function LoginPage() {
             required
           />
         </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
+        <PasswordInput
+          label="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+          required
+        />
         <ErrorBox message={action.error} />
         <button type="submit" className="primary block" disabled={action.busy}>
           {action.busy ? "Logging in…" : "Log in"}

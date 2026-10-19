@@ -5,6 +5,7 @@
 
 import type {
   AppointmentRequest,
+  AutoConfirmStatus,
   GpisChoices,
   ClinicSettings,
   Closure,
@@ -155,6 +156,8 @@ export const conversations = {
 
 export const requests = {
   list: (status: RequestStatus) => request<AppointmentRequest[]>("GET", `/requests${query({ status })}`),
+  /** 自动确认开了没有、上次成功查 GPiS（D71 ②） */
+  autoConfirm: () => request<AutoConfirmStatus>("GET", "/requests/auto-confirm"),
   /** 「要通知」：确认了、病人还不知道的 */
   toTell: () => request<AppointmentRequest[]>("GET", "/requests?to_tell=true"),
   /** 当场查 GPiS 那一天的预约（不填日期 = 请求的日期） */
@@ -222,4 +225,6 @@ export const staff = {
   list: () => request<StaffMember[]>("GET", "/staff"),
   add: (body: StaffIn) => request<StaffMember>("POST", "/staff", body),
   update: (id: number, body: StaffPatch) => request<StaffMember>("PATCH", `/staff/${seg(id)}`, body),
+  /** 只删得掉没用过的账号（建错、重复的）；用过的后端回 409，请改用停用 */
+  remove: (id: number) => request<void>("DELETE", `/staff/${seg(id)}`),
 };

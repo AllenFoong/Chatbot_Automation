@@ -139,7 +139,8 @@ def test_doctor_leave(boss, session):
 
 
 def test_clinic_settings(boss, session):
-    assert boss.get("/api/settings").json() == {"max_per_slot": 3, "max_per_slot_for_ai": 3, "clinic_contact_id": 34094}
+    assert boss.get("/api/settings").json() == {"max_per_slot": 3, "max_per_slot_for_ai": 3, "clinic_contact_id": 34094,
+                                                 "auto_confirm": False}      # 自动确认默认关（D71 ②）
     assert boss.patch("/api/settings", json={"max_per_slot_for_ai": 2}).json()["max_per_slot_for_ai"] == 2
     assert load_clinic_rules(session).max_per_slot_for_ai == 2
     r = boss.patch("/api/settings", json={"max_per_slot": 5})                # 每格最多 3 人（W22）

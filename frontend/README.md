@@ -154,6 +154,50 @@ CREATE DATABASE chatbot_dev OWNER chatbot;
 
 测完把结果记在下面「测试记录」。B 要等开发电脑测过，再照 [`docs/deploy-pc-b.md`](../docs/deploy-pc-b.md) 第 9 节更新。
 
+## 员工账号：看密码的眼睛、删除账号（D75）：在开发电脑上测试
+
+- 所有密码栏（登入、*My account* 改密码、*Staff accounts* 新增 / 重设）右边有**眼睛**：按一下看得到打的字，再按一下藏起来。只在这台电脑的画面上，不会送出去。
+- *Staff accounts* 每一行（自己那一行除外）多了 **Delete**：只删得掉**没在系统里做过事**的账号（建错、重复的）。
+  做过事的（回过消息、负责过对话、确认过请求、通知过病人、按过提醒、标记过 NO WA）会在那一行下面写原因，请改用 **Deactivate**：
+  删了的话，旧的记录就不知道是谁做的。自己的账号、最后一个 ADMIN 不能删。
+- 后端：`DELETE /api/staff/{id}`（只有 ADMIN），删掉时那个人登录中的 session 一起删。
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | `pytest` 429 passed；`npm test` 60 passed；`npm run build` 成功 | — |
+| 2 | 登入画面打密码 → 按密码栏右边的眼睛 → 再按一次 | 看得到打的字 → 又变回圆点 |
+| 3 | ADMIN → *Staff accounts* → 新增 `typo`（随便的名字、密码，按眼睛看一下）→ **Add account** | 表格多了 `typo`；下面的密码栏清空、回到隐藏 |
+| 4 | `typo` 那一行 → **Delete** → OK | `typo` 不见了 |
+| 5 | 做过事的账号（例 Phase 4b 测试用过的 STAFF）→ **Delete** → OK | 那一行下面红字 *… has … Deactivate the account instead …*，账号还在 |
+| 6 | 自己那一行 | 没有 *Delete* |
+| 7 | 用 STAFF 登入 → *My account* → 三个密码栏都有眼睛 | 按了看得到、再按藏起来 |
+
+云端（2026-10-18，只用假资料）：`pytest` 429 passed（新增 2 个：没用过的删得掉、STAFF 不能删、删了以后它的 session 不能用；
+用过的、自己的删不掉）；`npm test` 60 passed（眼睛、删除 / 删不掉的原因在那一行下面、自己那一行没有 Delete）；
+headless Chromium 点过：登入的密码栏按眼睛看得到；新增再删掉 `typo`；做过事的 `amy` 删不掉、原因整排显示。
+找到、已经改好：眼睛按钮放在 `<label>` 里，密码栏的名字变成「Password Show password」（读屏软件会念错）→ 按钮放到 label 外面。
+
+## *To tell patient* 的弹出视窗（D73 ③）：在开发电脑上测试
+
+- *To tell patient* 的卡片和别的分页一样，只放主要资料（疗程、医生、*In GPiS* 的日期 / 时间 / 医生）；下面只有 **Tell the patient** 和 *Patient cancelled*。
+- 按 **Tell the patient** → 画面中间弹出视窗（和 *Entered in GPiS ✓* 同一种）：标题有病人名字，下面一行是 GPiS 的日期、时间、医生、号码；
+  里面是黄色的原因（*Not sent by the system: …*）和消息；下面是 *Back*、*Copy message*、*Open in WhatsApp*（号码在允许名单才有）、**Patient told ✓**。
+- *Back*、右上角 ×、Esc、点视窗外面都是关掉，什么都不改。窄的萤幕按钮会换行。
+
+用 6a-2c 第 6 项第一次跑留下的 Demo Auto（AppointmentID `990001006`，当时号码不在允许名单）测，或任何一个在 *To tell patient* 的请求：
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | `git pull` → `npm test` 60 passed；`npm run build` 成功 | — |
+| 2 | *Requests* → *To tell patient* | 卡片里**没有**黄色原因、消息、*Patient told ✓*；有 **Tell the patient** |
+| 3 | **Tell the patient** → Esc；再按一次 → 点视窗外面 | 视窗打开、关掉，请求还在 *To tell patient* |
+| 4 | 再按 **Tell the patient** | 黄色 *Not sent by the system: This number is not in WHATSAPP_ALLOWED_RECIPIENTS (development). …*、消息 `好的哟，已经帮你预约了哦😊 …`、*Copy message*；号码现在在允许名单的话也有 *Open in WhatsApp* |
+| 5 | **Patient told ✓** | 视窗关掉；*Every confirmed patient has been told.*；*Confirmed* 分页的卡片有 *Patient told … (by staff)* |
+
+云端（2026-10-18，只用假资料）：`npm test` 60 passed（卡片里没有原因和按钮；视窗里有原因、*Open in WhatsApp* 的链接、*Patient told ✓*；
+*Back* 关掉不送任何请求）；`npm run build` 成功；headless Chromium 1366 / 400 宽截图、Esc 和点视窗外面都关得掉；
+*Entered in GPiS ✓* 的视窗改成共用同一个 `Modal` 之后照旧。找到、已经改好：400 宽时视窗下面 3 个按钮挤出视窗 → 按钮会换行。
+
 ## 上线
 
 `npm run build` 产生的 `dist\` 是普通的 HTML / JS / CSS 文件，要和 `/api` 放在**同一个网址**下，cookie 才会带上。

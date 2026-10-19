@@ -1,10 +1,11 @@
-// 员工账号（只有 ADMIN，D25）。离职的员工停用，不删除（旧的记录还会指向他）。
+// 员工账号（只有 ADMIN，D25）。离职的员工停用（旧的记录还会指向他）。
 // 后端保证至少留一个 active 的 ADMIN；停用、重设密码后，那个人已经登录的也马上失效（D26）。
+// Delete（D75）：只有没在系统里做过事的账号（建错、重复的）删得掉；做过事的，后端说明原因、请改用停用。
 
 import { useState, type FormEvent } from "react";
 import * as api from "../api";
 import { useUser } from "../auth";
-import { Badge, ErrorBox, Loading, PageHeader } from "../components";
+import { Badge, ErrorBox, Loading, PageHeader, PasswordInput } from "../components";
 import { useAction, useLoad } from "../hooks";
 import type { Role, StaffMember } from "../types";
 
@@ -21,7 +22,7 @@ function ResetPasswordForm({ member, onDone }: { member: StaffMember; onDone: ()
 
   return (
     <form className="inline" onSubmit={submit}>
-      <input type="password" aria-label={`New password for ${member.username}`} placeholder="New password"
+      <PasswordInput aria-label={`New password for ${member.username}`} placeholder="New password"
         autoComplete="new-password" minLength={MIN_PASSWORD} value={password} onChange={(e) => setPassword(e.target.value)} required />
       <button type="submit" className="primary small" disabled={action.busy}>Set password</button>
       <button type="button" className="small" onClick={onDone}>Cancel</button>
@@ -39,6 +40,7 @@ function StaffRow({ member, isMe, onChanged }: { member: StaffMember; isMe: bool
   }
 
   return (
+    <>
     <tr className={member.active ? undefined : "off"}>
       <td><strong>{member.username}</strong>{isMe && <span className="muted"> (you)</span>}</td>
       <td>{member.name}</td>
@@ -68,11 +70,28 @@ function StaffRow({ member, isMe, onChanged }: { member: StaffMember; isMe: bool
               {member.active ? "Deactivate" : "Activate"}
             </button>
             <button type="button" className="small" onClick={() => setResetting(true)}>Reset password</button>
+            {!isMe && (
+              <button type="button" className="small danger-text" disabled={action.busy}
+                onClick={async () => {
+                  if (window.confirm(`Delete ${member.username} permanently? Only accounts that were never used can be deleted; for a leaver, use Deactivate.`)
+                    && (await action.run(() => api.staff.remove(member.id)))) onChanged();
+                }}>
+                Delete
+              </button>
+            )}
           </div>
         )}
-        <ErrorBox message={action.error} />
       </td>
     </tr>
+    {action.error && (
+      // 错误另起一整行（例：删不掉的原因很长），不要挤在按钮那一格
+      <tr className="row-error">
+        <td colSpan={5}>
+          <ErrorBox message={action.error} />
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 
@@ -81,6 +100,7 @@ function AddStaffForm({ onAdded }: { onAdded: () => void }) {
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("STAFF");
   const [password, setPassword] = useState("");
+  const [added, setAdded] = useState(0); // 加好一个账号：密码栏换新的（回到隐藏）
   const action = useAction();
 
   async function submit(e: FormEvent) {
@@ -93,6 +113,7 @@ function AddStaffForm({ onAdded }: { onAdded: () => void }) {
       setName("");
       setRole("STAFF");
       setPassword("");
+      setAdded((n) => n + 1);
       onAdded();
     }
   }
@@ -122,11 +143,8 @@ function AddStaffForm({ onAdded }: { onAdded: () => void }) {
             <option value="ADMIN">Admin (settings, accounts)</option>
           </select>
         </label>
-        <label>
-          Password (at least {MIN_PASSWORD} characters)
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password" minLength={MIN_PASSWORD} required />
-        </label>
+        <PasswordInput key={added} label={`Password (at least ${MIN_PASSWORD} characters)`} value={password}
+          onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={MIN_PASSWORD} required />
       </div>
       <ErrorBox message={action.error} />
       <button type="submit" className="primary" disabled={action.busy}>Add account</button>
@@ -142,7 +160,7 @@ export default function StaffPage() {
     <div className="page">
       <PageHeader
         title="Staff accounts"
-        description="Who can log in. Leavers are deactivated, not deleted. Admins can also change settings and accounts."
+        description="Who can log in. Deactivate leavers (their history stays); delete only accounts made by mistake. Admins can also change settings and accounts."
       />
       <ErrorBox message={list.error} onRetry={list.reload} />
       {list.data === undefined ? (

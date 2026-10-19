@@ -27,6 +27,19 @@ describe("login", () => {
     expect(calls.at(-1)?.body).toEqual({ username: "boss", password: "wrong-pass" });
   });
 
+  it("shows the password only while the eye is pressed", async () => {
+    fakeApi({ "GET /api/auth/me": err(401, "Please log in") });
+    renderApp("/requests");
+    const user = userEvent.setup();
+    const password = await screen.findByLabelText("Password");
+    await user.type(password, "secret-123");
+    expect(password).toHaveAttribute("type", "password");
+    await user.click(screen.getByRole("button", { name: "Show password" }));
+    expect(password).toHaveAttribute("type", "text");
+    await user.click(screen.getByRole("button", { name: "Hide password" }));
+    expect(password).toHaveAttribute("type", "password");
+  });
+
   it("opens the page after logging in", async () => {
     fakeApi({
       "GET /api/auth/me": err(401, "Please log in"),
@@ -86,6 +99,124 @@ describe("roles", () => {
     renderApp("/settings/services");
     expect(await screen.findByRole("button", { name: "Edit" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Staff accounts" })).toBeInTheDocument();
+  });
+});
+
+describe("auto-confirm (D71 ②)", () => {
+  const settings = { max_per_slot: 3, max_per_slot_for_ai: 3, clinic_contact_id: 34094, auto_confirm: false };
+  const status = {
+    enabled: true,
+    runs_here: true,
+    source: "GPiS",
+    checked_at: "2026-10-19T03:00:00Z",
+    error: null,
+    in_business_hours: true,
+    stale: false,
+  };
+
+  it("only ADMIN can switch it on in Settings", async () => {
+    const { calls } = fakeApi({
+      "GET /api/auth/me": ok(ADMIN),
+      ...counts,
+      "GET /api/settings": ok(settings),
+      "PATCH /api/settings": (body) => ok({ ...settings, ...(body as object) }),
+    });
+    renderApp("/settings/clinic");
+    const user = userEvent.setup();
+    const box = await screen.findByRole("switch", { name: "Confirm matching requests automatically" });
+    expect(box).not.toBeChecked();
+    expect(screen.getByText("Off")).toBeInTheDocument();
+    // 关的时候没有说明
+    expect(screen.queryByText(/Off by default/)).toBeNull();
+    expect(screen.queryByText("Press Save to apply.")).toBeNull();
+    await user.click(box);
+    expect(screen.getByText("On")).toBeInTheDocument();
+    expect(screen.getByText(/Off by default/)).toBeInTheDocument();
+    expect(screen.getByText("Press Save to apply.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(screen.queryByText("Press Save to apply.")).toBeNull();
+    expect(calls.find((c) => c.method === "PATCH")?.body).toMatchObject({ auto_confirm: true });
+    // 拨回关、还没 Save：说明不见了，但还是提醒要 Save
+    await user.click(box);
+    expect(screen.queryByText(/Off by default/)).toBeNull();
+    expect(screen.getByText("Press Save to apply.")).toBeInTheDocument();
+  });
+
+  it("STAFF sees the switch but cannot change it", async () => {
+    fakeApi({ "GET /api/auth/me": ok(STAFF), ...counts, "GET /api/settings": ok({ ...settings, auto_confirm: true }) });
+    renderApp("/settings/clinic");
+    const box = await screen.findByRole("switch", { name: "Confirm matching requests automatically" });
+    expect(box).toBeChecked();
+    expect(box).toBeDisabled();
+    expect(screen.getByText(/Off by default/)).toBeInTheDocument();
+    expect(screen.queryByText("Press Save to apply.")).toBeNull();
+  });
+
+  it.each([
+    [{ ...status, enabled: false }, /Auto-confirm is off: press Entered in GPiS/],
+    [status, /Auto-confirm is on: requests that match GPiS exactly are confirmed automatically\. Last checked GPiS/],
+    [{ ...status, runs_here: false, source: "GPiS_Dev" }, /does not run with GPiS_Dev/],
+    [{ ...status, stale: true, error: "Could not check GPiS (OperationalError)." }, /has not checked GPiS since/],
+  ])("shows whether it is working on the Requests page (%#)", async (s, text) => {
+    fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      ...counts,
+      "GET /api/requests?status=PENDING": ok([]),
+      "GET /api/requests/auto-confirm": ok(s),
+    });
+    renderApp("/requests");
+    expect(await screen.findByText(text)).toBeInTheDocument();
+  });
+
+  it("marks requests confirmed by auto-confirm", async () => {
+    fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      ...counts,
+      "GET /api/requests?status=PENDING": ok([]),
+      "GET /api/requests/auto-confirm": ok(status),
+      "GET /api/requests?status=CONFIRMED": ok([
+        fakeRequest({ status: "CONFIRMED", handled_by: null, patient_told_at: "2026-10-19T03:03:00Z" }),
+      ]),
+    });
+    renderApp("/requests");
+    await userEvent.setup().click(await screen.findByRole("tab", { name: "Confirmed" }));
+    expect(await screen.findByText("Auto-confirm (matched GPiS)")).toBeInTheDocument();
+  });
+});
+
+describe("staff accounts", () => {
+  const boss = { ...ADMIN };
+  const typo = { id: 9, username: "typo", name: "Typo", role: "STAFF" as const, active: true };
+  const amy = { ...STAFF };
+
+  it("deletes an unused account and explains why a used one cannot be deleted", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let deleted = false;
+    const { calls } = fakeApi({
+      "GET /api/auth/me": ok(ADMIN),
+      ...counts,
+      "GET /api/staff": () => ok(deleted ? [boss, amy] : [boss, amy, typo]),
+      "DELETE /api/staff/9": () => {
+        deleted = true;
+        return { status: 204 };
+      },
+      "DELETE /api/staff/2": err(409, "amy has sent messages. Deactivate the account instead, so the history still shows who did it."),
+    });
+    renderApp("/staff");
+    const user = userEvent.setup();
+    const typoRow = (await screen.findByText("typo")).closest("tr")!;
+    const bossRow = screen.getByText("boss").closest("tr")!;
+    expect(within(bossRow).queryByRole("button", { name: "Delete" })).toBeNull(); // 自己的不能删
+    await user.click(within(typoRow).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByText("typo")).toBeNull());
+    expect(calls.some((c) => c.method === "DELETE" && c.path === "/api/staff/9")).toBe(true);
+
+    const amyRow = screen.getByText("amy").closest("tr")!;
+    await user.click(within(amyRow).getByRole("button", { name: "Delete" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Deactivate the account instead");
+    expect(alert.closest("tr")?.previousElementSibling).toBe(amyRow); // 在 amy 那一行的下面
   });
 });
 
@@ -212,7 +343,7 @@ describe("requests", () => {
     expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 
-  it("lists patients to tell, with Open in WhatsApp and Patient told", async () => {
+  it("lists patients to tell; the reason, message and Patient told are in a pop-up", async () => {
     let told = false;
     const message = "预约确认✅\nNAME: DEMO KID A";
     const { calls } = fakeApi({
@@ -245,18 +376,33 @@ describe("requests", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("tab", { name: "To tell patient (2)" }));
     const card = (await screen.findByText("Demo Kid A", { selector: "strong" })).closest("li")!;
-    expect(within(card).getByText(/More than 24 hours/)).toBeInTheDocument();
+    // 卡片只有重要的资讯：GPiS 的日期、时间、医生；原因、消息、按钮都在弹出视窗
     expect(within(card).getByText("Fri 09 Oct 2026 16:30 · Dr PHANG")).toBeInTheDocument();
-    expect(within(card).getByRole("link", { name: "Open in WhatsApp" })).toHaveAttribute(
+    expect(within(card).queryByText(/More than 24 hours/)).toBeNull();
+    expect(within(card).queryByRole("link", { name: "Open in WhatsApp" })).toBeNull();
+    expect(within(card).queryByRole("button", { name: "Patient told ✓" })).toBeNull();
+
+    // 不能 Open in WhatsApp 的（读 GPiS_Dev）：视窗里只有 Patient told；Back 关掉、什么都不改
+    const other = screen.getByText("Demo Kid B", { selector: "strong" }).closest("li")!;
+    await user.click(within(other).getByRole("button", { name: "Tell the patient" }));
+    let dialog = await screen.findByRole("dialog", { name: "Tell the patient – Demo Kid B" });
+    expect(within(dialog).getByText(/the system stopped before sending/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole("link", { name: "Open in WhatsApp" })).toBeNull();
+    await user.click(within(dialog).getByRole("button", { name: "Back" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await user.click(within(card).getByRole("button", { name: "Tell the patient" }));
+    dialog = await screen.findByRole("dialog", { name: "Tell the patient – Demo Kid A" });
+    expect(within(dialog).getByText(/More than 24 hours/)).toBeInTheDocument();
+    expect(within(dialog).getByText("In GPiS: Fri 09 Oct 2026 16:30 · Dr PHANG · +60120000001")).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Open in WhatsApp" })).toHaveAttribute(
       "href",
       "whatsapp://send?phone=60120000001&text=%E9%A2%84%E7%BA%A6%E7%A1%AE%E8%AE%A4%E2%9C%85%0ANAME%3A%20DEMO%20KID%20A",
     );
-    // 不能 Open in WhatsApp 的（读 GPiS_Dev）：只有 Patient told
-    const other = screen.getByText("Demo Kid B", { selector: "strong" }).closest("li")!;
-    expect(within(other).queryByRole("link", { name: "Open in WhatsApp" })).toBeNull();
-    expect(within(other).getByText(/the system stopped before sending/)).toBeInTheDocument();
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
 
-    await user.click(within(card).getByRole("button", { name: "Patient told ✓" }));
+    await user.click(within(dialog).getByRole("button", { name: "Patient told ✓" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(screen.getByText("Every confirmed patient has been told.")).toBeInTheDocument());
     expect(calls.some((c) => c.method === "POST" && c.path === "/api/requests/1/patient-told")).toBe(true);
     expect(screen.getByRole("tab", { name: "To tell patient" })).toBeInTheDocument();

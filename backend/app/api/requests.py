@@ -22,19 +22,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from .. import auto_confirm
 from ..auth import current_staff
-from ..config import WhatsAppSettings, get_reminder_text, get_whatsapp_settings
-from ..confirm import GpisChoice, RequestFacts, gpis_choices, match_score, may_send, rank, render_confirmation
+from ..config import WhatsAppSettings, get_whatsapp_settings
+from ..confirm import GpisChoice, RequestFacts, gpis_choices, match_score, may_send, rank
+from ..confirming import confirm_choice, doctor_names, used_by
 from ..db import appointment_requests as reqs
-from ..db import conversations as conv
-from ..db.models import (
-    AppointmentRequest, ClinicSettings, Conversation, ConversationMode, Customer, Doctor, RequestStatus, Sender,
-    Staff, WaStatus,
-)
+from ..db.models import AppointmentRequest, ClinicSettings, Conversation, RequestStatus, Staff
 from ..db.session import get_session
 from ..gpis import WrongDatabaseError
 from ..reminders import ReminderSource
-from ..whatsapp import RecipientNotAllowed, WhatsAppClient, WhatsAppError, WhatsAppNotConfigured, get_whatsapp_client
+from ..whatsapp import WhatsAppClient, get_whatsapp_client
 from .reminders import get_reminder_source
 
 log = logging.getLogger(__name__)
@@ -145,6 +143,28 @@ _LOAD = (
 )
 
 
+class AutoConfirmOut(BaseModel):
+    enabled: bool                    # Settings 的开关（只有 ADMIN 能改）
+    runs_here: bool                  # 这台电脑的资料来源可以自动确认（主机的 GPiS 或假资料；GPiS_Dev 不行）
+    source: str | None
+    checked_at: datetime | None      # 上次成功查 GPiS
+    error: str | None
+    in_business_hours: bool          # 9:00–17:30 才找
+    stale: bool                      # 打开了、营业时间，超过 15 分钟没成功查 GPiS → 红字
+
+
+@router.get("/auto-confirm", response_model=AutoConfirmOut)
+def auto_confirm_status(
+    session: Session = Depends(get_session),
+    source: ReminderSource | None = Depends(get_confirm_source),
+) -> AutoConfirmOut:
+    """Requests 页面上面那一行：自动确认开了没有、上次成功查 GPiS 是几点（D71 ②）。"""
+    settings = session.get(ClinicSettings, 1)
+    if settings is None:
+        raise HTTPException(status_code=503, detail="Clinic settings are missing: run python -m app.db.seed")
+    return AutoConfirmOut(**auto_confirm.status(settings, source).__dict__)
+
+
 @router.get("", response_model=list[RequestOut])
 def list_requests(
     status: RequestStatus = Query(RequestStatus.PENDING),
@@ -223,23 +243,6 @@ def _facts(r: AppointmentRequest) -> RequestFacts:
     return RequestFacts(contact_id=r.customer.gpis_contact_id, doctor_id=r.doctor_id, slot=r.preferred_slot)
 
 
-def _used_by(session: Session, appointment_ids: list[int], request_id: int) -> dict[int, int]:
-    if not appointment_ids:
-        return {}
-    rows = session.execute(
-        select(AppointmentRequest.gpis_appointment_id, AppointmentRequest.id).where(
-            AppointmentRequest.status == RequestStatus.CONFIRMED,
-            AppointmentRequest.gpis_appointment_id.in_(appointment_ids),
-            AppointmentRequest.id != request_id,
-        )
-    )
-    return {gpis_id: rid for gpis_id, rid in rows}
-
-
-def _doctor_names(session: Session) -> dict[str, str]:
-    return {d.id: d.display_name for d in session.scalars(select(Doctor))}
-
-
 @router.get("/{request_id}/gpis", response_model=GpisChoicesOut)
 def gpis_appointments(
     request_id: int,
@@ -252,8 +255,8 @@ def gpis_appointments(
     day = _day(r, date_)
     facts = _facts(r)
     choices = rank(_read_gpis_day(source, session, day), facts)
-    used = _used_by(session, [c.appointment_id for c in choices], r.id)
-    names = _doctor_names(session)
+    used = used_by(session, [c.appointment_id for c in choices], r.id)
+    names = doctor_names(session)
     return GpisChoicesOut(
         date=day,
         source=source.label,
@@ -271,65 +274,6 @@ def gpis_appointments(
             for c in choices
         ],
     )
-
-
-def _link_contact(session: Session, customer: Customer, contact_id: int | None) -> None:
-    """新病人：记下 GPiS 的 ContactID，下次就认得（D71）。已经有、或别的病人用了这个 ID，就不改。"""
-    if customer.gpis_contact_id is not None or contact_id is None:
-        return
-    taken = session.scalar(select(Customer.id).where(Customer.gpis_contact_id == contact_id))
-    if taken is None:
-        customer.gpis_contact_id = contact_id
-
-
-def _notify(
-    session: Session, r: AppointmentRequest, source: ReminderSource, whatsapp: WhatsAppClient, staff: Staff
-) -> None:
-    """确认之后马上经 WhatsApp 通知病人；发不了就留在「要通知」，写原因。"""
-    message = r.confirm_message or ""
-    if not may_send(source):
-        reqs.notify_failed(session, r, f"Not sent: the GPiS list comes from {source.label} (test data with real "
-                                       "patient names). Use demo data or the clinic's GPiS to send.")
-        return
-    if r.conversation is None:
-        reqs.notify_failed(session, r, "No WhatsApp conversation (the request was added by staff)")
-        return
-    contact = r.conversation.wa_contact
-    if not conv.customer_service_window_open(session, contact.id):
-        reqs.notify_failed(session, r, "More than 24 hours since the patient's last message: WhatsApp only allows "
-                                       "approved templates now")
-        return
-    open_conversation = conv.get_open_conversation(session, contact.id)
-    if open_conversation is None:
-        reqs.notify_failed(session, r, "The WhatsApp conversation is closed")
-        return
-    try:
-        wa_message_id = whatsapp.send_text(contact.wa_phone, message)
-    except RecipientNotAllowed:
-        reqs.notify_failed(session, r, "This number is not in WHATSAPP_ALLOWED_RECIPIENTS (development)")
-        return
-    except WhatsAppNotConfigured:
-        reqs.notify_failed(session, r, "WhatsApp is not set up on this computer")
-        return
-    except WhatsAppError as e:
-        reqs.notify_failed(session, r, f"WhatsApp did not accept the message: {e}")
-        return
-    try:
-        # AI 在回复的对话：算 AI（系统）发的，AI 照常继续；员工接手的对话：算这位员工发的（不会变成接手）
-        if open_conversation.mode == ConversationMode.BOT:
-            conv.record_outgoing_message(session, open_conversation, Sender.BOT, message,
-                                         wa_message_id=wa_message_id, wa_status=WaStatus.ACCEPTED)
-        else:
-            conv.record_outgoing_message(session, open_conversation, Sender.STAFF, message, staff=staff,
-                                         wa_message_id=wa_message_id, wa_status=WaStatus.ACCEPTED)
-        reqs.patient_notified(session, r)
-        session.commit()
-    except Exception:
-        # 病人已经收到了，但记录没存进去：留下消息 ID，方便查；请求留在「要通知」
-        log.exception("确认消息已经发出，但存进数据库失败（%s）", wa_message_id)
-        session.rollback()
-        reqs.notify_failed(session, r, "The message was sent, but saving it failed. Check the WhatsApp chat "
-                                       "before telling the patient again.")
 
 
 @router.post("/{request_id}/confirm", response_model=RequestOut)
@@ -354,23 +298,11 @@ def confirm(
             detail=f"GPiS has no appointment {body.gpis_appointment_id} on {day:%d/%m/%Y} (or it was cancelled). "
                    "Enter it in GPiS first, then try again.",
         )
-    used = _used_by(session, [choice.appointment_id], r.id)
-    if used:
+    if used_by(session, [choice.appointment_id], r.id):
         raise HTTPException(status_code=409, detail="This GPiS appointment already confirms another request")
 
-    names = _doctor_names(session)
-    message = render_confirmation(choice, names.get(choice.doctor_id, choice.doctor_id), get_reminder_text())
-    _link_contact(session, r.customer, choice.contact_id)
-    reqs.confirm_request(
-        session, r, staff, choice.appointment_id,
-        confirmed_date=choice.day, confirmed_slot=choice.slot, confirmed_doctor_id=choice.doctor_id,
-        confirm_message=message,
-    )
-    session.commit()                                   # 先存 CONFIRMED，再发：中途当机的留在「要通知」
-
     assert source is not None                          # _read_gpis_day 已经检查过
-    _notify(session, r, source, whatsapp, staff)
-    session.commit()
+    confirm_choice(session, r, choice, staff, source, whatsapp)
     session.refresh(r)
     return _out(r, source, wa)
 

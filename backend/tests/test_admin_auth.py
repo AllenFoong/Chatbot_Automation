@@ -117,3 +117,34 @@ def test_last_admin_cannot_be_removed(session, client_for):
         assert r.status_code == 409 and "admin" in r.json()["detail"]
     other = add_staff(session, "boss2", role=StaffRole.ADMIN, password=PASSWORD)
     assert client.patch(f"/api/staff/{other.id}", json={"role": "STAFF"}).status_code == 200
+
+
+def test_delete_an_unused_account(session, client_for):
+    """建错、重复的账号可以删掉；它登录中的 session 也一起没了（D75）。"""
+    add_staff(session, "boss", role=StaffRole.ADMIN, password=PASSWORD)
+    extra = add_staff(session, "typo", password=PASSWORD)
+    boss, typo = client_for("boss"), client_for("typo")
+    assert typo.get("/api/auth/me").status_code == 200
+    assert typo.delete(f"/api/staff/{extra.id}").status_code == 403             # STAFF 不能删
+    assert boss.delete(f"/api/staff/{extra.id}").status_code == 204
+    assert [m["username"] for m in boss.get("/api/staff").json()] == ["boss"]
+    assert typo.get("/api/auth/me").status_code == 401
+    assert session.scalars(select(StaffSession).where(StaffSession.staff_id == extra.id)).all() == []
+    assert boss.delete(f"/api/staff/{extra.id}").status_code == 404
+
+
+def test_used_accounts_and_yourself_cannot_be_deleted(session, client_for):
+    from app.db import conversations as conv
+    from app.db.models import Sender
+
+    boss_row = add_staff(session, "boss", role=StaffRole.ADMIN, password=PASSWORD)
+    amy = add_staff(session, "amy", password=PASSWORD)
+    boss = client_for("boss")
+    msg, _ = conv.record_incoming_message(session, "60120000001", "hi", "wamid.del.1")
+    conv.record_outgoing_message(session, msg.conversation, Sender.STAFF, "hello", staff=amy)
+    r = boss.delete(f"/api/staff/{amy.id}")
+    assert r.status_code == 409
+    assert "sent messages" in r.json()["detail"] and "Deactivate" in r.json()["detail"]
+    r = boss.delete(f"/api/staff/{boss_row.id}")
+    assert r.status_code == 409 and "your own account" in r.json()["detail"]
+    assert len(boss.get("/api/staff").json()) == 2

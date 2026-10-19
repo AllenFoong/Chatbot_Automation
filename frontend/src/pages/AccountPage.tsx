@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import * as api from "../api";
 import { useUser } from "../auth";
-import { Avatar, Badge, ErrorBox, Notice, PageHeader } from "../components";
+import { Avatar, Badge, ErrorBox, Notice, PageHeader, PasswordInput } from "../components";
 import { useAction } from "../hooks";
 
 const MIN_PASSWORD = 8; // = backend/app/auth.py MIN_PASSWORD_LENGTH
@@ -46,18 +46,9 @@ export default function AccountPage() {
           <h3>Change password</h3>
           <p>After the change, other computers where you are logged in need to log in again.</p>
         </div>
-        <label>
-          Current password
-          <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" required />
-        </label>
-        <label>
-          New password (at least {MIN_PASSWORD} characters)
-          <input type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" minLength={MIN_PASSWORD} required />
-        </label>
-        <label>
-          New password again
-          <input type="password" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" required />
-        </label>
+        <PasswordInput label="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" required />
+        <PasswordInput label={`New password (at least ${MIN_PASSWORD} characters)`} value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" minLength={MIN_PASSWORD} required />
+        <PasswordInput label="New password again" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" required />
         {mismatch && <div className="error" role="alert">The new passwords are not the same.</div>}
         <ErrorBox message={action.error} />
         {done && <Notice tone="success">Password changed. Other computers where you were logged in need to log in again.</Notice>}

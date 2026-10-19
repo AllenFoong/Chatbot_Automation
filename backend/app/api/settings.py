@@ -192,8 +192,11 @@ def update_service(code: str, body: ServicePatch, session: Session = Depends(get
     s = session.get(Service, code.strip().upper())
     if s is None:
         raise HTTPException(status_code=404, detail="Service not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    changes = body.model_dump(exclude_unset=True)
+    for field, value in changes.items():
         setattr(s, field, value)
+    if changes.get("auto_confirm"):
+        s.auto_confirm_error = None              # 重新打开：旧的错误不再显示，等下一次查 GPiS
     session.commit()
     return s
 
@@ -314,12 +317,14 @@ class SettingsOut(_Orm):
     max_per_slot: int
     max_per_slot_for_ai: int
     clinic_contact_id: int
+    auto_confirm: bool           # 自动确认（D71 ②）：只有 ADMIN 能改，默认关
 
 
 class SettingsPatch(BaseModel):
     max_per_slot: int | None = None
     max_per_slot_for_ai: int | None = None
     clinic_contact_id: int | None = None
+    auto_confirm: bool | None = None
 
 
 def _settings(session: Session) -> ClinicSettings:
@@ -337,7 +342,10 @@ def get_clinic_settings(session: Session = Depends(get_session)) -> ClinicSettin
 @router.patch("/settings", response_model=SettingsOut, dependencies=admin)
 def update_clinic_settings(body: SettingsPatch, session: Session = Depends(get_session)) -> ClinicSettings:
     s = _settings(session)
-    for field, value in body.model_dump(exclude_unset=True).items():
+    changes = body.model_dump(exclude_unset=True)
+    for field, value in changes.items():
         setattr(s, field, value)
+    if changes.get("auto_confirm"):
+        s.auto_confirm_error = None              # 重新打开：旧的错误不再显示，等下一次查 GPiS
     session.commit()
     return s
