@@ -26,7 +26,7 @@ from .phone import normalize_phone
 # 马来西亚没有夏令时间，固定 UTC+8（不用 zoneinfo：Windows 没有装 tzdata 会找不到时区）
 CLINIC_TZ = timezone(timedelta(hours=8))
 
-REMINDABLE_STATUSES = {"confirmed", "closed"}   # 将来的日期只有 Confirmed（B13）；以前的日子是 Closed
+REMINDABLE_STATUSES = {"confirmed"}             # Closed 不提醒（D76），见 build_reminder_list
 MAX_LINES_PER_MESSAGE = 5
 MAX_DAYS_AHEAD = 14                              # 连休再长，也只往后找两个星期
 
@@ -269,6 +269,10 @@ def build_reminder_list(
         seen.add(a.appointment_id)
         if (a.status or "").strip().lower() in IGNORED_STATUSES:
             not_appointments["Cancelled or postponed"] += 1
+            continue
+        # 病人记错日子、提前来了，员工把这条预约改成 Closed：已经看过，不用提醒（D76）
+        if (a.status or "").strip().lower() == "closed":
+            not_appointments["Closed (patient already came)"] += 1
             continue
         if "OFFDAY" in normalize_remarks(a.remarks):
             not_appointments["OFF DAY record"] += 1
