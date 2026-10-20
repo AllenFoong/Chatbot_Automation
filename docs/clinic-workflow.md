@@ -245,7 +245,7 @@ Patient Come → Waiting → Calling（显示医生 Consulting、诊室如 Room 
 | `RETAINER` | 保持器（矫正结束后） |
 
 **`*C` = 技工所做的牙已经送到诊所**（W39、W47）：戴牙那一步（`ISSUE CROWN` / `ISSUE C`、`ISSUE BRIDGE` / `ISSUE B`、`ISSUE IMPLANT`、`ISSUE DENTURE`）和假牙的 `MMR`、`TRY-IN`，
-技工所送来的那天，员工在 Remarks 后面加 `*C`，**一定写成 `*C`**（W47）。没有 `*C` = 东西还没到。`VENEER`（贴片）也一样要等技工所（W47）。Remarks 里也会写缩写 `ISSUE C`、`ISSUE B`（代码表照旧用全写，W28）。`C/UP AFTER ISSUE DENTURE` = 装好假牙之后的检查，不用等技工所（D57）。
+技工所送来的那天，员工在 Remarks 后面加 `*C`，**一定写成 `*C`**（W47）。没有 `*C` = 东西还没到。`VENEER`（贴片）也一样要等技工所（W47）。Remarks 里也会写缩写 `ISSUE C`、`ISSUE B`、`ISSUE D`（= `ISSUE DENTURE`，例 `ISSUE D(P)`，D77）（代码表照旧用全写，W28）。`C/UP AFTER ISSUE DENTURE` = 装好假牙之后的检查，不用等技工所（D57）。
 
 ### 对本系统的意义
 

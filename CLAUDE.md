@@ -134,6 +134,7 @@
 - [x] 员工账号（D75）：所有密码栏加看密码的眼睛；*Staff accounts* 加 **Delete**（只删没用过的账号，用过的写原因、请改用停用；自己、最后一个 ADMIN 不能删）；云端 `pytest` 429 个、Vitest 60 个，headless Chromium 点过；和 6a-2c 一起在 PR #33
 - [x] *To tell patient* 的卡片只放主要资料，原因、消息、*Open in WhatsApp* / *Copy message* / *Patient told ✓* 改放在弹出视窗（按 **Tell the patient**，和 *Entered in GPiS ✓* 共用 `Modal`，D73 ③）；Vitest 60 个，headless Chromium 1366 / 400 宽看过；在 PR #33
 - [x] *Settings → Slots & auto-confirm* 的勾选框改成 on / off 开关（绿色 / 灰色，照 iOS 设定的排法：名字在左、开关在右；关的时候不显示说明；`Switch` 元件；拨了还是要按 **Save**）；`backend/README.md` 6a-2c 清单第 2、3、10 项照着改；在 PR #33
+- [x] 员工反馈提醒（2026-10-20）：明天的预约是 `Closed`（病人记错日子提前来了）→ 不提醒，只算在 *Not appointments*（D76，空档不变）；Remarks `ISSUE D(P)` 没有 `*C` 却在 *Ready* → `ISSUE D` 也要 `*C`（D77）；开发电脑 `pytest` 433 个通过（09-02：`Closed (patient already came) 26`；10-09 READY 2 条）；B 还没更新
 
 ## 下一步
 

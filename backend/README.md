@@ -569,6 +569,8 @@ python -m app.reminders_cli 2026-09-02      # 拿 GPiS_Dev 的某一天当「明
 
 把第 3–6 项的终端输出贴回来（没有病人资料），截图要遮住名字和号码。
 
+> **D76 之后（2026-10-20）**：`Closed` 不提醒，只算在 *Not appointments* 的 `Closed (patient already came)`。`GPiS_Dev` 以前的日子（第 3–5、7 项的 09-02、09-18、09-30）全部是 `Closed`，READY、NEEDS_STAFF 会是空的；改成看 *Not appointments*：`Closed (patient already came)` 的数目 = 那天的病人数（不算取消、`00:00`、OFF DAY）。开发电脑 2026-10-20：09-02 是 `Cancelled or postponed 3, Closed (patient already came) 26`、10-09 READY 2 条（`Confirmed`）。要看 READY / NEEDS_STAFF 的原因，用快照之后的日子（例 `2026-10-09`）或假资料。
+
 ### 云端容器的测试记录（2026-10-08，PostgreSQL 16、只用假资料、没有 GPiS）
 
 - `pytest` → 255 passed（新增：名单的分类、`*C`、号码种类、家人合并、假期前的日期、*Open in WhatsApp* 的锁、终端摘要没有名字和号码、`GET /api/reminders`）。

@@ -108,9 +108,11 @@ def test_lunch_break_and_after_hours_exceptions_are_still_reminded(time_slot):
     assert len(build(appt(time_slot)).ready) == 1
 
 
-def test_closed_status_is_reminded():
-    """开发时选以前的日子，状态是 Closed（B13）。"""
-    assert len(build(appt(status="Closed")).ready) == 1
+def test_closed_status_is_not_an_appointment():
+    """病人提前来了，员工改成 Closed：不提醒，只算数量（D76）。"""
+    r = build(appt(status="Closed"))
+    assert not r.ready and not r.needs_staff
+    assert dict(r.not_appointments) == {"Closed (patient already came)": 1}
 
 
 # ---------- *C（D50、D51） ----------
@@ -124,6 +126,10 @@ def test_closed_status_is_reminded():
     ("ISSUE BRIDGE *C", False),
     ("ISSUE IMPLANT 46", True),
     ("ISSUE DENTURE *C", False),
+    ("ISSUE D(P)", True),            # ISSUE D = ISSUE DENTURE（D77）
+    ("ISSUE D (P) *C", False),
+    ("C/UP AFTER ISSUE D(P)", False),
+    ("ISSUE DR CHECK", False),       # D 后面接字母不算
     ("MMR (P)", True),
     ("TRY-IN (G) *C", False),
     ("TRY IN", True),
