@@ -126,6 +126,10 @@ def test_closed_status_is_not_an_appointment():
     ("ISSUE BRIDGE *C", False),
     ("ISSUE IMPLANT 46", True),
     ("ISSUE DENTURE *C", False),
+    ("ISSUE D(P)", True),            # ISSUE D = ISSUE DENTURE（D77）
+    ("ISSUE D (P) *C", False),
+    ("C/UP AFTER ISSUE D(P)", False),
+    ("ISSUE DR CHECK", False),       # D 后面接字母不算
     ("MMR (P)", True),
     ("TRY-IN (G) *C", False),
     ("TRY IN", True),

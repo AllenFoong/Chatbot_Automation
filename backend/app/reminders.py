@@ -30,9 +30,9 @@ REMINDABLE_STATUSES = {"confirmed"}             # Closed 不提醒（D76），�
 MAX_LINES_PER_MESSAGE = 5
 MAX_DAYS_AHEAD = 14                              # 连休再长，也只往后找两个星期
 
-# 要等技工所的代码（W39、W47）：Remarks 后面要有 *C = 东西已经送到诊所
+# 要等技工所的代码（W39、W47）；ISSUE D = ISSUE DENTURE（D77）：Remarks 后面要有 *C = 东西已经送到诊所
 _LAB_WORK = re.compile(
-    r"(?<![A-Z])(?:ISSUE\s*(?:CROWN|BRIDGE|IMPLANT|DENTURE|C|B)|MMR|TRY\s*-?\s*IN|VENEERS?)(?![A-Z])",
+    r"(?<![A-Z])(?:ISSUE\s*(?:CROWN|BRIDGE|IMPLANT|DENTURE|C|B|D)|MMR|TRY\s*-?\s*IN|VENEERS?)(?![A-Z])",
     re.IGNORECASE,
 )
 # 一定写成 *C（D51）：大写 C 紧跟在 * 后面，后面不能再接字母
