@@ -1069,3 +1069,51 @@ npm run build                 # ✓ built
 - headless Chromium：ADMIN 在 *Slots & auto-confirm* 打开 → *Saved.* → *Requests* 上面一行 *Auto-confirm is on … Last checked GPiS: …*；写的时候找到、已经改好：勾选框被表单的样式拉宽。
 - 开发者测试时要的（2026-10-18）：勾选框改成 **on / off 开关**（开是绿色、关是灰色，旁边写 *On* / *Off*；照 iOS 设定的排法：名字在左边、开关在右边，点整行都能切换；关的时候不显示下面的说明，拨了还没 Save 才写 *Press Save to apply.*；拨了还是要按 **Save**，和上面三个设定一样）。底下还是 checkbox，读屏软件念成 switch；Vitest 60 个；headless Chromium：滑鼠、空白键、点 *On* 字都能切换，STAFF 的变淡、拨不动。
 
+
+## Phase 6a-3a：AI 查空档的工具（D78）
+
+还不接 AI。`app/ai_tools.py` 里两个普通的 Python 函数，之后（6b）AI 会呼叫它们：
+
+| 工具 | AI 给的参数 | 回给 AI 的 |
+|---|---|---|
+| `check_available_slots` | 日期、疗程代码、医生（可以不给） | 那天每位医生可以约的时间；不能约的写原因（休息、诊所休息、要员工看、满了） |
+| `find_next_available` | 疗程代码、医生（可以不给）、从哪天开始（不给 = 明天） | 最近 3 天有空的日子（最多看 14 天）；一天都没有就写「转员工」 |
+
+每个工具都是：**检查 AI 给的参数 → 程序自己读 GPiS 和 PostgreSQL → 呼叫原来的空档计算（`availability.py`，没有改）→ 只回可以约的时间**。
+
+- AI 给错（日期不是 `YYYY-MM-DD`、今天或过去、60 天以后、没有这个疗程、没有这位医生）→ 回 `{"error": "..."}`，写哪里错、正确的写法，程序不会停。
+- AI 不能约的疗程（`ai_can_book` 是否，或可能要 1 hour）→ 叫 AI 问病人哪几天方便、转员工（D15、D16）。
+- `Dr Phang`、`phang` 都当作 `PHANG`；疗程代码不分大小写。
+- 那天要员工看（`NEEDS_REVIEW`）→ 不给时间、叫 AI 转员工。医生休息、诊所休息的日子不读 GPiS。
+- 读不到 GPiS → 叫 AI 告诉病人员工会回复、转员工；连接的错误只进日志，不给 AI。
+- 回的东西没有预约编号、ContactID、几个人、Remarks、名字。
+- 没有改表、没有改网页、不用更新 B。
+
+在终端试（开发电脑，`backend` 里、先启用 venv；印出来的就是 AI 会收到的，**只有时间，没有病人资料**）：
+
+```powershell
+python -m app.ai_tools check 2026-10-23 S+P            # 那天每位医生
+python -m app.ai_tools check 2026-10-23 S+P "Dr Phang"  # 只看 PHANG
+python -m app.ai_tools next S+P GOH                     # 往后找 GOH 最近 3 天
+python -m app.ai_tools next OR --from 2026-11-02
+```
+
+### 6a-3a 完成的条件（在开发电脑上测试）
+
+读的是 `GPiS_Dev`：印出来只有时间，可以贴；**不要**跑别的会印名字的指令。下面的日期换成「明天」以后、60 天内的日子。
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | `git pull` → `pytest` | 470 passed，没有 skipped |
+| 2 | 找一天 `python -m app.cli <日期> PHANG S+P`，再 `python -m app.ai_tools check <同一天> S+P PHANG` | `times` 就是 7b 里 `Can30` 是 1 的那些时间；没有 7c 的预约编号 |
+| 3 | `python -m app.ai_tools check 明天 S+P` | `error`：`'明天' is not a date. Use YYYY-MM-DD …`，最后一行 `Today is <今天>` |
+| 4 | `python -m app.ai_tools check <日期> scaling`、`… <日期> RCT` | 第一个：`Unknown treatment code` + 可以约的代码；第二个：`booked by staff` |
+| 5 | `python -m app.ai_tools check <星期三或四> S+P GOH` | GOH 的 `not_available`：`doctor not working this day` |
+| 6 | `python -m app.ai_tools next S+P` | 3 天，每天只列有空的医生，日期从明天开始 |
+
+### 云端容器的测试记录（2026-10-22，PostgreSQL 16、Python 3.11、只用假资料）
+
+- `pytest` → 470 passed（新增 37 个）：日期格式 / 今天 / 过去 / 60 天；疗程（大小写、不认识的列出可以约的代码、`RCT` 和可能要 1 hour 的转员工、停用的）；
+  医生（`Dr Phang` 等写法、不认识、停用）；空的一天每位医生的时间；休息的医生和诊所休息日不读 GPiS；同一格 2 人时 `S+P` 可以、`C/UP` 不行；
+  PENDING 的请求占位；要员工看的日子；满了；不回别的病人的资料；读 GPiS 失败不露出连接资料；往后找：跳过休息和满的日子、只列有空的医生、
+  从某天开始 / 过去的日子从明天、14 天都没有、不超过 60 天；终端指令。
