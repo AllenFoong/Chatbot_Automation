@@ -1117,3 +1117,12 @@ python -m app.ai_tools next OR --from 2026-11-02
   医生（`Dr Phang` 等写法、不认识、停用）；空的一天每位医生的时间；休息的医生和诊所休息日不读 GPiS；同一格 2 人时 `S+P` 可以、`C/UP` 不行；
   PENDING 的请求占位；要员工看的日子；满了；不回别的病人的资料；读 GPiS 失败不露出连接资料；往后找：跳过休息和满的日子、只列有空的医生、
   从某天开始 / 过去的日子从明天、14 天都没有、不超过 60 天；终端指令。
+
+### 开发电脑的测试记录（2026-10-23，`GPiS_Dev`）
+
+- 第 1–6 项全部通过：`pytest` 470 passed、没有 skipped；`check 2026-10-23`（今天）→ `not after today`；`check 2026-10-24 S+P` → GOH 12 个、PHANG 14 个时间，午休不列；
+  `明天` → `YYYY-MM-DD` 的错误；`scaling` → 可以约的代码；`RCT` → `booked by staff`；`2026-10-28 S+P GOH` → `doctor not working this day`；
+  `next S+P` → 10-24、10-25、10-26，`searched_until` 2026-11-06。
+- 第 2 项：`GPiS_Dev` 是之前的备份，10-26、10-28、11-02 PHANG 都是 `Patients=0`，找不到明天以后有预约的日子；三天的 `times` 和 7b `Can30 = 1` 一样。
+  「有人的时间不列出来」（满的格、PENDING 的请求、要员工看的日子）由 `pytest` 的假资料测试确认。
+

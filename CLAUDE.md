@@ -136,6 +136,7 @@
 - [x] *Settings → Slots & auto-confirm* 的勾选框改成 on / off 开关（绿色 / 灰色，照 iOS 设定的排法：名字在左、开关在右；关的时候不显示说明；`Switch` 元件；拨了还是要按 **Save**）；`backend/README.md` 6a-2c 清单第 2、3、10 项照着改；在 PR #33
 - [x] 员工反馈提醒（2026-10-20）：明天的预约是 `Closed`（病人记错日子提前来了）→ 不提醒，只算在 *Not appointments*（D76，空档不变）；Remarks `ISSUE D(P)` 没有 `*C` 却在 *Ready* → `ISSUE D` 也要 `*C`（D77）；开发电脑 `pytest` 433 个通过（09-02：`Closed (patient already came) 26`；10-09 READY 2 条）；B 还没更新
 - [x] Phase 6a-3a 初版（D78，开发者说「直接开发」）：`backend/app/ai_tools.py` 两个 AI 工具 `check_available_slots`、`find_next_available`（检查 AI 给的参数 → 读 GPiS / PostgreSQL → 原来的空档计算 → 只回时间）；`python -m app.ai_tools check / next` 在终端试；没有改表、没有改网页、不用更新 B；云端 `pytest` 470 个，全部假数据
+- [x] 6a-3a 开发电脑测试 6 项全部通过（2026-10-23，`GPiS_Dev`；`pytest` 470 个；`GPiS_Dev` 明天以后没有预约，有人的时间由假资料测试确认；记录见 `backend/README.md`）
 
 ## 下一步
 
@@ -143,7 +144,7 @@
 2. 画面整理（D66，PR #23）：B 已经更新（2026-10-13）。和第 1 项一起，一两个星期后问员工新画面（卡片、☰）好不好用。画面还是英文（D24）。
 3. A10（D67）：B 已经是 `0005`（2026-10-14）。问诊所 W60（90 天可以吗）。B 2027-01-13 之前每次都是 `删了 0 条`；那之后看一次 `start.log`，确认第一次真的删了。
 4. 更新电脑 B：照 `docs/deploy-pc-b.md` 第 9 节（zip 经 Google Drive 链接、对 hash，D64）；更新前先在开发电脑跑过测试。B 上**不跑测试**，读的是主机 A 的正式资料。第一版模板没有按钮（D48）；真的用 Cloud API 发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
-5. Phase 6（AI）：6a-1（遮证件号码）已经合并（PR #31，不用更新 B）；6a-2a 开发电脑测试通过（PR #32）；6a-2a、6a-2b 已经合并（PR #32）；6a-2c（自动确认，D71 ②、D74）程序好了，要在开发电脑照 `backend/README.md`「6a-2c 完成的条件」测 10 项（要升到 `0007`），员工账号的眼睛 / 删除照 `frontend/README.md`（D75）测 7 项；6a-3a（查空档的工具，D78）程序好了，要在开发电脑照 `backend/README.md`「6a-3a 完成的条件」测 6 项；接着 6a-3b（找病人、原来的医生、建请求：要新的 GPiS 查询，先在 `GPiS_Dev` 对照）。不做「员工手动建请求」（2026-10-19：员工看了 WhatsApp 直接去 GPiS 约比较快；请求只由 AI 建）。自动确认先关着，员工按一段时间、ADMIN 觉得对得上再打开；B 下次更新要升到 `0007`。同时整理 W61–W72 的中英问卷请老板回答；6b（接 AI）要等 W62。提醒继续手动（D68）；5c 等 AI 要上线才接（BSP + Coexistence，老板签约）。
+5. Phase 6（AI）：6a-1（遮证件号码）已经合并（PR #31，不用更新 B）；6a-2a 开发电脑测试通过（PR #32）；6a-2a、6a-2b 已经合并（PR #32）；6a-2c（自动确认，D71 ②、D74）程序好了，要在开发电脑照 `backend/README.md`「6a-2c 完成的条件」测 10 项（要升到 `0007`），员工账号的眼睛 / 删除照 `frontend/README.md`（D75）测 7 项；6a-3a（查空档的工具，D78）开发电脑测试通过（2026-10-23）；接着 6a-3b（找病人、原来的医生、建请求：要新的 GPiS 查询，先在 `GPiS_Dev` 对照）。不做「员工手动建请求」（2026-10-19：员工看了 WhatsApp 直接去 GPiS 约比较快；请求只由 AI 建）。自动确认先关着，员工按一段时间、ADMIN 觉得对得上再打开；B 下次更新要升到 `0007`。同时整理 W61–W72 的中英问卷请老板回答；6b（接 AI）要等 W62。提醒继续手动（D68）；5c 等 AI 要上线才接（BSP + Coexistence，老板签约）。
 6. A1：B 经局域网用只读帐号读 A，已经通了（2026-10-13）。B 下班有时候关（W54）：Phase 6 之前决定长期放哪里（`docs/architecture.md` 9.4）。
 7. 假期：B 已经导入 2026、2027 年（2026-10-13）。2028 年的在 2027 年底前导入、核对回教节日的日期（D61）；诊所临时休息的日子 `admin` 自己加。
 8. A8（还没录入 GPiS 的请求要算占用）是 Phase 6 的第一步（6a），建议的做法在 `docs/architecture.md` 11.6。
