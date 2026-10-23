@@ -7,10 +7,12 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Protocol
 
 from .availability import GpisAppointment
+from .phone import normalize_phone
 from .reminders import ReminderAppointment
 
 APPOINTMENTS_SQL = """
@@ -34,7 +36,25 @@ WHERE a.AppointmentDate >= ?
   AND a.AppointmentDate <  ?
 """
 
-# 上面两条 SELECT 用到的栏位。python -m app.reminders_cli --check-gpis 会检查它们在不在（只看栏位名字）
+# 6a-3b：用 WhatsApp 号码找病人（D79）。chatbot_reader 只能读这两个表，所以从预约记录找：号码在 Qry_CAH_Appointment.HPNo。
+# 号码格式混杂（统计 B10）：先在 SQL 去掉 - 空格 + 再比对最后 8 位，Python 再用 normalize_phone 比整个号码。
+PATIENTS_BY_PHONE_SQL = """
+SELECT a.ContactID, a.ContactName, a.AppointmentDate, q.HPNo
+FROM dbo.Tbl_CAH_Appointment a
+JOIN dbo.Qry_CAH_Appointment q ON q.AppointmentID = a.AppointmentID
+WHERE REPLACE(REPLACE(REPLACE(q.HPNo, '-', ''), ' ', ''), '+', '') LIKE ?
+"""
+
+# 6a-3b：一位病人某段时间的预约（找多步骤疗程原来的医生，D16）。不读名字、号码。
+VISITS_SQL = """
+SELECT a.AppointmentDate, a.DoctorID, a.Status, a.Remarks
+FROM dbo.Tbl_CAH_Appointment a
+WHERE a.ContactID = ?
+  AND a.AppointmentDate >= ?
+  AND a.AppointmentDate <  ?
+"""
+
+# 上面几条 SELECT 用到的栏位。python -m app.reminders_cli --check-gpis 会检查它们在不在（只看栏位名字）
 REQUIRED_COLUMNS = {
     "Tbl_CAH_Appointment": ("AppointmentID", "AppointmentDate", "TimeSlot", "DoctorID", "Status",
                             "ContactID", "ContactName", "Remarks"),
@@ -112,6 +132,48 @@ def missing_columns(found: set[tuple[str, str]]) -> list[str]:
 
 class AppointmentSource(Protocol):
     def appointments_for(self, day: date, doctor_id: str) -> list[GpisAppointment]: ...
+
+
+@dataclass(frozen=True)
+class GpisPatient:
+    """用号码找到的一位病人：ContactID、GPiS 上的名字、最近一次预约的日子。"""
+
+    contact_id: int
+    name: str
+    last_visit: date
+
+
+@dataclass(frozen=True)
+class PastVisit:
+    """一位病人的一次预约（找原来的医生用）。没有名字、号码。"""
+
+    day: date
+    doctor_id: str | None
+    status: str | None
+    remarks: str | None
+
+
+class PatientSource(Protocol):
+    """找病人（6a-3b）：GpisReader 读 GPiS，DemoReminderSource 用假资料。"""
+
+    is_production: bool
+
+    def patients_for_phone(self, phone: str) -> list[GpisPatient]: ...
+
+    def visits_of(self, contact_id: int, first: date, last: date) -> list[PastVisit]: ...
+
+
+def patients_from_rows(rows, phone: str) -> list[GpisPatient]:
+    """rows：(ContactID, 名字, 日期, 号码)。只留号码完全一样的，每位病人一行（最近的名字）。"""
+    latest: dict[int, GpisPatient] = {}
+    for contact_id, name, day, hp_no in rows:
+        if contact_id is None or normalize_phone(hp_no) != phone:
+            continue
+        day = day.date() if isinstance(day, datetime) else day
+        old = latest.get(contact_id)
+        if old is None or day > old.last_visit:
+            latest[contact_id] = GpisPatient(contact_id, (name or "").strip(), day)
+    return sorted(latest.values(), key=lambda p: (-p.last_visit.toordinal(), p.contact_id))
 
 
 class WrongDatabaseError(RuntimeError):
@@ -194,6 +256,19 @@ class GpisReader:
                 remarks=r.Remarks,
             )
         return list(by_id.values())
+
+    def patients_for_phone(self, phone: str) -> list[GpisPatient]:
+        rows = self._query(PATIENTS_BY_PHONE_SQL, "%" + phone[-8:])
+        return patients_from_rows(((r.ContactID, r.ContactName, r.AppointmentDate, r.HPNo) for r in rows), phone)
+
+    def visits_of(self, contact_id: int, first: date, last: date) -> list[PastVisit]:
+        rows = self._query(VISITS_SQL, contact_id, datetime.combine(first, time.min),
+                           datetime.combine(last, time.min) + timedelta(days=1))
+        return [
+            PastVisit(r.AppointmentDate.date() if isinstance(r.AppointmentDate, datetime) else r.AppointmentDate,
+                      r.DoctorID, r.Status, r.Remarks)
+            for r in rows
+        ]
 
     def missing_columns(self) -> list[str]:
         return missing_columns({(r.TABLE_NAME, r.COLUMN_NAME) for r in self._query(COLUMNS_SQL)})

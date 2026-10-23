@@ -1126,3 +1126,71 @@ python -m app.ai_tools next OR --from 2026-11-02
 - 第 2 项：`GPiS_Dev` 是之前的备份，10-26、10-28、11-02 PHANG 都是 `Patients=0`，找不到明天以后有预约的日子；三天的 `times` 和 7b `Can30 = 1` 一样。
   「有人的时间不列出来」（满的格、PENDING 的请求、要员工看的日子）由 `pytest` 的假资料测试确认。
 
+
+## Phase 6a-3b：AI 找病人、原来的医生、建请求（D79）
+
+还不接 AI。`app/ai_tools.py` 再加 3 个工具（和 6a-3a 一样：检查 AI 给的参数 → 程序自己读资料 → 只回最少资料）：
+
+| 工具 | AI 给的 | 回给 AI 的 |
+|---|---|---|
+| `find_patients` | 没有参数：只能查**这段对话的号码** | 用这个号码的病人：`patient_id`（`G` + GPiS 的 ContactID，或 `N` + 本系统新病人的编号）和名字；没有就叫 AI 当新病人、只问名字 |
+| `get_treatment_doctor` | `patient_id`、疗程 | 多步骤疗程（例 `OR`、`RB`、`RETAINER`）原来的医生；不是多步骤的 = 哪位都可以；找不到 → 转员工 |
+| `create_appointment_request` | 疗程、医生、日期、时间，`patient_id` 或新病人的名字 | 建好的 `PENDING` 请求（编号、日期、时间、医生），叫 AI 告诉病人「员工录入后确认」 |
+
+- **找病人**：GPiS 里号码在预约记录上（`Qry_CAH_Appointment.HPNo`，`chatbot_reader` 本来就能读）。号码格式混杂（统计 B10），先比最后 8 位，再用 `normalize_phone` 比整个号码；
+  一个病人用过几个号码时用最近的名字；诊所自己（ContactID 34094）不算。**读 `GPiS_Dev` 时名字换成 `(name hidden …)`**（真的病人，不能送去 AI 公司，D44）；主机的 GPiS、假资料才给名字。
+- **`patient_id` 一定要是这个号码的病人**：AI 拿别的号码的 ID 来约会被拒绝。
+- **原来的医生**：过去 2 年到今天，同一类疗程（例 ORTHO：`ON`、`OR`、`RB`、`RETAINER`）最近一次、没有取消的预约的医生；那位医生已经停用 → 转员工。
+- **建请求之前再检查一次**：日期、疗程、医生、时间（`HH:MM`）；多步骤疗程只能约原来的医生；同一位病人同一天已经有 `PENDING` 的请求就拒绝；
+  **锁住那天、那位医生**（PostgreSQL advisory lock）再查一次那个时间还有没有空（GPiS + 别的 `PENDING` 请求），两段对话同时约同一格时第二个会看到第一个。
+- 新病人只要名字（2–60 个字，**不能有数字**，免得 IC 号码进来）；建的 Customer 号码 = 这段对话的号码。之后 `find_patients` 会列出 `N…`。
+- 请求都是 30 分钟（AI 只约 30 分钟的疗程，D78）。出错时什么都不存。
+- 没有改表、没有改网页、不用更新 B。`chatbot_reader` 的权限不用改（只读 `Tbl_CAH_Appointment`、`Qry_CAH_Appointment`）。
+
+在终端试（`backend` 里、先启用 venv）：
+
+```powershell
+python -m app.ai_tools patients <号码>                     # find_patients
+python -m app.ai_tools doctor <号码> G1234 OR              # get_treatment_doctor
+python -m app.ai_tools book <号码> S+P PHANG 2026-10-30 10:00 --patient G1234      # 真的建一个 PENDING 请求
+python -m app.ai_tools book <号码> S+P PHANG 2026-10-30 10:30 --new-name "Demo New"
+```
+
+`REMINDER_SOURCE=demo` 时找病人用假资料（自己手机的号码有 Demo Patient A、B 两位；B 每天有 `OR`）；空档还是读 GPiS。`book` 要那个号码有还没结束的对话（先用手机传消息给 Meta 测试号码）。
+
+### 6a-3b 完成的条件（在开发电脑上测试）
+
+**第 2、3 项读 `GPiS_Dev`：号码、名字都不要贴给我、不要截图**，只说对不对得上、几位。
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | `git pull` → `pytest` | 505 passed，没有 skipped |
+| 2 | 在 *Reminders*（读 `GPiS_Dev`）找一张有几位家人的卡片，记下号码 → `python -m app.ai_tools patients <那个号码>` | 位数和卡片上的家人一样（可能更多：以前来过的家人也算）；`name` 都是 `(name hidden …)`；`patient_id` 是 `G` + 数字 |
+| 3 | SSMS 连 `GPiS_Dev`，跑下面的 SQL，挑一行 → `python -m app.ai_tools doctor <那行的 HPNo> G<那行的 ContactID> OR` | `doctor` = 那行的 `DoctorID`（同一位病人之后还有 `RB`、`ON`、`RETAINER` 的话，以最近那次的医生为准） |
+| 4 | `.env` 加 `REMINDER_SOURCE=demo` → `python -m app.ai_tools patients <你的手机>` | `G9001` `DEMO PATIENT A`、`G9002` `DEMO PATIENT B` |
+| 5 | `python -m app.ai_tools doctor <你的手机> G9002 OR` | 今天是星期三、四 → `PHANG`；其他天 → `GOH`（假资料 B 每天的 `OR` 医生） |
+| 6 | 手机传一条消息给 Meta 测试号码（视窗 2、3 开着）→ `python -m app.ai_tools book <你的手机> S+P PHANG <明天以后、PHANG 上班的日子> 10:00 --patient G9001` | `request_id`、`status: PENDING`；网页 *Requests* → *Pending* 有 DEMO PATIENT A 的卡片（*Open conversation* 是你的对话） |
+| 7 | 同一个指令改成 14:00 再跑一次 | `already has a request on <日期> (10:00 …` |
+| 8 | `python -m app.ai_tools book <你的手机> OR PHANG <日期> 11:00 --patient G9002`（选 B 的医生**不是** PHANG 的话）或 `--new-name "Demo New"` | `must be with the doctor who started the treatment: …` / `no earlier ORTHO visit` |
+| 9 | 清理：*Requests* 把这次建的请求 **Reject**；`.env` 拿掉 `REMINDER_SOURCE=demo` | *Pending* 没有这次的请求 |
+
+第 3 项用的 SQL（只在开发电脑的 SSMS 跑，结果不要贴）：
+
+```sql
+USE GPiS_Dev;
+SELECT TOP 5 a.ContactID, q.HPNo, a.DoctorID, a.AppointmentDate
+FROM dbo.Tbl_CAH_Appointment a
+JOIN dbo.Qry_CAH_Appointment q ON q.AppointmentID = a.AppointmentID
+WHERE a.Remarks LIKE 'OR %' AND a.AppointmentDate < GETDATE()
+  AND ISNULL(a.Status, '') NOT IN ('Canceled', 'Postpone')
+ORDER BY a.AppointmentDate DESC;
+```
+
+### 云端容器的测试记录（2026-10-23，PostgreSQL 16、Python 3.11、只用假资料）
+
+- `pytest` → 505 passed（新增 35 个）：号码的各种写法对得上、最后 8 位一样但国家不一样的不算、两个号码写在一起的不算、同一位病人用最近的名字；
+  假资料自己手机有 A、B 两位；家人最近来过的在前、`(P)` 拿掉、诊所自己不算；本系统的新病人列一次（已经录入 GPiS 的不重复）；没有人 → 新病人；
+  `GPiS_Dev` 名字藏起来；没有对话不能查；读不到 GPiS 不露出连接资料；ORTHO 找最近一次（取消的、别的疗程、以后的不看）；不是多步骤 → 哪位都可以；
+  没有记录、新病人、医生停用 → 转员工；别的号码的病人、ID 格式不对；建请求（Customer 记下 ContactID、挂在对话下面、30 分钟、同一位病人再约用同一个 Customer）；
+  新病人再用 `N…` 约；GPiS 1 人 + 2 个请求就满了、第 3 个被拒绝而且什么都没存；同一天两次；ORTHO 只能约原来的医生；名字有数字、太短、两个都给 / 都没给；
+  时间格式、没有医生、今天、RCT、午休、医生休息；没有对话；出错时之前存好的资料不受影响；终端指令。

@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from .config import get_whatsapp_settings
+from .gpis import GpisPatient, PastVisit, patients_from_rows
 from .reminders import ReminderAppointment
 
 FALLBACK_PHONE = "60120000001"
@@ -67,3 +68,16 @@ class DemoReminderSource:
             )
             for i, (slot, doctor, status, name, phone, remarks) in enumerate(rows, start=1)
         ]
+
+    # ---------- 找病人（6a-3b，AI 的工具用）：同一批假资料，往前看 30 天 ----------
+
+    def patients_for_phone(self, phone: str) -> list[GpisPatient]:
+        today = date.today()
+        rows = self.reminder_appointments(today - timedelta(days=30), today)
+        return patients_from_rows(((a.contact_id, a.contact_name, a.appointment_date, a.hp_no) for a in rows), phone)
+
+    def visits_of(self, contact_id: int, first: date, last: date) -> list[PastVisit]:
+        first = max(first, last - timedelta(days=60))     # 假资料每天都一样，不用看太多天
+        return [PastVisit(a.appointment_date, a.doctor_id, a.status, a.remarks)
+                for a in self.reminder_appointments(first, last) if a.contact_id == contact_id]
+
