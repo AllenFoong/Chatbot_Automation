@@ -176,12 +176,12 @@ Start-ScheduledTask -TaskName Chatbot_Automation
 Test-NetConnection 127.0.0.1 -Port 8000 | Select TcpTestSucceeded          # False = 没在跑
 Get-ScheduledTask -TaskName Chatbot_Automation | Select State                # Running = 脚本还在；Ready = 脚本也没在跑
 Get-Content "$env:LOCALAPPDATA\Chatbot\logs\start.log" -Tail 15
-(Get-CimInstance Win32_OperatingSystem).LastBootUpTime                       # 这次开机的时间
+(Get-CimInstance Win32_OperatingSystem).LastBootUpTime                       # 上次「重新启动」的时间（快速启动的关机 / 开机不算，看下面的事件）
 Get-ScheduledTaskInfo -TaskName Chatbot_Automation | Select LastRunTime, LastTaskResult
 Get-ChildItem "$env:LOCALAPPDATA\Chatbot\logs\uvicorn-*.log" | Sort Name -Desc | Select -First 1 | Get-Content -Tail 20
 Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddDays(-3);
   ProviderName='Microsoft-Windows-Winlogon','Microsoft-Windows-Kernel-Power','Microsoft-Windows-Power-Troubleshooter'} |
-  Select TimeCreated, ProviderName, Id | Sort TimeCreated                    # 7001 登入、7002 登出、42 睡眠、1 醒来
+  Select TimeCreated, ProviderName, Id | Sort TimeCreated                    # 7001 登入、7002 登出、42 睡眠 / 关机（快速启动）、1 醒来 / 开机
 ```
 
 | 看到的 | 原因 |
@@ -390,6 +390,14 @@ B 上现在装的（给以后维护、移除时看）：python.org 的 Python 3.
 | uvicorn 日志 `uvicorn-20261023-085119.log` | 停在 `Uvicorn running on …`，没有 `Shutting down`：是被直接结束的，不是出错 |
 | 处理 | 10:02 `Start-ScheduledTask` → 可以用了（`LastTaskResult` 267009 = `0x41301`，正在执行） |
 
-原因：还没确定。10-23 白天之后脚本和 uvicorn 一起被结束（最可能是登出 Windows），10-24 没有新的登入，所以没有自己启动。要看 Winlogon 的事件、问员工下班是登出、锁屏还是睡眠。
+Windows 事件（10-22 ～ 10-24）：
+
+| 时间 | 事件 | 意思 |
+|---|---|---|
+| 10-22 16:49、10-23 16:45 | 7002 → 187 → 42 → 107 | 员工下班**关机**；B 开着快速启动，关机 = 登出 + 休眠核心，所以 uvicorn 跟着停、`LastBootUpTime` 不变（只有 10-22 09:12 是真的重新启动：109、172） |
+| 10-22 08:56、10-23 08:50 | Power-Troubleshooter 1 → 7001 | 开机、登入 → `start.log` 8–16 秒后有 `启动`（正常） |
+| **10-24 09:18** | Power-Troubleshooter 1 → 7001 | 开机、登入 → **`start.log` 没有 `启动`**：登入没有带起本系统 |
+
+原因：每天关机停掉 uvicorn 是正常的（W54），第二天登入会再启动。**这次是 10-24 09:18 的登入没有启动 `start-chatbot.ps1`**，为什么还没确定（要看 7001 是哪个帐号登入、工作排程器自己的记录、触发条件还在不在）。
 之后要决定：只靠「登入时启动」不够，脚本被结束后要等到下一次登入才回来（`deploy/install-autostart.ps1` 的 `$trigger`）。
 
