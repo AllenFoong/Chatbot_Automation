@@ -168,6 +168,32 @@ Start-ScheduledTask -TaskName Chatbot_Automation
   只用 `Stop-ScheduledTask` 不够：uvicorn 可能还在跑。
 - 拿掉自动启动：`.\deploy\install-autostart.ps1 -Remove`（会先停下本系统）。
 
+### 网页打不开（*This site can't be reached*、`ERR_CONNECTION_REFUSED`）
+
+意思是 port 8000 上没有程序在听（uvicorn 没在跑），不是网络、防火墙的问题。在 B 的 Windows Terminal 照顺序做，**先查、记下来，再启动**（启动会盖掉 `LastRunTime`）：
+
+```powershell
+Test-NetConnection 127.0.0.1 -Port 8000 | Select TcpTestSucceeded          # False = 没在跑
+Get-ScheduledTask -TaskName Chatbot_Automation | Select State                # Running = 脚本还在；Ready = 脚本也没在跑
+Get-Content "$env:LOCALAPPDATA\Chatbot\logs\start.log" -Tail 15
+(Get-CimInstance Win32_OperatingSystem).LastBootUpTime                       # 这次开机的时间
+Get-ScheduledTaskInfo -TaskName Chatbot_Automation | Select LastRunTime, LastTaskResult
+Get-ChildItem "$env:LOCALAPPDATA\Chatbot\logs\uvicorn-*.log" | Sort Name -Desc | Select -First 1 | Get-Content -Tail 20
+Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddDays(-3);
+  ProviderName='Microsoft-Windows-Winlogon','Microsoft-Windows-Kernel-Power','Microsoft-Windows-Power-Troubleshooter'} |
+  Select TimeCreated, ProviderName, Id | Sort TimeCreated                    # 7001 登入、7002 登出、42 睡眠、1 醒来
+```
+
+| 看到的 | 原因 |
+|---|---|
+| `start.log` 最后是 `找不到 …python.exe` | venv 不见了 / 文件夹改过名（第 3、9 节） |
+| `uvicorn 停了（exit code …）` 几次、最后 `不再重开` | 程序启动就出错：看最新的 uvicorn 日志的 Traceback，拿到开发电脑重现 |
+| 最后是 `uvicorn 启动`、后面没有 `停了`；uvicorn 日志停在 `Uvicorn running on …`（没有 `Shutting down`） | 脚本和 uvicorn **一起**被结束了（登出 Windows、工作管理员结束、`stop-chatbot.ps1`），之后没有新的登入，所以没有自己启动。看 Winlogon 7002 / 7001 的时间 |
+| 今天开过机、登入过，`start.log` 却没有今天的 `启动` | 登入没有触发工作排程器：看 `LastTaskResult`（`0x41301` = 267009 是「正在执行」，正常） |
+
+查完再启动、确认：`Start-ScheduledTask -TaskName Chatbot_Automation` → 约 30 秒后 `start.log` 多了 `启动`、`备份`、`清理`、`uvicorn 启动` → `Test-NetConnection` 是 `True` → 网页登入。
+贴结果之前先看一眼有没有名字、号码（规则 4）；上面这些命令本来就只有时间、数目。在第 11 节记下日期、看到的、原因。
+
 ## 7. 装好之后的检查（在 B 上）
 
 | # | 做什么 | 应该看到 |
@@ -351,4 +377,19 @@ B 上现在装的（给以后维护、移除时看）：python.org 的 Python 3.
 - **B 在 PR #23 之后、这次之前，已经装过 A10（`afb06e8`）、改过表（`0005`），没有记录**：什么时候、怎么装的已经查不到。之后每次更新都要记下来（日期、zip 的名字、hash、`alembic current` 前后）。
 - 做安装包前先确认开发电脑在 `main` 的最新版（`git checkout main`、`git pull`）：这次是在测试用的分支上做的，碰巧程序一样。
 - 第 9 节加了：改表前先 `alembic current`、再手动备份一次；解压前 `Test-Path` 是 `True` 就停下来。
+
+### 网页打不开（2026-10-24）
+
+员工打开 <http://localhost:8000> → *This site can't be reached*（`127.0.0.1 refused to connect`）。照第 6 节「网页打不开」查：
+
+| 查的 | 结果 |
+|---|---|
+| port 8000 / 工作排程器 | `False` / `Ready`（脚本和 uvicorn 都没在跑） |
+| `start.log` | 最后一次是 10-23 08:51 `uvicorn 启动`，后面没有 `uvicorn 停了`；10-24 一行都没有 |
+| 开机时间 | 10-22 09:12（之后没有重开机；10-23 08:50 的启动是重新登入） |
+| uvicorn 日志 `uvicorn-20261023-085119.log` | 停在 `Uvicorn running on …`，没有 `Shutting down`：是被直接结束的，不是出错 |
+| 处理 | 10:02 `Start-ScheduledTask` → 可以用了（`LastTaskResult` 267009 = `0x41301`，正在执行） |
+
+原因：还没确定。10-23 白天之后脚本和 uvicorn 一起被结束（最可能是登出 Windows），10-24 没有新的登入，所以没有自己启动。要看 Winlogon 的事件、问员工下班是登出、锁屏还是睡眠。
+之后要决定：只靠「登入时启动」不够，脚本被结束后要等到下一次登入才回来（`deploy/install-autostart.ps1` 的 `$trigger`）。
 
