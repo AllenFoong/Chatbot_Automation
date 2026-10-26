@@ -1194,3 +1194,10 @@ ORDER BY a.AppointmentDate DESC;
   没有记录、新病人、医生停用 → 转员工；别的号码的病人、ID 格式不对；建请求（Customer 记下 ContactID、挂在对话下面、30 分钟、同一位病人再约用同一个 Customer）；
   新病人再用 `N…` 约；GPiS 1 人 + 2 个请求就满了、第 3 个被拒绝而且什么都没存；同一天两次；ORTHO 只能约原来的医生；名字有数字、太短、两个都给 / 都没给；
   时间格式、没有医生、今天、RCT、午休、医生休息；没有对话；出错时之前存好的资料不受影响；终端指令。
+
+### 开发电脑的测试记录（2026-10-26）
+
+- 第 1–9 项全部通过：`pytest` 505 passed、没有 skipped；`GPiS_Dev` 用号码找到的家人位数对得上、名字都藏起来；
+  SSMS 查到的矫正病人，`doctor` 和最近一次 `OR` 的 `DoctorID` 一样；假资料 `G9001`、`G9002`，B 的矫正医生 GOH（星期一）；
+  建请求后 *Requests* 有 DEMO PATIENT A 的卡片；同一天再约被拒绝；`OR` 约 PHANG → `must be … GOH`；新病人约 `OR` → `no earlier ORTHO visit`；已经清理。
+
