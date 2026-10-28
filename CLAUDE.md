@@ -135,7 +135,7 @@
 - [x] Phase 6a-3b 初版（D79）：`find_patients`（只查这段对话的号码：GPiS 预约记录的 HPNo + 本系统的新病人；`GPiS_Dev` 名字不给 AI）、`get_treatment_doctor`（多步骤疗程过去 2 年最近一次的医生）、`create_appointment_request`（再检查一次 + 锁住那天那位医生 + 同一天一个 `PENDING`）；`python -m app.ai_tools patients / doctor / book`；`REMINDER_SOURCE=demo` 有假的病人；没有改表、没有改网页、不用更新 B、`chatbot_reader` 不用改；云端 `pytest` 505 个，全部假数据
 - [x] 6a-3b 开发电脑测试 9 项全部通过（2026-10-26；记录见 `backend/README.md`）
 - [x] 电脑 B 更新到 `605af12`（2026-10-28，记录在 `docs/deploy-pc-b.md` 第 11 节）：D76、D77（员工 10-20 的反馈）、6a-2b / 6a-2c / D75 / 6a-3、改表 `0005` → `0007`；`--check-gpis` 两个 `[OK]`、`start.log` 正常、网页 5 项通过、自动确认 Off。改名被 `explorer.exe` 挡住 → 重新启动 *Windows Explorer*，第 9 节加了做法、解压改用 `Expand-Archive`；改表后的 `alembic current`、手动备份的结果下次补看
-- [x] W61–W72 开发者回答（2026-10-28，记在 `docs/clinic-workflow.md`，决定 D80）：AI 不主动说是 AI（被问时不说是真人）、先不改签名表（上线前请律师看 PDPA）、回答价钱（要价目表）、急症安排最近的时间 + 转员工、一天 20–30 个、三种语言、B 开着时 9AM–9PM、老板付费、员工用手机回复 AI 就停、IC 用来分辨同名的病人
+- [x] W61–W72 开发者回答（2026-10-28，记在 `docs/clinic-workflow.md`，决定 D80）：AI 不主动说是 AI（被问时不说是真人）、先不改签名表（上线前请律师看 PDPA）、回答价钱（要价目表）、急症安排最近的时间 + 转员工、一天 20–30 个、三种语言、B 每天上班一定开机、下班大多会关（不关的晚上 AI 回到 9PM）、老板付费、员工用手机回复 AI 就停、IC 用来分辨同名的病人
 
 ## 下一步
 
