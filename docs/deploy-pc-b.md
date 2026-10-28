@@ -234,8 +234,10 @@ Windows PowerShell 5.1、Python 3.11.9、PostgreSQL 18.6、`GPiS_Dev`（`chatbot
    把 `C:\Chatbot_Automation` 改名成 `C:\Chatbot_Automation.old`（要退回时用）。
    改名前关掉**其他**开在这个文件夹里的东西：别的 PowerShell / Terminal 视窗和分页（例如还在 `(.venv)` 的）、文件总管、从里面打开的记事本。
    `Access to the path ... is denied` = 还有程序在用它：`resmon` → *CPU* → *Associated Handles* 搜 `Chatbot_Automation` 看是哪个程序；
+   是 `explorer.exe`（2026-10-28 就是它，视窗关了也还抓着）→ 工作管理员 → *Windows Explorer* 右键 → *Restart*，再改名；
    **改名没有成功就停在这里，不要解压**（2026-10-13 在 B 上：改名失败后照样解压，第 11 节「更新到 PR #23」）。
-3. 先确认 `Test-Path C:\Chatbot_Automation` 是 `False`（旧的已经改名；是 `True` 就停下来，先查里面是什么），再解压新的到 `C:\Chatbot_Automation`、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
+3. 先确认 `Test-Path C:\Chatbot_Automation` 是 `False`（旧的已经改名；是 `True` 就停下来，先查里面是什么），再解压新的到 `C:\Chatbot_Automation`
+   （用指令 `Expand-Archive "$HOME\Downloads\chatbot-<commit>.zip" C:\Chatbot_Automation`，**不用文件总管**开这个文件夹，下次改名才不会被挡）、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
 4. 先 `alembic current` 记下现在是哪一版。有改表的话，改表前**再手动备份一次**（开机那份没有今天按过的 *Open in WhatsApp*，退回时员工会看不到今天发过谁）：
    ```powershell
    $pgDump = (Get-ChildItem "C:\Program Files\PostgreSQL\*\bin\pg_dump.exe" | Select-Object -First 1).FullName
@@ -351,4 +353,30 @@ B 上现在装的（给以后维护、移除时看）：python.org 的 Python 3.
 - **B 在 PR #23 之后、这次之前，已经装过 A10（`afb06e8`）、改过表（`0005`），没有记录**：什么时候、怎么装的已经查不到。之后每次更新都要记下来（日期、zip 的名字、hash、`alembic current` 前后）。
 - 做安装包前先确认开发电脑在 `main` 的最新版（`git checkout main`、`git pull`）：这次是在测试用的分支上做的，碰巧程序一样。
 - 第 9 节加了：改表前先 `alembic current`、再手动备份一次；解压前 `Test-Path` 是 `True` 就停下来。
+
+### 更新到 `605af12`（2026-10-28，D76、D77 + 6a-2b / 6a-2c / D75 / 6a-3 + 改表 `0007`）
+
+`main` 的 `605af12`（PR #36 合并后）。`.env`、`requirements-lock.txt`、`deploy\` 从 `4f8935b` 起都没改，`.env` 照旧复制。员工当天的提醒发完才做（有改表）。
+
+| 步骤 | 结果 |
+|---|---|
+| 旧文件夹改名成 `.old` | ⚠️ 第一次 `Access denied`：`stop-chatbot.ps1` → `停了 0 个 python.exe`、没有程序从这个文件夹执行；`resmon` 找到 **`explorer.exe` 抓着 `C:\Chatbot_Automation\backend`**（2 个 handle）→ 关掉文件总管 / 重新启动 *Windows Explorer* → ✅ 改名成功 |
+| 解压 | ✅ 用 `Expand-Archive`（不开文件总管） |
+| venv | ✅ 重新建（Python 3.11.9），`pip install -r requirements-lock.txt` |
+| `alembic current`（改表前） | `0005` |
+| 手动备份 | 第一次指令换行断掉（`pg_dump: option requires an argument -- f`），重打一次；`$LASTEXITCODE` 画面上没看到 |
+| `alembic upgrade head` | ✅ `Running upgrade 0005 -> 0006`、`0006 -> 0007` |
+| `alembic current`（改表后） | 画面上只有两行 `INFO`、没有版本号：待确认（见下面） |
+| `--check-gpis` | ✅ 两个 `[OK]`（`chatbot_reader` 只读、读不到 `Tbl_User`、不能备份） |
+| `retention --dry-run` | ✅ `2026-07-30` 之前的提醒 0 条、不用再留的号码 0 个 |
+| 启动 | ✅ `start.log` 16:02：`启动` → `备份：…chatbot-20261028-1602.dump` → `清理：…删了 0 条…删了 0 个` → `uvicorn 启动` |
+| 网页 5 项（ADMIN 先到 *Reminders*、明天的名单、*Requests* 空的 + *Auto-confirm is off*、开关 **Off**、STAFF） | ✅ 开发者说全部完成 |
+| 清理 | ✅ `.old` 删了 |
+
+这次找到的：
+
+- **改名被挡的是文件总管**，不是本系统：之前用文件总管开过 `backend`，视窗关了也还抓着。第 9 节加了：`explorer.exe` 就重新启动 *Windows Explorer*；解压用 `Expand-Archive`，不要用文件总管开这个文件夹。
+- 改表后的 `alembic current`、手动备份的 `$LASTEXITCODE` 画面上没看到，下次去 B 补看（`alembic current` 要是 `0007 (head)`；`backup` 文件夹有 `chatbot-20261028-…` 两个 dump：手动的和 16:02 开机的）。
+- zip 的 hash 没有记下来。下次照第 9 节记：日期、zip 的名字、hash、`alembic current` 前后。
+- 自动确认的开关保持 **Off**；B 上还没有 AI，*Requests* 是空的。
 
