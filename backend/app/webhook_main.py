@@ -1,7 +1,8 @@
 """只有 WhatsApp webhook 的小程序（D35）。
 
 开发时用 tunnel（例如 cloudflared）把它放到网上，让 Meta 把消息送进来。网上只看得到 /webhook：
-看不到 Admin API、/availability（读 GPiS_Dev）和 /docs。它只连本系统的 PostgreSQL，不连 GPiS。
+看不到 Admin API、/availability（读 GPiS_Dev）和 /docs。AI_REPLIES_ENABLED 打开时，背景的 AI 回复会经
+app/ai_tools.py 读 GPiS（空档、找病人），但网上还是只看得到 /webhook（D81）。
 
 启动（在 backend/ 里）：uvicorn app.webhook_main:app --port 8001
 """

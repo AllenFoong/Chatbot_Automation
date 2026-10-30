@@ -13,7 +13,7 @@
 | [`docs/decisions.md`](docs/decisions.md) | 做过的决定和原因、数据安全规则 |
 | [`docs/clinic-workflow.md`](docs/clinic-workflow.md) | 营业时间、医生排班、staff 如何使用 GPiS 预约、Remarks 治疗代码、待确认问题 |
 | [`sql/README.md`](sql/README.md) | Phase 1：查空档的 SQL、测试记录 |
-| [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API；Phase 3：PostgreSQL（安装、建表、改表结构的步骤）；Phase 4a：员工登录、Admin API；Phase 5a：WhatsApp（Meta 测试 App、tunnel、测试清单）；Phase 5b：预约提醒（名单、Open in WhatsApp、测试清单）；资料保留（A10：提醒 90 天后删掉、测试清单）；Phase 6a-1（遮证件号码）、6a-2a（`PENDING` 的请求算占用）、6a-2b（*Entered in GPiS ✓*、*To tell patient*）、6a-2c（自动确认）、6a-3a（AI 查空档的工具）、6a-3b（AI 找病人、建请求），各有测试清单；对照步骤 |
+| [`backend/README.md`](backend/README.md) | Phase 2：FastAPI 空档 API；Phase 3：PostgreSQL（安装、建表、改表结构的步骤）；Phase 4a：员工登录、Admin API；Phase 5a：WhatsApp（Meta 测试 App、tunnel、测试清单）；Phase 5b：预约提醒（名单、Open in WhatsApp、测试清单）；资料保留（A10：提醒 90 天后删掉、测试清单）；Phase 6a-1（遮证件号码）、6a-2a（`PENDING` 的请求算占用）、6a-2b（*Entered in GPiS ✓*、*To tell patient*）、6a-2c（自动确认）、6a-3a（AI 查空档的工具）、6a-3b（AI 找病人、建请求）、6b（AI 回复），各有测试清单；对照步骤 |
 | [`frontend/README.md`](frontend/README.md) | Phase 4b：Admin Platform 网页（React + TypeScript）：安装、启动、测试清单；画面整理（D66）的测试清单；员工账号的删除和看密码的眼睛（D75）、*To tell patient* 弹出视窗的测试清单 |
 | [`docs/deploy-pc-b.md`](docs/deploy-pc-b.md) | 5b 试跑：装到柜台电脑 B（要准备什么、安装、自动启动、备份、检查、先在开发电脑演练和记录、更新、还原备份）；脚本在 `deploy/` |
 | [`docs/pc-b-checklist.md`](docs/pc-b-checklist.md) | 去诊所装电脑 B 的打勾清单：出发前、传档案（Google Drive，不用 USB）、到了先看先问、B 和 A 的步骤和时间、B 不合要求 / 连不上 A 怎么办、离开前 |
@@ -136,6 +136,7 @@
 - [x] 6a-3b 开发电脑测试 9 项全部通过（2026-10-26；记录见 `backend/README.md`）
 - [x] 电脑 B 更新到 `605af12`（2026-10-28，记录在 `docs/deploy-pc-b.md` 第 11 节）：D76、D77（员工 10-20 的反馈）、6a-2b / 6a-2c / D75 / 6a-3、改表 `0005` → `0007`；`--check-gpis` 两个 `[OK]`、`start.log` 正常、网页 5 项通过、自动确认 Off。改名被 `explorer.exe` 挡住 → 重新启动 *Windows Explorer*，第 9 节加了做法、解压改用 `Expand-Archive`；改表后的 `alembic current`、手动备份的结果下次补看
 - [x] W61–W72 开发者回答（2026-10-28，记在 `docs/clinic-workflow.md`，决定 D80）：AI 不主动说是 AI（被问时不说是真人）、先不改签名表（上线前请律师看 PDPA）、回答价钱（要价目表）、急症安排最近的时间 + 转员工、一天 20–30 个、三种语言、B 每天上班一定开机、下班大多会关（不关的晚上 AI 回到 9PM）、老板付费、员工用手机回复 AI 就停、IC 用来分辨同名的病人
+- [x] Phase 6b 初版（D81）：`backend/app/ai_agent.py`：webhook 回完 Meta 在背景让 AI 回（同一段对话一次一个）；先检查 AI 开关、BOT、允许名单、9AM–9PM，不符合就转员工、不送去 AI；对话最近 40 条 + 诊所资料 + 6a-3 的工具 + `hand_over_to_human`；照 D80 说话；出问题一律转员工；`AI_MODEL`（默认 `claude-opus-5-5`）、`AI_EFFORT`、`ANTHROPIC_API_KEY` 在 `.env`；新套件 `anthropic` 2.3.0；没有改表、没有改网页、不用更新 B；云端 `pytest` 529 个（假的 Claude，不连 Anthropic）
 
 ## 下一步
 
@@ -143,7 +144,7 @@
 2. 画面整理（D66，PR #23）：B 已经更新（2026-10-13）。和第 1 项一起，一两个星期后问员工新画面（卡片、☰）好不好用。画面还是英文（D24）。
 3. A10（D67）：B 已经是 `0007`（2026-10-28，包含 A10 的 `0005`）。问诊所 W60（90 天可以吗）。B 2027-01-13 之前每次都是 `删了 0 条`；那之后看一次 `start.log`，确认第一次真的删了。
 4. 更新电脑 B（上次：2026-10-28，`605af12`）：照 `docs/deploy-pc-b.md` 第 9 节（zip 经 Google Drive 链接、对 hash，D64）；更新前先在开发电脑跑过测试。B 上**不跑测试**，读的是主机 A 的正式资料。第一版模板没有按钮（D48）；真的用 Cloud API 发只用假的预约来源 + Meta 测试号码 + 允许名单（D44）。每次测 WhatsApp：cloudflared 重开后要改 Meta 的 *Callback URL*；System User 的 token 60 天失效（D39）；有问题先跑 `python -m app.whatsapp_check`。
-5. Phase 6（AI）：6a-1（遮证件号码）已经合并（PR #31，不用更新 B）；6a-2a 开发电脑测试通过（PR #32）；6a-2a、6a-2b 已经合并（PR #32）；6a-2c（自动确认，D71 ②、D74）程序好了，要在开发电脑照 `backend/README.md`「6a-2c 完成的条件」测 10 项（要升到 `0007`），员工账号的眼睛 / 删除照 `frontend/README.md`（D75）测 7 项；6a-3a（查空档的工具，D78）开发电脑测试通过（2026-10-23）；6a-3b（找病人、原来的医生、建请求，D79）开发电脑测试通过（2026-10-26）；6a-3 完成后是 6b（接 AI，要等 W62）。不做「员工手动建请求」（2026-10-19：员工看了 WhatsApp 直接去 GPiS 约比较快；请求只由 AI 建）。自动确认先关着，员工按一段时间、ADMIN 觉得对得上再打开；B 已经是 `0007`（2026-10-28），下次去 B 补看 `alembic current` 是 `0007 (head)`、`backup` 有 10-28 的手动备份。W61–W72 已回答（D80）：接着写 6b（接 AI，只用假资料 + 自己的手机 + 允许名单）；要诊所的价目表（W64）；上线前请律师看 PDPA 通知 / 跨境传送（W62）。提醒继续手动（D68）；5c 等 AI 要上线才接（BSP + Coexistence，老板签约）。
+5. Phase 6（AI）：6a-1（遮证件号码）已经合并（PR #31，不用更新 B）；6a-2a 开发电脑测试通过（PR #32）；6a-2a、6a-2b 已经合并（PR #32）；6a-2c（自动确认，D71 ②、D74）程序好了，要在开发电脑照 `backend/README.md`「6a-2c 完成的条件」测 10 项（要升到 `0007`），员工账号的眼睛 / 删除照 `frontend/README.md`（D75）测 7 项；6a-3a（查空档的工具，D78）开发电脑测试通过（2026-10-23）；6a-3b（找病人、原来的医生、建请求，D79）开发电脑测试通过（2026-10-26）；6a-3 完成后是 6b（接 AI，要等 W62）。不做「员工手动建请求」（2026-10-19：员工看了 WhatsApp 直接去 GPiS 约比较快；请求只由 AI 建）。自动确认先关着，员工按一段时间、ADMIN 觉得对得上再打开；B 已经是 `0007`（2026-10-28），下次去 B 补看 `alembic current` 是 `0007 (head)`、`backup` 有 10-28 的手动备份。W61–W72 已回答（D80）；6b（接 AI，D81）程序好了，拿到自己的 API key 后照 `backend/README.md`「6b 完成的条件」测 11 项（只用假资料 + 自己的手机 + 允许名单）；接着 6c（Requests 页面配合 AI）、6d（假对话测试集，比较模型）；要诊所的价目表（W64）；上线前请律师看 PDPA 通知 / 跨境传送（W62）。提醒继续手动（D68）；5c 等 AI 要上线才接（BSP + Coexistence，老板签约）。
 6. A1：B 经局域网用只读帐号读 A，已经通了（2026-10-13）。B 下班有时候关（W54）：Phase 6 之前决定长期放哪里（`docs/architecture.md` 9.4）。
 7. 假期：B 已经导入 2026、2027 年（2026-10-13）。2028 年的在 2027 年底前导入、核对回教节日的日期（D61）；诊所临时休息的日子 `admin` 自己加。
 8. A8（还没录入 GPiS 的请求要算占用）是 Phase 6 的第一步（6a），建议的做法在 `docs/architecture.md` 11.6。

@@ -77,8 +77,27 @@ def get_whatsapp_settings() -> WhatsAppSettings:
 
 
 def ai_replies_enabled() -> bool:
-    """AI 回复（Phase 6）。还没有 AI 时是 false：病人的新对话直接交给员工（D37）。"""
+    """AI 回复（Phase 6）。默认 false：病人的新对话直接交给员工（D37）。打开时也只回允许名单的号码（D81）。"""
     return os.environ.get("AI_REPLIES_ENABLED", "false").strip().lower() == "true"
+
+
+AI_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+
+
+@dataclass(frozen=True)
+class AiSettings:
+    """AI 用哪个模型、想多深（6b）。API key 在 ANTHROPIC_API_KEY（SDK 自己读，不经过这里）。"""
+
+    model: str
+    effort: str
+
+
+def get_ai_settings() -> AiSettings:
+    model = os.environ.get("AI_MODEL", "").strip() or "claude-opus-5-5"
+    effort = os.environ.get("AI_EFFORT", "").strip().lower() or "medium"
+    if effort not in AI_EFFORTS:
+        raise RuntimeError(f"AI_EFFORT 要是 {', '.join(AI_EFFORTS)} 其中一个")
+    return AiSettings(model=model, effort=effort)
 
 
 def get_reminder_text():

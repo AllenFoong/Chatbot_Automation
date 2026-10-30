@@ -4,7 +4,7 @@
 - POST /webhook：先检查签名（X-Hub-Signature-256），不是 Meta 送来的一律不处理。
 - 同一条消息 Meta 可能送两次：record_incoming_message 用 wa_message_id 去重。
 - 处理失败（例如数据库连不上）回 500，Meta 会再送一次；处理好了回 200。
-- 还没有 AI（Phase 6）：新对话直接交给员工（D37）。
+- AI_REPLIES_ENABLED 没打开：新对话直接交给员工（D37）。打开了：回完 Meta 之后在背景让 AI 回复（app/ai_agent.py，D81）。
 - 病人传的 IC / 护照号码：存之前先遮掉后面 6 位（D69，app/redact.py）。
 """
 
@@ -14,10 +14,11 @@ import hmac
 import json
 import logging
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
+from . import ai_agent
 from .config import WhatsAppSettings, ai_replies_enabled, get_whatsapp_settings
 from .db import conversations as conv
 from .db.models import ConversationMode
@@ -53,6 +54,7 @@ def verify(
 
 @router.post("/webhook")
 def receive(
+    background: BackgroundTasks,
     body: bytes = Depends(_raw_body),
     signature: str | None = Header(None, alias="X-Hub-Signature-256"),
     settings: WhatsAppSettings = Depends(get_whatsapp_settings),
@@ -71,6 +73,7 @@ def receive(
 
     messages, statuses = parse_webhook(payload, settings.phone_number_id)
     new = 0
+    ai_turns: set[int] = set()
     for m in messages:
         try:
             message, is_new = conv.record_incoming_message(
@@ -82,10 +85,16 @@ def receive(
         if is_new:
             new += 1
             conversation = message.conversation
-            if not ai_replies_enabled() and conversation.mode == ConversationMode.BOT:
-                conv.hand_over_to_human(session, conversation, AI_OFF_REASON)
+            if conversation.mode == ConversationMode.BOT:
+                if ai_replies_enabled():
+                    ai_turns.add(conversation.id)
+                else:
+                    conv.hand_over_to_human(session, conversation, AI_OFF_REASON)
     for s in statuses:
         conv.update_message_status(session, s.wa_message_id, s.status, s.error)
     session.commit()
+    # AI 要几秒到几十秒：先回 Meta（不然它会再送一次），回完才跑。同一段对话的几条消息只跑一次
+    for conversation_id in sorted(ai_turns):
+        background.add_task(ai_agent.reply_in_background, conversation_id)
     log.info("webhook：%d 条新消息、%d 个送达状态", new, len(statuses))
     return {"received": len(messages) + len(statuses)}
