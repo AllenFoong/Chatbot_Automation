@@ -176,9 +176,23 @@ def test_new_message_goes_to_staff_while_ai_is_off(webhook, session):
 
 
 def test_new_message_stays_with_ai_when_ai_is_on(webhook, session, monkeypatch):
+    """AI 打开：对话留给 AI，回完 Meta 之后在背景回复；同一段对话的几条消息只排一次（D81）。"""
     monkeypatch.setenv("AI_REPLIES_ENABLED", "true")
+    scheduled = []
+    monkeypatch.setattr("app.webhook.ai_agent.reply_in_background", scheduled.append)
+    webhook.post_signed(payload([text("w1"), text("w2", "明天早上可以吗")]))
+    msg = session.scalars(select(Message).order_by(Message.id)).first()
+    assert msg.conversation.mode == ConversationMode.BOT
+    assert scheduled == [msg.conversation_id]
+    webhook.post_signed(payload([text("w2", "明天早上可以吗")]))          # Meta 重送：不再排
+    assert scheduled == [msg.conversation_id]
+
+
+def test_no_ai_turn_while_ai_is_off(webhook, session, monkeypatch):
+    scheduled = []
+    monkeypatch.setattr("app.webhook.ai_agent.reply_in_background", scheduled.append)
     webhook.post_signed(payload([text("w1")]))
-    assert session.scalars(select(Message)).one().conversation.mode == ConversationMode.BOT
+    assert scheduled == []
 
 
 def test_id_numbers_are_masked_before_saving(webhook, session):
