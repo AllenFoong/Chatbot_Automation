@@ -137,6 +137,19 @@ def test_history_is_merged_and_starts_with_the_patient(db):
     ]
 
 
+def test_staff_messages_are_marked_in_history(db):
+    c = incoming(db, "Hi", "w1")
+    conv.record_outgoing_message(db, c, Sender.STAFF, "好的哟，已经帮你预约了哦")   # 员工发 = 接手
+    conv.hand_back_to_bot(db, c)
+    conv.record_outgoing_message(db, c, Sender.BOT, "Anything else?")
+    incoming(db, "你好", "w2")
+    claude = FakeClaude(response(text_block("好的")))
+    run(db, c, claude)
+    assert claude.calls[0]["messages"][1] == {
+        "role": "assistant", "content": "[Staff] 好的哟，已经帮你预约了哦\nAnything else?"}
+    assert "never correct" in str(claude.calls[0]["system"])
+
+
 # ---------- 工具 ----------
 
 def test_booking_with_tools(db):

@@ -1616,6 +1616,13 @@ ul.error {
   gap: 12px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
+  /* 往下滑时名字和按钮留在上面；负的 margin 盖住 .detail-pane 的 padding，消息不会从上面露出来 */
+  position: sticky;
+  top: -18px;
+  z-index: 1;
+  margin-top: -18px;
+  padding-top: 18px;
+  background: var(--surface);
 }
 
 .detail-title {
