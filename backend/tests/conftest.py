@@ -25,6 +25,12 @@ def _no_auto_confirm_loop(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _ai_off_unless_a_test_turns_it_on(monkeypatch):
+    """.env 的 AI_REPLIES_ENABLED=true（开发电脑测 6b 时）不能影响测试；要 AI 的测试自己 setenv。"""
+    monkeypatch.setenv("AI_REPLIES_ENABLED", "false")
+
+
+@pytest.fixture(autouse=True)
 def _never_use_dev_database(monkeypatch):
     """测试绝不能连 DATABASE_URL（开发用的数据库），只能用 TEST_DATABASE_URL。"""
 
