@@ -1709,6 +1709,13 @@ ul.error {
   gap: 8px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
+  /* 和 .detail-header 一样：回复格子留在下面，消息在中间滑 */
+  position: sticky;
+  bottom: -18px;
+  z-index: 1;
+  margin-bottom: -18px;
+  padding-bottom: 18px;
+  background: var(--surface);
 }
 
 .reply .row-between {
