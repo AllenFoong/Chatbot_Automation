@@ -317,3 +317,12 @@ def test_ai_settings(monkeypatch):
     monkeypatch.setenv("AI_EFFORT", "turbo")
     with pytest.raises(RuntimeError):
         get_ai_settings()
+
+
+def test_greeting_menu_is_in_one_language(db):
+    c = incoming(db, "你好")
+    claude = FakeClaude(response(text_block("好的")))
+    run(db, c, claude)
+    system = str(claude.calls[0]["system"])
+    assert "only in the person's language" in system
+    assert "Consultation 询问价格" in system and "Konsultasi (tanya harga)" in system
