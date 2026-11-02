@@ -327,6 +327,8 @@ def test_greeting_menu_is_in_one_language(db):
     system = str(claude.calls[0]["system"])
     assert "only in the person's language" in system
     assert "Consultation 询问价格" in system and "Konsultasi (tanya harga)" in system
+    assert "One language per message, never two" in system and "do not change the language" in system
+    assert "say only what changes" in system and "at most 3 short lines" in system
 
 
 # ---------- 早上接着回昨晚的消息 ----------

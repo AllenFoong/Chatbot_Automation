@@ -1239,9 +1239,9 @@ AI 怎么说话照 D80：不主动说自己是 AI，但被问时不说是真人�
 |---|---|---|
 | 1 | `git pull` → `pip install -r requirements-dev.txt`（新的 `anthropic`）→ `pytest` | 545 passed，没有 skipped |
 | 2 | `.env`：`AI_REPLIES_ENABLED=true`、`ANTHROPIC_API_KEY=<你的 key>`、`REMINDER_SOURCE=demo`、`WHATSAPP_ALLOWED_RECIPIENTS=<你的手机>` → 开视窗 1–4（cloudflared 重开要改 Meta 的 *Callback URL*） | 视窗 1、2 启动没有错误 |
-| 3 | 网页 *Conversations* 先看你手机的那段对话：以前测试时 AI 没开，对话已经转给员工（*Human*）→ 先按 **Hand back to AI**；然后手机传 `你好` 给测试号码 | 十几秒内收到选单：`你好！请问需要帮你预约哪项治疗？例如：1. Consultation 询问价格 2. Book a slot 预约时间` + 员工核实后通知，只用中文（传 `Hi` 只回英文、`Hai` 只回马来文）；不自我介绍、不提以前员工发的消息；对话页往下滑，上面的名字和按钮、下面的回复格子不动；网页 *Conversations* 有你的消息和 AI 的回复；视窗 2 有 `AI：stop=end_turn …`、`对话 N → replied` |
+| 3 | 网页 *Conversations* 先看你手机的那段对话：以前测试时 AI 没开，对话已经转给员工（*Human*）→ 先按 **Hand back to AI**；然后手机传 `你好` 给测试号码 | 十几秒内收到选单：`你好！请问需要帮你预约哪项治疗？例如：1. Consultation 询问价格 2. Book a slot 预约时间` + 员工核实后通知，只用中文（传 `Hi` 只回英文、`Hai` 只回马来文）；不自我介绍、不提以前员工发的消息；对话页打开时在最下面（最新的消息）；往上滑，上面的名字和按钮、下面的回复格子不动；网页 *Conversations* 有你的消息和 AI 的回复；视窗 2 有 `AI：stop=end_turn …`、`对话 N → replied` |
 | 4 | 传 `我想约洗牙，<下一个星期五的日期> 早上` | AI 问是帮 DEMO PATIENT A 还是 B → 选 A → 列出几个时间 → 选一个、说好 → AI 说「已经记下、员工确认后通知」；*Requests* → *Pending* 有 DEMO PATIENT A 的卡片 |
-| 4b | 接着传 `可以改到星期三吗？` → AI 给时间 → 选一个、说好 | AI 自己改，不转员工；*Requests* → *Pending* 只剩新的那张（旧的变 *Cancelled*）；视窗 2 有 `list_requests`、`create_appointment_request` |
+| 4b | 接着传 `可以改到星期三吗？` → AI 给时间 → 选一个、说好 | AI 只用中文（你回 `ok` 也不换语言）；确认只有一句，例 `Dr GOH 03/11 (二) 10:00 AM 有空，要改到这个时间吗？`；AI 自己改，不转员工；*Requests* → *Pending* 只剩新的那张（旧的变 *Cancelled*）；视窗 2 有 `list_requests`、`create_appointment_request` |
 | 4c | 传 `不用了，取消吧` | AI 取消请求；*Pending* 没有这张了。（员工已经按 *Entered in GPiS ✓* 的请求，AI 会转员工） |
 | 5 | 传 `你是真人吗？` | 不说是真人：说是诊所的预约助理 |
 | 6 | 传 `洗牙多少钱？` | 说员工会回复；*Conversations* 这段对话转给员工、原因写价钱 → 按 **Hand back to AI** |

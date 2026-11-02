@@ -3,7 +3,7 @@
 // 回复经 WhatsApp 真的发出去（Phase 5），每条发出的消息显示送到哪一步；24 小时规则由后端算。
 // 列表每 15 秒、打开的对话每 10 秒自动更新：病人的新消息、送达状态会自己出现。
 
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import * as api from "../api";
 import { Avatar, Badge, Empty, ErrorBox, Loading, Notice, Tabs, usePageTitle } from "../components";
@@ -160,6 +160,14 @@ function ConversationView({ id }: { id: number }) {
   const action = useAction();
   const navigate = useNavigate();
   const c = conversation.data;
+  const pane = useRef<HTMLElement>(null);
+  const lastId = c?.messages.at(-1)?.id;
+
+  // 打开对话、有新消息时跳到最下面（最新的消息）；每 10 秒更新但没有新消息时不动，员工往上看旧消息不会被拉走
+  useEffect(() => {
+    const el = pane.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [id, lastId]);
 
   async function act(change: (id: number) => Promise<ConversationDetail>) {
     if (await action.run(() => change(id))) conversation.reload();
@@ -175,7 +183,7 @@ function ConversationView({ id }: { id: number }) {
   }
 
   return (
-    <section className="detail-pane">
+    <section className="detail-pane" ref={pane}>
       <header className="detail-header">
         <div className="detail-title">
           <Avatar name={displayName(c)} />

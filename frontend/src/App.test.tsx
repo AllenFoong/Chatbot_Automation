@@ -485,6 +485,25 @@ describe("conversations", () => {
   });
 });
 
+describe("opening a conversation", () => {
+  it("jumps to the newest message", async () => {
+    const height = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(900);
+    fakeApi({
+      "GET /api/auth/me": ok(STAFF),
+      "GET /api/requests?to_tell=true": ok([]),
+      "GET /api/requests?status=PENDING": ok([]),
+      "GET /api/conversations?mode=HUMAN": ok([]),
+      "GET /api/conversations": ok([fakeConversation()]),
+      "GET /api/conversations/5": ok(fakeConversation()),
+    });
+    renderApp("/conversations/5");
+    await screen.findByText("Hi, can I book scaling?");
+    const pane = document.querySelector<HTMLElement>(".detail-pane:not(.placeholder)")!;
+    await waitFor(() => expect(pane.scrollTop).toBe(900));
+    height.mockRestore();
+  });
+});
+
 describe("replying to the patient", () => {
   it("sends the reply and shows its delivery status", async () => {
     let replied = false;
