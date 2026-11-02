@@ -416,3 +416,31 @@ def test_catch_up_loop_runs_and_stops(monkeypatch):
     loop.start()
     assert called.wait(2)
     loop.stop()
+
+
+# ---------- 语言 ----------
+
+@pytest.mark.parametrize(("body", "lang"), [
+    ("可以改到11点吗", "zh"), ("明天dr phang", "zh"), ("Can I change to Wednesday?", "en"),
+    ("morning, hello", "en"), ("Boleh saya buat temujanji minggu depan?", "ms"), ("Hai", "ms"),
+    ("ok", None), ("yes", None), ("2", None), ("Zhong li", None), ("👍", None), ("[Image] cat", None),
+])
+def test_message_language(body, lang):
+    assert ai_agent.message_language(body) == lang
+
+
+def test_reply_language_follows_the_latest_message_with_words(db):
+    c = incoming(db, "Can I book scaling?", "w1")
+    conv.record_outgoing_message(db, c, Sender.BOT, "Sure")
+    incoming(db, "要换成10点", "w2")
+    incoming(db, "yes", "w3")                       # 不换语言：还是中文
+    claude = FakeClaude(response(text_block("好的")))
+    run(db, c, claude)
+    assert "Write this whole reply in Chinese (简体中文) only" in str(claude.calls[0]["system"])
+
+
+def test_no_language_note_when_nothing_tells(db):
+    c = incoming(db, "2")
+    claude = FakeClaude(response(text_block("Hi")))
+    run(db, c, claude)
+    assert "Write this whole reply in" not in str(claude.calls[0]["system"])

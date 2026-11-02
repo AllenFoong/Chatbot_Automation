@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
@@ -203,7 +204,8 @@ def system_prompt(session: Session, today: date) -> str:
         "questions about the clinic.",
         "",
         "How to talk:",
-        "- One language per message, never two. Use the language of the person's latest message that has real "
+        "- One language per message, never two, never a translation underneath. The examples in these rules are "
+        "in English only to show what to say. Use the language of the person's latest message that has real "
         "words (Chinese, English or Malay). Short replies such as ok, yes, 好, 2 or an emoji do not change the "
         "language: keep the one you were using.",
         "- People read this on a phone: at most 3 short lines, friendly, no markdown, no lists of details the "
@@ -266,6 +268,46 @@ def system_prompt(session: Session, today: date) -> str:
         "",
         f"Today is {today.isoformat()} ({weekday}), Malaysia time.",
     ])
+
+
+# ---------- 这次用哪一种语言（程序决定，不靠 AI 猜：AI 会照抄英文例句、变成双语） ----------
+
+_CJK = re.compile(r"[\u3400-\u9fff]")
+_WORD = re.compile(r"[a-z]+")
+_MALAY = {"saya", "boleh", "nak", "tak", "tidak", "temujanji", "esok", "lusa", "hari", "gigi", "terima", "kasih",
+          "minggu", "depan", "pagi", "petang", "ada", "untuk", "dengan", "buat", "mahu", "hendak", "berapa",
+          "harga", "doktor", "klinik", "bila", "tukar", "batal", "hai", "selamat", "sakit", "cuci", "jam", "pukul",
+          "macam", "mana", "apa", "kami", "anak", "isteri", "suami", "ini", "itu", "dan", "atau", "jumpa"}
+_ENGLISH = {"i", "can", "the", "to", "my", "is", "are", "book", "want", "please", "change", "what", "how", "when",
+            "appointment", "hi", "hello", "morning", "afternoon", "evening", "thanks", "thank", "you", "for", "a",
+            "an", "do", "does", "have", "need", "would", "like", "tomorrow", "today", "next", "week", "cancel",
+            "time", "free", "check", "cleaning", "teeth", "tooth", "pain", "price", "much", "may", "know", "around",
+            "it", "me", "on", "at", "of", "and", "or", "not", "dont", "don", "with", "will", "this", "that", "sorry"}
+LANGUAGES = {"zh": "Chinese (简体中文)", "en": "English", "ms": "Malay (Bahasa Melayu)"}
+
+
+def message_language(body: str) -> str | None:
+    """一条病人消息是哪一种语言；ok、yes、2、名字、表情符号这种看不出来的 → None（不换语言）。"""
+    if body.startswith("["):                  # [Image] [Reaction] 之类
+        return None
+    if _CJK.search(body):
+        return "zh"
+    words = _WORD.findall(body.lower())
+    ms = sum(w in _MALAY for w in words)
+    en = sum(w in _ENGLISH for w in words)
+    if ms > en:
+        return "ms"
+    if en > ms:
+        return "en"
+    return None
+
+
+def reply_language(session: Session, conversation: Conversation) -> str | None:
+    """病人最新一条看得出语言的消息（最近 HISTORY_LIMIT 条里找）。"""
+    bodies = session.scalars(select(Message.body).where(
+        Message.conversation_id == conversation.id, Message.sender == Sender.CUSTOMER,
+    ).order_by(Message.id.desc()).limit(HISTORY_LIMIT))
+    return next((lang for lang in map(message_language, bodies) if lang), None)
 
 
 # ---------- 对话 → 给 AI 的 messages ----------
@@ -383,6 +425,10 @@ def reply(
 
     today = local.date()
     system = system_prompt(session, today)
+    lang = reply_language(session, conversation)
+    if lang:
+        system += (f"\n\nWrite this whole reply in {LANGUAGES[lang]} only, every line, even though the examples "
+                   "above are in English. Do not add a translation.")
     if late:
         system += ("\n\nThe person's last messages came in after hours (9PM–9AM); this reply goes out this morning. "
                    "Start with a short sorry for the late reply.")
