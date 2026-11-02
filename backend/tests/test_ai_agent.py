@@ -107,6 +107,7 @@ def test_what_is_sent_to_claude(db):
     assert call["fallbacks"] == "default" and call["betas"] == ["server-side-fallback-2026-07-01"]
     assert [t["name"] for t in call["tools"]] == ["find_patients", "get_treatment_doctor", "check_available_slots",
                                                   "find_next_available", "create_appointment_request",
+                                                  "list_requests", "cancel_appointment_request",
                                                   "hand_over_to_human"]
     assert call["messages"] == [{"role": "user", "content": "我想洗牙"}]
     system = call["system"]

@@ -118,8 +118,28 @@ TOOLS: list[dict] = [
                 "time": {"type": "string", "description": "HH:MM, 24 hours, one of the free times"},
                 "patient_id": {"type": "string", "description": "From find_patients"},
                 "new_patient_name": {"type": "string", "description": "For a new patient: the name only"},
+                "replaces_request_id": {"type": "integer", "description": "To move a PENDING request from "
+                                        "list_requests to this new time; the old one is cancelled"},
             },
             "required": ["service", "doctor", "date", "time"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "list_requests",
+        "description": "Upcoming booking requests made in this chat, with their status: PENDING (waiting for "
+                       "staff) or CONFIRMED (entered in the clinic system). Call it when the person asks about, "
+                       "changes or cancels a booking.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "cancel_appointment_request",
+        "description": "Cancel a PENDING request from list_requests after the person has said they want to "
+                       "cancel it. Not for moving it to another time (use replaces_request_id).",
+        "input_schema": {
+            "type": "object",
+            "properties": {"request_id": {"type": "integer", "description": "From list_requests"}},
+            "required": ["request_id"],
             "additionalProperties": False,
         },
     },
@@ -220,7 +240,10 @@ def system_prompt(session: Session, today: date) -> str:
         "urgent=true.",
         "- Complaints, or the person wants to talk to staff.",
         "- Medical questions (whether to extract, which medicine): do not answer.",
-        "- Changing or cancelling an existing appointment: ask for the details, then hand over.",
+        "- Changing or cancelling a booking: call list_requests. A PENDING request from this chat you handle "
+        "yourself: for a new time check the free times, repeat the new details, and after the person agrees call "
+        "create_appointment_request with replaces_request_id; to cancel, call cancel_appointment_request. "
+        "A CONFIRMED request, or an appointment not in the list: ask what they want, then hand over.",
         "- Prices: there is no price list yet. Say staff will reply about the price, and hand over.",
         "- Photos, voice messages or documents: say staff will check them, and hand over.",
         "- A tool says to hand over, or you still do not understand what the person wants after 3 tries.",
@@ -281,7 +304,12 @@ def _run_tool(ctx: ai_tools.ToolContext, name: str, args: dict) -> dict:
         return ai_tools.find_next_available(ctx, a.get("service"), a.get("doctor"), a.get("from_date"))
     if name == "create_appointment_request":
         return ai_tools.create_appointment_request(ctx, a.get("service"), a.get("doctor"), a.get("date"),
-                                                   a.get("time"), a.get("patient_id"), a.get("new_patient_name"))
+                                                   a.get("time"), a.get("patient_id"), a.get("new_patient_name"),
+                                                   a.get("replaces_request_id"))
+    if name == "list_requests":
+        return ai_tools.list_requests(ctx)
+    if name == "cancel_appointment_request":
+        return ai_tools.cancel_appointment_request(ctx, a.get("request_id"))
     return {"error": f"Unknown tool {name!r}."}
 
 

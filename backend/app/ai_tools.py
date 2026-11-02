@@ -28,7 +28,7 @@ from .availability import check_available_slots as compute_day
 from .clinic_rules import ClinicRules
 from .confirm import may_send
 from .db.appointment_requests import create_appointment_request as add_request
-from .db.appointment_requests import held_requests
+from .db.appointment_requests import cancel_request, held_requests
 from .db.customers import create_customer, customers_booked_via, find_customers_by_phone
 from .db.models import (
     AppointmentRequest,
@@ -382,25 +382,28 @@ def get_treatment_doctor(ctx: ToolContext, patient_id: str, service: str) -> dic
 
 @_tool
 def create_appointment_request(ctx: ToolContext, service: str, doctor: str, date: str, time: str,
-                               patient_id: str | None = None, new_patient_name: str | None = None) -> dict:
+                               patient_id: str | None = None, new_patient_name: str | None = None,
+                               replaces_request_id: int | str | None = None) -> dict:
     """建一个 PENDING 的请求（员工录入 GPiS 后才算约好）。建之前再查一次那个时间还有没有空。
 
     病人二选一：patient_id（find_patients 给的）或 new_patient_name（新病人，只要名字）。
+    replaces_request_id：病人要改时间。这段对话自己的 PENDING 请求，新的存好才取消旧的（同一个 transaction）。
     回传：{"request_id", "status": "PENDING", "patient_id", "service", "doctor", "date", "weekday", "time", "message"}。
     """
     session = ctx.session
     try:
-        return _create(ctx, service, doctor, date, time, patient_id, new_patient_name)
+        return _create(ctx, service, doctor, date, time, patient_id, new_patient_name, replaces_request_id)
     except ToolError:
         session.rollback()          # 什么都不留；也放开锁
         raise
 
 
 def _create(ctx: ToolContext, service: str, doctor: str, date_: str, time_: str,
-            patient_id: str | None, new_patient_name: str | None) -> dict:
+            patient_id: str | None, new_patient_name: str | None, replaces_request_id=None) -> dict:
     session = ctx.session
     if ctx.conversation is None:
         raise ToolError("This tool needs the WhatsApp conversation.")
+    old = _own_pending(ctx, replaces_request_id) if replaces_request_id not in (None, "") else None
     day = _bookable_date(date_, ctx)
     svc = _ai_service(session, service)
     slot = _parse_time(time_)
@@ -428,6 +431,11 @@ def _create(ctx: ToolContext, service: str, doctor: str, date_: str, time_: str,
     # 同一个时间同时有两段对话在约：锁住这天这位医生，第二个要等第一个存好，再查一次就看得到它的请求
     session.execute(text("SELECT pg_advisory_xact_lock(:lock, hashtext(:key))"),
                     {"lock": SLOT_LOCK, "key": f"{day.isoformat()} {doc.id}"})
+    if old is not None:
+        # 改时间：旧的先取消（还没 commit），同一天、同一格就不算重复、不算占用；下面出错会 rollback，旧的还在
+        if old.customer_id != (p.customer.id if p.customer is not None else None) and not _same_patient(old, p):
+            raise ToolError(f"Request {old.id} is for a different patient. Use that patient's patient_id.")
+        cancel_request(session, old)
 
     customer = p.customer
     if customer is None and p.contact_id is not None:
@@ -454,7 +462,7 @@ def _create(ctx: ToolContext, service: str, doctor: str, date_: str, time_: str,
     request = add_request(session, customer, svc.code, conversation=ctx.conversation, doctor_id=doc.id,
                           preferred_date=day, preferred_slot=slot, duration_minutes=30)
     session.commit()
-    return {
+    out = {
         "request_id": request.id,
         "status": "PENDING",
         "patient_id": p.patient_id or f"N{customer.id}",
@@ -466,6 +474,79 @@ def _create(ctx: ToolContext, service: str, doctor: str, date_: str, time_: str,
         "message": "Saved as a request. Tell the patient the clinic will confirm after staff enter it "
                    "(during opening hours).",
     }
+    if old is not None:
+        out["replaced_request_id"] = old.id
+        out["message"] = (f"Saved, and request {old.id} is cancelled. Tell the patient the new time is a request; "
+                          "the clinic will confirm after staff enter it.")
+    return out
+
+
+def _same_patient(request: AppointmentRequest, p: _Patient) -> bool:
+    return p.contact_id is not None and request.customer.gpis_contact_id == p.contact_id
+
+
+def _own_pending(ctx: ToolContext, request_id) -> AppointmentRequest:
+    """这段对话自己建的请求（AI 不能动别的对话的）；只有 PENDING 的能改、能取消。"""
+    try:
+        rid = int(str(request_id).strip())
+    except ValueError:
+        raise ToolError(f"request_id {request_id!r} is not valid. Use a request_id from list_requests.") from None
+    req = ctx.session.get(AppointmentRequest, rid)
+    if req is None or ctx.conversation is None or req.conversation_id != ctx.conversation.id:
+        raise ToolError(f"Request {rid} is not from this chat. Call list_requests.")
+    if req.status == RequestStatus.CONFIRMED:
+        raise ToolError(f"Request {rid} is already confirmed in the clinic system. To change or cancel it, ask "
+                        "what the patient wants, then hand over to staff.")
+    if req.status != RequestStatus.PENDING:
+        raise ToolError(f"Request {rid} is {req.status.value.lower()}: nothing to change.")
+    return req
+
+
+def _request_out(ctx: ToolContext, req: AppointmentRequest) -> dict:
+    c = req.customer
+    hide = c.gpis_contact_id is not None and not _may_show_names(ctx)
+    return {
+        "request_id": req.id,
+        "status": req.status.value,
+        "patient_id": f"G{c.gpis_contact_id}" if c.gpis_contact_id is not None else f"N{c.id}",
+        "name": HIDDEN_NAME if hide else c.name,
+        "service": req.service_code,
+        "doctor": req.doctor_id,
+        "date": req.preferred_date.isoformat() if req.preferred_date else None,
+        "weekday": req.preferred_date.strftime("%A") if req.preferred_date else None,
+        "time": req.preferred_slot.strftime("%H:%M") if req.preferred_slot else None,
+    }
+
+
+@_tool
+def list_requests(ctx: ToolContext) -> dict:
+    """这段对话建过、日期还没过的请求（PENDING = 等员工；CONFIRMED = 已经录入 GPiS）。
+
+    回传：{"requests": [{"request_id", "status", "patient_id", "name", "service", "doctor", "date", "weekday",
+    "time"}], "message"}。
+    """
+    if ctx.conversation is None:
+        raise ToolError("This tool needs the WhatsApp conversation.")
+    rows = ctx.session.scalars(select(AppointmentRequest).where(
+        AppointmentRequest.conversation_id == ctx.conversation.id,
+        AppointmentRequest.status.in_([RequestStatus.PENDING, RequestStatus.CONFIRMED]),
+        AppointmentRequest.preferred_date >= ctx.today,
+    ).order_by(AppointmentRequest.preferred_date, AppointmentRequest.preferred_slot))
+    requests = [_request_out(ctx, r) for r in rows]
+    return {"requests": requests, "message": (
+        "PENDING requests can be changed (create_appointment_request with replaces_request_id) or cancelled "
+        "(cancel_appointment_request). CONFIRMED ones are in the clinic system: hand over to staff to change them."
+        if requests else "No upcoming requests from this chat. An appointment made another way: hand over to staff.")}
+
+
+@_tool
+def cancel_appointment_request(ctx: ToolContext, request_id) -> dict:
+    """病人不要了：取消这段对话自己的 PENDING 请求（还没录入 GPiS，员工不用做什么）。"""
+    req = _own_pending(ctx, request_id)
+    cancel_request(ctx.session, req)
+    ctx.session.commit()
+    return {"request_id": req.id, "status": "CANCELLED",
+            "message": "Cancelled. Tell the patient the request is cancelled."}
 
 
 # ---------- 在终端试（开发电脑；印出来的就是 AI 会收到的，没有病人资料） ----------

@@ -297,3 +297,76 @@ def test_command_line_patients_with_demo_data(db, monkeypatch, capsys):
     assert "DEMO PATIENT A" in printed and "DEMO PATIENT B" in printed
     assert ai_tools.main(["book", "0120000001", "S+P", "PHANG", "2026-12-01", "10:00", "--new-name", "Demo"]) == 1
     assert "No open conversation" in capsys.readouterr().out
+
+
+# ---------- 改时间、取消（这段对话自己的 PENDING 请求） ----------
+
+def test_move_a_pending_request_to_another_day(db, conversation):
+    first = ai_tools.create_appointment_request(ctx_for(db, conversation), "S+P", "PHANG", "2026-10-23", "10:00",
+                                                patient_id="G502")
+    listed = ai_tools.list_requests(ctx_for(db, conversation))["requests"]
+    assert listed == [{"request_id": first["request_id"], "status": "PENDING", "patient_id": "G502",
+                       "name": "DEMO KID", "service": "S+P", "doctor": "PHANG", "date": "2026-10-23",
+                       "weekday": "Friday", "time": "10:00"}]
+    out = ai_tools.create_appointment_request(ctx_for(db, conversation), "S+P", "PHANG", "2026-10-24", "11:00",
+                                              patient_id="G502", replaces_request_id=first["request_id"])
+    assert out["replaced_request_id"] == first["request_id"] and "is cancelled" in out["message"]
+    old, new = requests(db)
+    assert (old.status, new.status, new.preferred_date) == (RequestStatus.CANCELLED, RequestStatus.PENDING,
+                                                             date(2026, 10, 24))
+
+
+def test_move_to_another_time_on_the_same_day(db, conversation):
+    """同一天改时间：旧的先取消，不算「同一天约两次」。"""
+    first = ai_tools.create_appointment_request(ctx_for(db, conversation), "S+P", "PHANG", "2026-10-23", "10:00",
+                                                patient_id="G502")
+    out = ai_tools.create_appointment_request(ctx_for(db, conversation), "S+P", "PHANG", "2026-10-23", "15:00",
+                                              patient_id="G502", replaces_request_id=first["request_id"])
+    assert out["time"] == "15:00"
+    assert [r.status for r in requests(db)] == [RequestStatus.CANCELLED, RequestStatus.PENDING]
+
+
+def test_failed_move_keeps_the_old_request(db, conversation):
+    first = ai_tools.create_appointment_request(ctx_for(db, conversation), "S+P", "PHANG", "2026-10-23", "10:00",
+                                                patient_id="G502")
+    out = ai_tools.create_appointment_request(ctx_for(db, conversation), "S+P", "PHANG", "2026-10-23", "12:00",
+                                              patient_id="G502", replaces_request_id=first["request_id"])
+    assert "is not free" in out["error"]
+    out = ai_tools.create_appointment_request(ctx_for(db, conversation), "S+P", "PHANG", "2026-10-24", "10:00",
+                                              patient_id="G501", replaces_request_id=first["request_id"])
+    assert "different patient" in out["error"]
+    assert [r.status for r in requests(db)] == [RequestStatus.PENDING]
+
+
+def test_cancel_a_pending_request(db, conversation):
+    first = ai_tools.create_appointment_request(ctx_for(db, conversation), "S+P", "PHANG", "2026-10-23", "10:00",
+                                                patient_id="G502")
+    out = ai_tools.cancel_appointment_request(ctx_for(db, conversation), first["request_id"])
+    assert out["status"] == "CANCELLED"
+    assert ai_tools.list_requests(ctx_for(db, conversation))["requests"] == []
+    assert "nothing to change" in ai_tools.cancel_appointment_request(ctx_for(db, conversation),
+                                                                      first["request_id"])["error"]
+
+
+def test_only_this_chats_pending_requests_can_change(db, conversation):
+    first = ai_tools.create_appointment_request(ctx_for(db, conversation), "S+P", "PHANG", "2026-10-23", "10:00",
+                                                patient_id="G502")
+    other = conv.open_conversation(db, conv.get_or_create_wa_contact(db, OTHER_PHONE))
+    db.commit()
+    out = ai_tools.cancel_appointment_request(ctx_for(db, other), first["request_id"])
+    assert "not from this chat" in out["error"]
+    assert "is not valid" in ai_tools.cancel_appointment_request(ctx_for(db, conversation), "abc")["error"]
+    r = requests(db)[0]
+    r.status, r.handled_at = RequestStatus.CONFIRMED, func.now()
+    db.commit()
+    assert ai_tools.list_requests(ctx_for(db, conversation))["requests"][0]["status"] == "CONFIRMED"
+    out = ai_tools.cancel_appointment_request(ctx_for(db, conversation), r.id)
+    assert "already confirmed" in out["error"] and "hand over" in out["error"]
+    assert requests(db)[0].status == RequestStatus.CONFIRMED
+
+
+def test_gpis_dev_names_stay_hidden_in_the_request_list(db, conversation):
+    ai_tools.create_appointment_request(ctx_for(db, conversation), "S+P", "PHANG", "2026-10-23", "10:00",
+                                        patient_id="G502")
+    dev = FakePatients(FAMILY.by_phone, fake_data=False)
+    assert ai_tools.list_requests(ctx_for(db, conversation, patients=dev))["requests"][0]["name"] == HIDDEN_NAME
