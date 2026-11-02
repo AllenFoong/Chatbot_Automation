@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from . import ai_tools
@@ -38,6 +39,9 @@ HISTORY_LIMIT = 40                          # 送给 AI 的最近几条消息
 MAX_STEPS = 8                               # 一次回复最多几轮工具，超过就转员工
 MAX_TOKENS = 16000
 LOCK_KEY = 642019                           # 同一段对话一次只跑一个回复（自动确认 642017、建请求 642018）
+CATCH_UP_LOCK = 642020                      # 早上接着回：一次只有一个在跑
+CATCH_UP_WITHIN = timedelta(hours=23)       # WhatsApp 病人最后一条消息 24 小时内才能回；留 1 小时
+CATCH_UP_EVERY = timedelta(minutes=5)
 # 会拒绝回答时由 API 自动换模型重跑（server-side fallback）：只有这几个模型支持 "default"
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
@@ -346,8 +350,12 @@ def reply(
     patients=None,
     now: datetime | None = None,
     settings: AiSettings | None = None,
+    late: bool = False,
 ) -> TurnResult:
-    """回复这段对话最新的病人消息。会 commit。呼叫的人要先拿到这段对话的锁（reply_in_background）。"""
+    """回复这段对话最新的病人消息。会 commit。呼叫的人要先拿到这段对话的锁（reply_in_background）。
+
+    late：早上接着回昨晚的消息（catch_up），AI 先说一句抱歉回晚了。
+    """
     settings = settings or get_ai_settings()
     now = now or datetime.now(timezone.utc)
     conversation = session.get(Conversation, conversation_id)
@@ -370,6 +378,9 @@ def reply(
 
     today = local.date()
     system = system_prompt(session, today)
+    if late:
+        system += ("\n\nThe person's last messages came in after hours (9PM–9AM); this reply goes out this morning. "
+                   "Start with a short sorry for the late reply.")
     messages = history(session, conversation)
     ctx = ai_tools.ToolContext(session=session, gpis=gpis, today=today, patients=patients, conversation=conversation)
     result = TurnResult("replied")
@@ -435,7 +446,7 @@ def reply(
 
 
 def reply_in_background(conversation_id: int, *, session_factory: Callable | None = None, client=None,
-                        whatsapp=None, gpis=None, patients=None) -> TurnResult | None:
+                        whatsapp=None, gpis=None, patients=None, late: bool = False) -> TurnResult | None:
     """webhook 回完 Meta 之后跑（FastAPI BackgroundTasks）。同一段对话一次只跑一个；出错只记日志。"""
     from .config import reminder_source_name
     from .db.session import new_session
@@ -459,7 +470,8 @@ def reply_in_background(conversation_id: int, *, session_factory: Callable | Non
                     if patients is None and reminder_source_name() == "demo":
                         patients = DemoReminderSource.from_settings()
                     result = reply(session, conversation_id, client=client,
-                                   whatsapp=whatsapp or get_whatsapp_client(), gpis=gpis, patients=patients)
+                                   whatsapp=whatsapp or get_whatsapp_client(), gpis=gpis, patients=patients,
+                                   late=late)
                 finally:
                     lock_conn.execute(text("SELECT pg_advisory_unlock(:k, :c)"), {"k": LOCK_KEY, "c": conversation_id})
                     lock_conn.commit()
@@ -476,3 +488,91 @@ def reply_in_background(conversation_id: int, *, session_factory: Callable | Non
         except Exception:
             log.exception("转员工也失败（对话 %s）", conversation_id)
         return None
+
+
+# ---------- 早上接着回昨晚的消息 ----------
+
+def overnight_conversations(session: Session, now: datetime) -> list[int]:
+    """9PM–9AM 来的消息转给员工（AFTER_HOURS）、员工还没处理的对话。
+
+    员工按过 Take over（有负责的人）或回复过（最后一条不是病人的）就不算；最后一条超过 23 小时也不算
+    （WhatsApp 24 小时后不能随便发，员工要自己处理）。
+    """
+    last = (select(Message.conversation_id, Message.sender, Message.created_at)
+            .ext(distinct_on(Message.conversation_id))
+            .order_by(Message.conversation_id, Message.id.desc())
+            .subquery())
+    rows = session.execute(
+        select(Conversation.id)
+        .join(last, last.c.conversation_id == Conversation.id)
+        .where(
+            Conversation.mode == ConversationMode.HUMAN,
+            Conversation.handover_reason == AFTER_HOURS,
+            Conversation.assigned_staff_id.is_(None),
+            last.c.sender == Sender.CUSTOMER,
+            last.c.created_at >= now - CATCH_UP_WITHIN,
+        )
+        .order_by(Conversation.id)
+    )
+    return list(rows.scalars())
+
+
+def catch_up(*, session_factory: Callable | None = None, now: datetime | None = None,
+             run: Callable | None = None) -> list[int]:
+    """9AM–9PM、AI 开着的时候：昨晚转给员工、员工还没处理的对话交回 AI，AI 一段一段接着回（先说抱歉回晚了）。
+
+    回传交回 AI 的对话。webhook 小程序（webhook_main.py）开着时每 5 分钟跑一次；电脑 B 早上开机后也会补上。
+    """
+    from .config import ai_replies_enabled
+    from .db.session import new_session
+
+    now = now or datetime.now(timezone.utc)
+    if not ai_replies_enabled() or not AI_START <= now.astimezone(CLINIC_TZ).time() < AI_END:
+        return []
+    session_factory = session_factory or new_session
+    run = run or reply_in_background
+    with session_factory() as session:
+        bind = session.get_bind()
+        with getattr(bind, "engine", bind).connect() as lock_conn:
+            if not lock_conn.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": CATCH_UP_LOCK}).scalar():
+                return []
+            try:
+                ids = overnight_conversations(session, now)
+                for cid in ids:
+                    conv.hand_back_to_bot(session, session.get(Conversation, cid))
+                session.commit()
+            finally:
+                lock_conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": CATCH_UP_LOCK})
+                lock_conn.commit()
+    for cid in ids:
+        run(cid, late=True)             # 出错会自己转员工（reply_in_background）
+    if ids:
+        log.info("AI：早上接着回 %d 段昨晚的对话 %s", len(ids), ids)
+    return ids
+
+
+class CatchUpLoop:
+    """webhook 小程序启动时开始、关掉时停（webhook_main.py 的 lifespan）。第一次在启动后 20 秒。"""
+
+    def __init__(self, interval: timedelta = CATCH_UP_EVERY, first_after: float = 20.0):
+        import threading
+
+        self.interval, self.first_after = interval, first_after
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, name="ai-catch-up", daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=5)
+
+    def _run(self) -> None:
+        wait = self.first_after
+        while not self._stop.wait(wait):
+            try:
+                catch_up()
+            except Exception:                    # 例：PostgreSQL 没开。下一次再试
+                log.exception("AI：早上接着回，这一次没有跑成")
+            wait = self.interval.total_seconds()

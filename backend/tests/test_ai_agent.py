@@ -327,3 +327,90 @@ def test_greeting_menu_is_in_one_language(db):
     system = str(claude.calls[0]["system"])
     assert "only in the person's language" in system
     assert "Consultation 询问价格" in system and "Konsultasi (tanya harga)" in system
+
+
+# ---------- 早上接着回昨晚的消息 ----------
+
+NIGHT = datetime(2026, 10, 20, 14, 0, tzinfo=timezone.utc)        # 马来西亚 10-20 22:00
+
+
+def night_message(db, body="hi", wamid="n1", at=NIGHT):
+    c = incoming(db, body, wamid)
+    db.execute(Message.__table__.update().where(Message.wa_message_id == wamid).values(created_at=at))
+    run(db, c, FakeClaude(), now=at)                                # 晚上：转员工，不送去 AI
+    db.commit()
+    return db.get(Conversation, c.id)
+
+
+def catch_up(db, now=NOW):
+    ran = []
+    out = ai_agent.catch_up(session_factory=lambda: nullcontext(db), now=now,
+                            run=lambda cid, late: ran.append((cid, late)))
+    return out, ran
+
+
+def test_night_message_is_answered_in_the_morning(db, monkeypatch):
+    monkeypatch.setenv("AI_REPLIES_ENABLED", "true")
+    c = night_message(db)
+    assert (c.mode, c.handover_reason) == (ConversationMode.HUMAN, AFTER_HOURS)
+    assert catch_up(db, now=datetime(2026, 10, 20, 23, 0, tzinfo=timezone.utc)) == ([], [])   # 7AM：还没到
+    out, ran = catch_up(db)                                          # 10AM
+    assert out == [c.id] and ran == [(c.id, True)]
+    c = db.get(Conversation, c.id)
+    assert (c.mode, c.handover_reason) == (ConversationMode.BOT, None)
+    assert catch_up(db) == ([], [])                                  # 只做一次
+
+
+def test_morning_reply_says_sorry(db, monkeypatch):
+    monkeypatch.setenv("AI_REPLIES_ENABLED", "true")
+    c = night_message(db)
+    conv.hand_back_to_bot(db, c)
+    claude = FakeClaude(response(text_block("Sorry for the late reply!")))
+    assert reply(db, c.id, client=claude, whatsapp=FakeWhatsApp(), gpis=FakeGpis(), patients=FAMILY,
+                 now=NOW, settings=OPUS, late=True).action == "replied"
+    assert "sorry for the late reply" in str(claude.calls[0]["system"])
+
+
+@pytest.mark.parametrize("staff_did", ["replied", "took_over", "handed_back"])
+def test_staff_already_handled_it(db, monkeypatch, staff_did):
+    monkeypatch.setenv("AI_REPLIES_ENABLED", "true")
+    c = night_message(db)
+    if staff_did == "replied":
+        conv.record_outgoing_message(db, c, Sender.STAFF, "Good morning!")
+    elif staff_did == "took_over":
+        from tests.database import add_staff
+        conv.take_over(db, c, add_staff(db))
+    else:
+        conv.hand_back_to_bot(db, c)
+    db.commit()
+    assert catch_up(db) == ([], [])
+
+
+def test_not_after_23_hours_or_when_ai_is_off(db, monkeypatch):
+    c = night_message(db, at=datetime(2026, 10, 19, 14, 0, tzinfo=timezone.utc))   # 前天晚上
+    monkeypatch.setenv("AI_REPLIES_ENABLED", "true")
+    assert catch_up(db) == ([], [])
+    db.execute(Message.__table__.update().where(Message.conversation_id == c.id).values(created_at=NIGHT))
+    db.commit()
+    monkeypatch.setenv("AI_REPLIES_ENABLED", "false")
+    assert catch_up(db) == ([], [])
+    monkeypatch.setenv("AI_REPLIES_ENABLED", "true")
+    assert catch_up(db)[0] == [c.id]
+
+
+def test_other_handover_reasons_stay_with_staff(db, monkeypatch):
+    monkeypatch.setenv("AI_REPLIES_ENABLED", "true")
+    c = incoming(db, "我要投诉")
+    conv.hand_over_to_human(db, c, "Complaint")
+    db.commit()
+    assert catch_up(db) == ([], [])
+
+
+def test_catch_up_loop_runs_and_stops(monkeypatch):
+    import threading
+    called = threading.Event()
+    monkeypatch.setattr(ai_agent, "catch_up", lambda: called.set())
+    loop = ai_agent.CatchUpLoop(first_after=0.01)
+    loop.start()
+    assert called.wait(2)
+    loop.stop()

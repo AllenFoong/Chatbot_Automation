@@ -22,6 +22,7 @@ from tests.database import PASSWORD, drop_all_tables, upgrade_to_head
 def _no_auto_confirm_loop(monkeypatch):
     """测试不开背景的自动确认（app/main.py 的 lifespan）。"""
     monkeypatch.setenv("AUTO_CONFIRM_LOOP", "off")
+    monkeypatch.setenv("AI_CATCH_UP_LOOP", "off")
 
 
 @pytest.fixture(autouse=True)

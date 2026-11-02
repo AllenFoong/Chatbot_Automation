@@ -10,11 +10,13 @@ app/ai_tools.py 读 GPiS（空档、找病人），但网上还是只看得到 /
 from __future__ import annotations
 
 import logging
+import os
 import re
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from . import webhook
+from . import ai_agent, webhook
 
 # 在视窗里看得到"收到几条消息"这类记录（只有数量和 ID，没有消息内容和电话号码，D38）
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(message)s")
@@ -33,7 +35,24 @@ class HideVerifyToken(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(HideVerifyToken())
 
-app = FastAPI(title="WhatsApp webhook", docs_url=None, redoc_url=None, openapi_url=None)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """开着的时候每 5 分钟看一次：昨晚 9PM 后来的消息，早上 9AM 起交回 AI 接着回（ai_agent.catch_up）。
+
+    AI_CATCH_UP_LOOP=off 可以关掉（测试用）；AI_REPLIES_ENABLED 没打开时这个背景什么都不做。
+    """
+    loop = None
+    if os.environ.get("AI_CATCH_UP_LOOP", "on").strip().lower() != "off":
+        loop = ai_agent.CatchUpLoop()
+        loop.start()
+    yield
+    if loop is not None:
+        loop.stop()
+
+
+app = FastAPI(title="WhatsApp webhook", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 app.include_router(webhook.router)
 
 
