@@ -180,6 +180,8 @@ export interface ClinicSettings {
   clinic_contact_id: number;
   /** 自动确认（D71 ②）：只有 ADMIN 能改，默认关 */
   auto_confirm: boolean;
+  /** 价目表（D82）：AI 回答价钱照这个；null = 问价钱转员工 */
+  price_info: string | null;
 }
 
 /** Requests 页面上面那一行（GET /api/requests/auto-confirm） */

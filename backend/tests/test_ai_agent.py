@@ -444,3 +444,22 @@ def test_no_language_note_when_nothing_tells(db):
     claude = FakeClaude(response(text_block("Hi")))
     run(db, c, claude)
     assert "Write this whole reply in" not in str(claude.calls[0]["system"])
+
+
+
+# ---------- 价钱（D82） ----------
+
+def test_price_list_goes_into_the_prompt(db):
+    from app.db.models import ClinicSettings
+    c = incoming(db, "洗牙多少钱？")
+    wa = FakeWhatsApp()
+    claude = FakeClaude(response(text_block("洗牙 RM100–200")))
+    run(db, c, claude, wa)
+    system = str(claude.calls[0]["system"])
+    assert "Price list:" in system and "Scaling & polishing" in system and "do not hand over" in system
+    db.get(ClinicSettings, 1).price_info = None                     # ADMIN 清空了：问价钱转员工
+    db.commit()
+    incoming(db, "补牙呢？", "w2")
+    claude = FakeClaude(response(text_block("员工会回复")))
+    run(db, c, claude, wa)
+    assert "there is no price list yet" in str(claude.calls[0]["system"])

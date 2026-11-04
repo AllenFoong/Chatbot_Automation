@@ -139,9 +139,17 @@ def test_doctor_leave(boss, session):
 
 
 def test_clinic_settings(boss, session):
-    assert boss.get("/api/settings").json() == {"max_per_slot": 3, "max_per_slot_for_ai": 3, "clinic_contact_id": 34094,
-                                                 "auto_confirm": False}      # 自动确认默认关（D71 ②）
+    got = boss.get("/api/settings").json()
+    assert "Scaling & polishing" in got.pop("price_info")                    # 价目表的第一版（D82）
+    assert got == {"max_per_slot": 3, "max_per_slot_for_ai": 3, "clinic_contact_id": 34094,
+                   "auto_confirm": False}      # 自动确认默认关（D71 ②）
     assert boss.patch("/api/settings", json={"max_per_slot_for_ai": 2}).json()["max_per_slot_for_ai"] == 2
     assert load_clinic_rules(session).max_per_slot_for_ai == 2
     r = boss.patch("/api/settings", json={"max_per_slot": 5})                # 每格最多 3 人（W22）
     assert r.status_code == 422 and r.json()["rule"] == "ck_clinic_settings_max_per_slot"
+
+
+def test_price_list_is_trimmed_and_can_be_cleared(boss):
+    assert boss.patch("/api/settings", json={"price_info": "  Scaling: 120  "}).json()["price_info"] == "Scaling: 120"
+    assert boss.patch("/api/settings", json={"price_info": "   "}).json()["price_info"] is None   # 清空 = 转员工
+    assert boss.patch("/api/settings", json={"price_info": "x" * 10001}).status_code == 422

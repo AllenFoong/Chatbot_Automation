@@ -103,7 +103,8 @@ describe("roles", () => {
 });
 
 describe("auto-confirm (D71 ②)", () => {
-  const settings = { max_per_slot: 3, max_per_slot_for_ai: 3, clinic_contact_id: 34094, auto_confirm: false };
+  const settings = { max_per_slot: 3, max_per_slot_for_ai: 3, clinic_contact_id: 34094, auto_confirm: false,
+    price_info: "Scaling: 100-200" };
   const status = {
     enabled: true,
     runs_here: true,
@@ -137,10 +138,36 @@ describe("auto-confirm (D71 ②)", () => {
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
     expect(screen.queryByText("Press Save to apply.")).toBeNull();
     expect(calls.find((c) => c.method === "PATCH")?.body).toMatchObject({ auto_confirm: true });
+    expect(calls.find((c) => c.method === "PATCH")?.body).not.toHaveProperty("price_info");   // 不盖掉价目表
     // 拨回关、还没 Save：说明不见了，但还是提醒要 Save
     await user.click(box);
     expect(screen.queryByText(/Off by default/)).toBeNull();
     expect(screen.getByText("Press Save to apply.")).toBeInTheDocument();
+  });
+
+  it("ADMIN edits the price list; STAFF can only read it", async () => {
+    const { calls } = fakeApi({
+      "GET /api/auth/me": ok(ADMIN),
+      ...counts,
+      "GET /api/settings": ok(settings),
+      "PATCH /api/settings": (body) => ok({ ...settings, ...(body as object) }),
+    });
+    renderApp("/settings/prices");
+    const user = userEvent.setup();
+    const box = await screen.findByRole("textbox", { name: "Prices (RM)" });
+    expect(box).toHaveValue("Scaling: 100-200");
+    await user.clear(box);
+    await user.type(box, "Scaling: 120");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ price_info: "Scaling: 120" });
+  });
+
+  it("STAFF reads the price list without a Save button", async () => {
+    fakeApi({ "GET /api/auth/me": ok(STAFF), ...counts, "GET /api/settings": ok(settings) });
+    renderApp("/settings/prices");
+    expect(await screen.findByRole("textbox", { name: "Prices (RM)" })).toHaveAttribute("readonly");
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
 
   it("STAFF sees the switch but cannot change it", async () => {

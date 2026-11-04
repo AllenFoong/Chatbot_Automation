@@ -1724,6 +1724,13 @@ ul.error {
 
 /* ---------- 设置 ---------- */
 
+.settings-form textarea.price-info {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .legend {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

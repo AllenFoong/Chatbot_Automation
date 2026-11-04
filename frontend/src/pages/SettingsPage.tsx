@@ -9,6 +9,7 @@ import ClinicSection from "./settings/ClinicSection";
 import ClosuresSection from "./settings/ClosuresSection";
 import DoctorsSection from "./settings/DoctorsSection";
 import LeavesSection from "./settings/LeavesSection";
+import PricesSection from "./settings/PricesSection";
 import ServicesSection from "./settings/ServicesSection";
 
 const SECTIONS = {
@@ -17,6 +18,7 @@ const SECTIONS = {
   closures: { label: "Clinic closures", Component: ClosuresSection },
   leaves: { label: "Doctor leave", Component: LeavesSection },
   clinic: { label: "Slots & auto-confirm", Component: ClinicSection },
+  prices: { label: "Prices", Component: PricesSection },
 } as const;
 
 type SectionKey = keyof typeof SECTIONS;

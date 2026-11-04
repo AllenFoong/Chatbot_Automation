@@ -318,6 +318,7 @@ class SettingsOut(_Orm):
     max_per_slot_for_ai: int
     clinic_contact_id: int
     auto_confirm: bool           # 自动确认（D71 ②）：只有 ADMIN 能改，默认关
+    price_info: str | None       # 价目表（D82）：AI 回答价钱照这个
 
 
 class SettingsPatch(BaseModel):
@@ -325,6 +326,7 @@ class SettingsPatch(BaseModel):
     max_per_slot_for_ai: int | None = None
     clinic_contact_id: int | None = None
     auto_confirm: bool | None = None
+    price_info: str | None = Field(default=None, max_length=10000)
 
 
 def _settings(session: Session) -> ClinicSettings:
@@ -343,6 +345,8 @@ def get_clinic_settings(session: Session = Depends(get_session)) -> ClinicSettin
 def update_clinic_settings(body: SettingsPatch, session: Session = Depends(get_session)) -> ClinicSettings:
     s = _settings(session)
     changes = body.model_dump(exclude_unset=True)
+    if "price_info" in changes:
+        changes["price_info"] = (changes["price_info"] or "").strip() or None     # 清空 = 问价钱转员工
     for field, value in changes.items():
         setattr(s, field, value)
     if changes.get("auto_confirm"):

@@ -28,7 +28,7 @@ from . import ai_tools
 from .clinic_rules import ClinicRules
 from .config import AiSettings, get_ai_settings, get_reminder_text, get_whatsapp_settings
 from .db import conversations as conv
-from .db.models import Conversation, ConversationMode, Doctor, Message, Sender, Service, WaStatus
+from .db.models import ClinicSettings, Conversation, ConversationMode, Doctor, Message, Sender, Service, WaStatus
 from .db.rules import load_clinic_rules
 from .reminders import CLINIC_TZ
 from .whatsapp import WhatsAppError
@@ -198,6 +198,8 @@ def system_prompt(session: Session, today: date) -> str:
     closed = [f"- {d.isoformat()} ({_WEEKDAYS[d.weekday()]}): {reason}"
               for d, reason in sorted(rules.closures.items()) if today <= d <= today + timedelta(days=60)]
     weekday = _WEEKDAYS[today.weekday()]
+    settings = session.get(ClinicSettings, 1)
+    price_info = (settings.price_info or "").strip() if settings else ""
     return "\n".join([
         f"You answer WhatsApp messages for {clinic.clinic_name_en} / {clinic.clinic_name}, {clinic.branch}, "
         "a dental clinic in Johor, Malaysia. You help people book appointment requests and answer simple "
@@ -208,8 +210,8 @@ def system_prompt(session: Session, today: date) -> str:
         "in English only to show what to say. Use the language of the person's latest message that has real "
         "words (Chinese, English or Malay). Short replies such as ok, yes, 好, 2 or an emoji do not change the "
         "language: keep the one you were using.",
-        "- People read this on a phone: at most 3 short lines, friendly, no markdown, no lists of details the "
-        "person already knows.",
+        "- People read this on a phone: at most 3 short lines (a price answer may list a few kinds, one per line), "
+        "friendly, no markdown, no lists of details the person already knows.",
         "- Do not introduce yourself and do not say you are an AI or an assistant. If someone asks whether you are "
         "a real person or a bot, never say you are a person: say this is the clinic's booking assistant and staff "
         "confirm every booking.",
@@ -255,12 +257,18 @@ def system_prompt(session: Session, today: date) -> str:
         "yourself: for a new time check the free times, ask in one line as in step 5, and after the person agrees call "
         "create_appointment_request with replaces_request_id; to cancel, call cancel_appointment_request. "
         "A CONFIRMED request, or an appointment not in the list: ask what they want, then hand over.",
+        "- Prices: answer from the price list below and do not hand over. Give the range and say the doctor "
+        "confirms the price after checking. Answer what was asked in a few lines; for braces or Invisalign give "
+        "the kinds and prices first and the payment steps only if asked. Never make up a price: anything the list "
+        "does not cover, say staff will reply, and hand over."
+        if price_info else
         "- Prices: there is no price list yet. Say staff will reply about the price, and hand over.",
         "- Photos, voice messages or documents: say staff will check them, and hand over.",
         "- A tool says to hand over, or you still do not understand what the person wants after 3 tries.",
         "- If the person sends an IC or passport number, it arrives partly hidden. Say there is no need to send "
         "it on WhatsApp, and carry on.",
         "",
+        *(["Price list:", price_info, ""] if price_info else []),
         "Clinic hours (no booking outside these):",
         *_schedule_lines(session, rules),
         "Clinic closed (next 60 days):",

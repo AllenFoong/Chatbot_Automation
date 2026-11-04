@@ -51,3 +51,18 @@ def test_0006_requests_confirmed_before_count_as_told(db_engine):
             assert [tuple(r) for r in rows] == [(1, True), (2, None)]
         finally:
             trans.rollback()
+
+
+def test_0008_fills_the_first_price_list(db_engine):
+    """已经有的诊所设定升级后有价目表；员工改过的不会被盖掉（只填空的）。"""
+    with db_engine.connect() as conn:
+        trans = conn.begin()
+        try:
+            command.downgrade(alembic_config(conn), "0007")
+            conn.execute(text("DELETE FROM clinic_settings"))
+            conn.execute(text("INSERT INTO clinic_settings (id, clinic_contact_id) VALUES (1, 34094)"))
+            command.upgrade(alembic_config(conn), "head")
+            info = conn.execute(text("SELECT price_info FROM clinic_settings")).scalar()
+            assert "Invisalign" in info and "1100–1500" in info
+        finally:
+            trans.rollback()

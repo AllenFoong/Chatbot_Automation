@@ -191,6 +191,8 @@ class ClinicSettings(Base):
     auto_confirm: Mapped[bool] = mapped_column(server_default=false())
     auto_confirm_checked_at: Mapped[datetime | None]              # 上次成功查 GPiS 的时间（页面显示，太久就红字）
     auto_confirm_error: Mapped[str | None] = mapped_column(Text)  # 上次失败的原因（成功一次就清掉；不写连接字符串）
+    # 价目表（W64、D82）：AI 回答价钱照这个；ADMIN 在 Settings → Prices 改。空 = 问价钱一律转员工
+    price_info: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         CheckConstraint("id = 1", name="single_row"),

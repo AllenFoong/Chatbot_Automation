@@ -13,6 +13,7 @@ from datetime import time
 
 from sqlalchemy.orm import Session
 
+from ..price_info import DEFAULT_PRICE_INFO
 from .models import ClinicSettings, Doctor, DoctorSchedule, Service
 from .session import new_session
 
@@ -70,6 +71,7 @@ SETTINGS = {
     "max_per_slot": 3,              # W22
     "max_per_slot_for_ai": 3,
     "clinic_contact_id": 34094,     # 诊所自己当联系人（统计 B6）
+    "price_info": DEFAULT_PRICE_INFO,
 }
 
 

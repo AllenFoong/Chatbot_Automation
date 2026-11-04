@@ -30,7 +30,10 @@ export default function ClinicSection({ canEdit }: { canEdit: boolean }) {
     e.preventDefault();
     if (!form) return;
     let result: ClinicSettings | undefined;
-    if (await action.run(async () => (result = await api.settings.updateClinic(form)))) {
+    // 只送这一页的设定：价目表在 Prices 页面改，这里不要用旧的盖掉
+    const { max_per_slot, max_per_slot_for_ai, clinic_contact_id, auto_confirm } = form;
+    const body = { max_per_slot, max_per_slot_for_ai, clinic_contact_id, auto_confirm };
+    if (await action.run(async () => (result = await api.settings.updateClinic(body)))) {
       setForm(result!);
       setStored(result!);
       setSaved(true);
