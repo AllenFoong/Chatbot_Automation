@@ -7,16 +7,16 @@
 //   按了就记在后端（reminders 表）：谁、几点按的；换页、重新整理、另一位员工都看得到，避免同一个号码发两次。
 //   系统不知道员工最后有没有按 Enter：按错了可以按 Mark as not sent。
 // - NO WA（D55）：病人在签名表写 NO WA → 员工按一次，这个号码（整个号码，家人也一起）以后不提醒。
-// - Note（D82）：每条消息最后加的一段话（例 Feel free to pay cash），员工在这一页改；改了重新读名单，消息跟着变。
+// - Extra note（D82）：每条消息最后加的一段话（例 Feel free to pay cash），上面的按钮开弹出视窗改；改了重新读名单，消息跟着变。
 //   已经按过 Open in WhatsApp 的不会变（WhatsApp 那边已经填好了）。
 // - 每次 Refresh 都重新读 GPiS，不自动更新。
 
 import { useEffect, useState, type FormEvent } from "react";
 import * as api from "../api";
-import { Badge, Empty, ErrorBox, Loading, Notice, PageHeader, Tabs } from "../components";
+import { Badge, Empty, ErrorBox, Loading, Modal, Notice, PageHeader, Tabs } from "../components";
 import { formatDate, formatDateTime, formatPhone, whatsappLink } from "../format";
 import { useAction, useLoad } from "../hooks";
-import { AlertIcon, CopyIcon, RefreshIcon, WhatsAppIcon } from "../icons";
+import { AlertIcon, CopyIcon, PencilIcon, RefreshIcon, WhatsAppIcon } from "../icons";
 import type { PhoneKind, ReminderGroup, ReminderList, ReminderNote, ReminderRecord } from "../types";
 
 type View = "READY" | "STAFF" | "OTHER";
@@ -239,75 +239,78 @@ function StaffCard({ group, showDate, onChanged }: { group: ReminderGroup; showD
   );
 }
 
-/** 每条消息最后加的一段话（D82）：看、改、拿掉。每位员工都能改 */
-function NoteCard({ note, onSaved }: { note: ReminderNote; onSaved: () => void }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const action = useAction();
+/** 每条消息最后加的一段话（D82）：页面上面一个按钮，按了开弹出视窗看、改、拿掉。每位员工都能改 */
+function NoteButton({ note, onSaved }: { note: ReminderNote; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        <PencilIcon />
+        Extra note
+        {note.text && <Badge kind="ok">On</Badge>}
+      </button>
+      {open && (
+        <NoteModal
+          note={note}
+          onClose={() => setOpen(false)}
+          onSaved={() => {
+            setOpen(false);
+            onSaved();
+          }}
+        />
+      )}
+    </>
+  );
+}
 
-  function edit() {
-    setDraft(note.text ?? "");
-    action.clearError();
-    setEditing(true);
-  }
+function NoteModal({ note, onClose, onSaved }: { note: ReminderNote; onClose: () => void; onSaved: () => void }) {
+  const [draft, setDraft] = useState(note.text ?? "");
+  const action = useAction();
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    if (await action.run(() => api.reminders.setNote(draft))) {
-      setEditing(false);
-      onSaved();
-    }
+    if (await action.run(() => api.reminders.setNote(draft))) onSaved();
   }
 
-  const changed = note.updated_at && (
-    <p className="muted small">
-      Last changed{note.staff_name ? ` by ${note.staff_name}` : ""} at {formatDateTime(note.updated_at)}.
-    </p>
-  );
-
   return (
-    <section className="card reminder-note" aria-label="Extra note">
-      <div className="row-between">
-        <div className="card-title">
-          <h3>Extra note</h3>
-          <p>Added at the end of every reminder message, e.g. "Feel free to pay cash". Leave it empty to add nothing.</p>
-        </div>
-        {!editing && (
-          <button type="button" className="small" onClick={edit}>
-            {note.text ? "Edit note" : "Add note"}
+    <Modal
+      title="Extra note"
+      subtitle='Added at the end of every reminder message, e.g. "Feel free to pay cash".'
+      busy={action.busy}
+      onClose={onClose}
+      onSubmit={(e) => void save(e)}
+      footer={
+        <>
+          <button type="button" disabled={action.busy} onClick={onClose}>
+            Cancel
           </button>
-        )}
-      </div>
-      {editing ? (
-        <form className="inline-form" onSubmit={(e) => void save(e)}>
-          <textarea
-            aria-label="Note"
-            rows={3}
-            value={draft}
-            maxLength={NOTE_MAX}
-            placeholder="Feel free to pay cash 💵"
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <p className="help">
-            {draft.length} / {NOTE_MAX} characters. Reminders already opened in WhatsApp do not change.
+          <button type="submit" className="primary" disabled={action.busy}>
+            Save note
+          </button>
+        </>
+      }
+    >
+      <div className="reminder-note">
+        <textarea
+          aria-label="Note"
+          rows={4}
+          value={draft}
+          maxLength={NOTE_MAX}
+          placeholder="Feel free to pay cash 💵"
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <p className="muted small">
+          {draft.length} / {NOTE_MAX} characters. Leave it empty to add nothing. Reminders already opened in WhatsApp
+          do not change.
+        </p>
+        {note.updated_at && (
+          <p className="muted small">
+            Last changed{note.staff_name ? ` by ${note.staff_name}` : ""} at {formatDateTime(note.updated_at)}.
           </p>
-          <div className="actions">
-            <button type="submit" className="primary" disabled={action.busy}>
-              Save note
-            </button>
-            <button type="button" disabled={action.busy} onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </div>
-          <ErrorBox message={action.error} />
-        </form>
-      ) : note.text ? (
-        <pre className="message-preview">{note.text}</pre>
-      ) : (
-        <p className="muted small">No extra note.</p>
-      )}
-      {!editing && changed}
-    </section>
+        )}
+        <ErrorBox message={action.error} />
+      </div>
+    </Modal>
   );
 }
 
@@ -370,6 +373,7 @@ export default function RemindersPage() {
                 Show
               </button>
             </form>
+            {data && <NoteButton note={data.note} onSaved={list.reload} />}
             <button type="button" onClick={list.reload}>
               <RefreshIcon />
               Refresh
@@ -404,7 +408,6 @@ export default function RemindersPage() {
               appears for numbers in WHATSAPP_ALLOWED_RECIPIENTS.
             </Notice>
           )}
-          <NoteCard note={data.note} onSaved={list.reload} />
           <div className="list-toolbar">
             <Tabs
               label="Reminder lists"

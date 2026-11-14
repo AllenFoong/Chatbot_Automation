@@ -1318,19 +1318,18 @@ ul.error {
   margin-left: auto;
 }
 
-/* 每条提醒最后加的一段话（D82） */
+/* 每条提醒最后加的一段话（D82）：弹出视窗里面 */
 .reminder-note {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .reminder-note textarea {
-  align-self: stretch;
-  max-width: 640px;
+  width: 100%;
 }
 
-.reminder-note .message-preview {
+.message-preview {
   margin: 0;
   max-width: 640px;
 }
