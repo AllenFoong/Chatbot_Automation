@@ -222,7 +222,7 @@ npm run dev                   # 视窗 1 的 Admin API 也要开着；backend\.e
 | 1 | 上面的指令 | `npm test` 66 passed；`npm run build` 成功 |
 | 2 | 登录画面 | 中间一张白色卡片：牙齿图示、*Username*、*Password*（右边眼睛）、青绿色 **Log in**；打错密码有红色框 |
 | 3 | 左边选单 | 白色一栏（页面往下拉也一直白到底）；选到的那页浅青绿底；Conversations、Requests 后面红色数字；☰ 收成只有图示、再按展开 |
-| 4 | *Reminders* | 和上次一样（卡片、*Extra note*、分页、*Message* 打开整行） |
+| 4 | *Reminders* → 卡片下面的 **Message** | 画面中间弹出视窗：标题 *Message – 名字*、整条消息、*Copy message*、**Done**；Esc、×、点外面都关掉；卡片本身不变高 |
 | 5 | *Conversations* | 左边列表（选到的浅青绿底）、右边对话：病人的消息靠左灰色、AI 靠右浅蓝、员工靠右浅青绿；下面 *Reply on WhatsApp*、**Send** |
 | 6 | *Requests* | 每个请求一张卡片：资料在浅灰框里；**Entered in GPiS ✓**、*Reject*、*Patient cancelled*；按 **Entered in GPiS ✓** → 弹出视窗、GPiS 的预约一行一个框，选到的变青绿框 |
 | 7 | *Settings* 5 块 | 上面一排灰底的切换（选到的白色）；表格有灰色表头；*Slots & auto-confirm* 的开关是青绿 / 灰色；*Save* 之后绿色 *Saved.* |
@@ -231,7 +231,7 @@ npm run dev                   # 视窗 1 的 Admin API 也要开着；backend\.e
 | 10 | *My account* | 名字卡片 + *Change password*（三个密码栏都有眼睛） |
 | 11 | 视窗缩窄（或手机宽度） | 上面一排 ☰ 打开选单；卡片一排一张；表格在卡片里左右拉；没有整页左右卷动 |
 | 12 | 用 STAFF 帐号 | *Settings* 看得到、不能改（开关灰色拨不动）；选单没有 *Staff accounts* |
-| 13 | *Reminders*（Ready、Needs staff）、*Requests* 一排几张卡片 | 名字、预约的框、按钮、最下面一行在每一排都对齐（一样高）；打开一张卡片的 *Message*，旁边卡片的按钮不动 |
+| 13 | *Reminders*（Ready、Needs staff）、*Requests* 一排几张卡片 | 名字、预约的框、按钮、最下面一行在每一排都对齐（一样高）；*Message* 是弹出视窗，卡片不会变高 |
 
 不喜欢的地方（颜色、大小、排法）直接说：颜色在 `src/index.css` 最上面，元件在 `src/components/ui/`。
 
@@ -302,4 +302,6 @@ npm run dev                   # 视窗 1 的 Admin API 也要开着；backend\.e
 - 2026-11-14 卡片对齐（开发者要的）：*Reminders* 的 Ready / Needs staff、*Requests* 的卡片用 CSS subgrid（`CARD_GRID`、`CARD_ROWS_3/4`，在 `components/ui/card.tsx`），
   同一排每张卡片的每一块一样高、在同一个位置；Needs staff 没有号码的卡片也有最下面一行（*No WhatsApp number to stop.*）；
   headless Chromium 量过 Requests 3 张卡片按钮那一行的顶端都是 538px；400 宽一排一张照常；`npm test` 66 passed。
+- 2026-11-14 *Reminders* 卡片的 **Message** 改成弹出视窗（开发者要的，和 *Extra note* 同一种 `Modal`）：整条消息、*Copy message*、**Done**（右上角 × 也是关）；
+  `npm test` → 67 passed（新增：按 Message → 视窗里是整条消息 → Done 关掉）；headless Chromium 1366 / 400 宽看过、Esc 关得掉。
 

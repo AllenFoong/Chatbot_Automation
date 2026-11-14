@@ -316,6 +316,22 @@ describe("reminders", () => {
     expect(within(dialog).getByRole("textbox", { name: "Note" })).toHaveValue("Pay cash");
   });
 
+  it("shows the whole message in a pop-up window", async () => {
+    fakeApi({ ...base, "GET /api/reminders": ok(fakeReminderList()) });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    const card = (await screen.findByText("DEMO PATIENT A & DEMO PATIENT B")).closest("li")!;
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await user.click(within(card).getByRole("button", { name: "Message" }));
+    const dialog = screen.getByRole("dialog", { name: "Message – DEMO PATIENT A & DEMO PATIENT B" });
+    expect(within(dialog).getByLabelText("Reminder message").textContent).toBe(
+      "NAME: DEMO PATIENT A & DEMO PATIENT B\nTIME: 10:00 AM & 10:30 AM",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("builds the WhatsApp link with the message encoded", () => {
     expect(whatsappLink("60120000001", "温馨提醒💕\nA & B")).toBe(
       "whatsapp://send?phone=60120000001&text=%E6%B8%A9%E9%A6%A8%E6%8F%90%E9%86%92%F0%9F%92%95%0AA%20%26%20B",

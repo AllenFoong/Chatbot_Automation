@@ -138,7 +138,7 @@
 - [x] W61–W72 开发者回答（2026-10-28，记在 `docs/clinic-workflow.md`，决定 D80）：AI 不主动说是 AI（被问时不说是真人）、先不改签名表（上线前请律师看 PDPA）、回答价钱（要价目表）、急症安排最近的时间 + 转员工、一天 20–30 个、三种语言、B 每天上班一定开机、下班大多会关（不关的晚上 AI 回到 9PM）、老板付费、员工用手机回复 AI 就停、IC 用来分辨同名的病人
 - [x] Phase 6b 初版（D81）：`backend/app/ai_agent.py`：webhook 回完 Meta 在背景让 AI 回（同一段对话一次一个）；先检查 AI 开关、BOT、允许名单、9AM–9PM，不符合就转员工、不送去 AI；对话最近 40 条 + 诊所资料 + 6a-3 的工具 + `hand_over_to_human`；照 D80 说话；出问题一律转员工；`AI_MODEL`（默认 `claude-opus-5-5`）、`AI_EFFORT`、`ANTHROPIC_API_KEY` 在 `.env`；新套件 `anthropic` 2.3.0；没有改表、没有改网页、不用更新 B；云端 `pytest` 529 个（假的 Claude，不连 Anthropic）
 - [x] 提醒消息最后加的一段话（D82，开发者 2026-11-14 要的）：*Reminders* 页面上面的 **Extra note** 按钮开弹出视窗（例 *Feel free to pay cash*；视窗下面 **Preview** 边打边看整条消息），每位员工都能改、记下谁改的，每条提醒消息最后空一行加上；空的 = 不加；`clinic_settings` 加 3 栏（migration `0008`）；云端 `pytest` 535 个、Vitest 66 个（弹出视窗 + 预览），headless Chromium 用假资料点过；要在开发电脑照 `backend/README.md`「D82 完成的条件」测 10 项，B 要升到 `0008`
-- [x] Admin Platform 换成 shadcn/ui（D83，修改 D30；开发者 2026-11-14 要的）：先换 Reminders 给开发者看，开发者说「全部换」→ **所有页面都换了**、`styles.css` 删掉，Tailwind 4 标准设定 + Radix（`src/components/ui/`，照 shadcn new-york v4 写，云端连不到 shadcn 的网站），颜色还是诊所的青绿色；66 个测试没有改；headless Chromium 1366 / 400 宽看过每一页；要在开发电脑 `npm ci` 后照 `frontend/README.md`「全部换成 shadcn/ui（D83）」测 13 项（卡片每一排对齐：CSS subgrid）；更新 B 只是网页（D82 的 `0008` 也要升）
+- [x] Admin Platform 换成 shadcn/ui（D83，修改 D30；开发者 2026-11-14 要的）：先换 Reminders 给开发者看，开发者说「全部换」→ **所有页面都换了**、`styles.css` 删掉，Tailwind 4 标准设定 + Radix（`src/components/ui/`，照 shadcn new-york v4 写，云端连不到 shadcn 的网站），颜色还是诊所的青绿色；66 个测试没有改；headless Chromium 1366 / 400 宽看过每一页；要在开发电脑 `npm ci` 后照 `frontend/README.md`「全部换成 shadcn/ui（D83）」测 13 项（卡片每一排对齐：CSS subgrid；提醒卡片的 *Message* 是弹出视窗；Vitest 67 个）；更新 B 只是网页（D82 的 `0008` 也要升）
 
 ## 下一步
 

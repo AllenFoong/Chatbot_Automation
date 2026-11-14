@@ -15,22 +15,21 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   CheckIcon,
-  ChevronDownIcon,
   CopyIcon,
   InboxIcon,
   InfoIcon,
   LoaderCircleIcon,
+  MessageSquareTextIcon,
   PencilIcon,
   RefreshCwIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import * as api from "../api";
-import { Page, PageHeader } from "../components";
+import { Modal, Page, PageHeader } from "../components";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { CARD_GRID, CARD_ROWS_3, CARD_ROWS_4, Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -165,26 +164,56 @@ function RecordLine({ record }: { record: ReminderRecord }) {
   );
 }
 
-/** 卡片最下面：Message（按了在下面整行打开整条消息）+ 右边的 NO WA */
-function MessageFooter({ message, children }: { message: string | null; children: ReactNode }) {
+/** 卡片最下面：Message（按了在画面中间弹出视窗，看整条消息）+ 右边的 NO WA。卡片本身不会变高 */
+function MessageFooter({ title, message, children }: { title: string; message: string | null; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const canCopy = typeof navigator !== "undefined" && !!navigator.clipboard;
   if (!message) return <CardFooter className="items-start justify-end border-t pt-4">{children}</CardFooter>;
+
+  async function copy() {
+    await navigator.clipboard.writeText(message!);
+    setCopied(true);
+  }
+
   return (
-    <Collapsible asChild className="group/msg">
-      <CardFooter className="flex-wrap items-start gap-2 self-stretch border-t pt-4">
-        <CollapsibleTrigger asChild>
-          <Button type="button" variant="link" size="sm" className="text-sm">
-            <ChevronDownIcon className="transition-transform group-data-[state=closed]/msg:-rotate-90" />
-            Message
-          </Button>
-        </CollapsibleTrigger>
-        {children}
-        <CollapsibleContent className="w-full">
-          <pre className="m-0 rounded-lg border bg-muted p-3 font-sans text-sm leading-relaxed whitespace-pre-wrap">
+    <CardFooter className="flex-wrap items-start gap-2 border-t pt-4">
+      <Button type="button" variant="link" size="sm" className="text-sm" onClick={() => setOpen(true)}>
+        <MessageSquareTextIcon />
+        Message
+      </Button>
+      {children}
+      {open && (
+        <Modal
+          title={`Message – ${title}`}
+          subtitle="The reminder exactly as it will be filled in WhatsApp."
+          onClose={() => {
+            setOpen(false);
+            setCopied(false);
+          }}
+          footer={
+            <>
+              {canCopy && (
+                <Button type="button" variant="outline" onClick={() => void copy()}>
+                  {copied ? <CheckIcon /> : <CopyIcon />}
+                  {copied ? "Copied" : "Copy message"}
+                </Button>
+              )}
+              <Button type="button" onClick={() => setOpen(false)}>
+                Done
+              </Button>
+            </>
+          }
+        >
+          <pre
+            aria-label="Reminder message"
+            className="m-0 max-h-[60vh] overflow-y-auto rounded-lg border bg-muted p-3 font-sans text-sm leading-relaxed whitespace-pre-wrap"
+          >
             {message}
           </pre>
-        </CollapsibleContent>
-      </CardFooter>
-    </Collapsible>
+        </Modal>
+      )}
+    </CardFooter>
   );
 }
 
@@ -305,7 +334,7 @@ function ReadyCard({
             <ErrorAlert message={action.error} />
         </CardContent>
 
-        <MessageFooter message={group.message}>
+        <MessageFooter title={names(group)} message={group.message}>
           <OptOutButton group={group} onChanged={onChanged} />
         </MessageFooter>
       </Card>
