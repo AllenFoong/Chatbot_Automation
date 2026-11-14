@@ -396,8 +396,8 @@ B 上现在装的（给以后维护、移除时看）：python.org 的 Python 3.
 | 重做 | 删掉装错的 `C:\Chatbot_Automation`（`.old` 不动）→ 用 `chatbot-f287264.zip` 重新解压 → `Unblock-File`、复制 `.env`、venv、`pip install`。手动备份没有重做（系统停着，之后没有人按过 *Open in WhatsApp*） |
 | `alembic upgrade head` → `alembic current` | ✅ `0008 (head)`（开发者回报） |
 | `retention --dry-run` | ✅ `预约日期在 2026-08-16 之前的提醒有 0 条（0 天）；不用再留的号码有 0 个` |
-| 启动 | ✅ `Start-ScheduledTask` 没有错误。`start.log` 的路径是 `%LOCALAPPDATA%\Chatbot\logs\start.log`（当天给开发者的指令漏了 `logs`，找不到档案；第 9 节的写法本来就对）；内容开发者没有回报 |
-| `--check-gpis` | 开发者没有回报（网页名单读得到 GPiS，见下一行） |
+| 启动 | ✅ `Start-ScheduledTask` 没有错误；`start.log` 正常（开发者回报）。路径是 `%LOCALAPPDATA%\Chatbot\logs\start.log`（当天给开发者的指令漏了 `logs`，找不到档案；第 9 节的写法本来就对） |
+| `--check-gpis` | ✅ 正常（开发者回报） |
 | 网页 7 项（新的登入画面、明天的名单和 GPiS 一样、*Message* 视窗、*Extra note* 视窗空的 → *Cancel*、自动确认 **Off**、*Open in WhatsApp* → *Mark as not sent*、`staff` 登入看得到名单、*Settings* 不能改、没有 *Staff accounts*） | ✅ 开发者说全部对 |
 | 清理 | ✅ `.old` 删了 |
 

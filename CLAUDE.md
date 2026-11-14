@@ -140,7 +140,7 @@
 - [x] 提醒消息最后加的一段话（D82，开发者 2026-11-14 要的）：*Reminders* 页面上面的 **Extra note** 按钮开弹出视窗（例 *Feel free to pay cash*；视窗下面 **Preview** 边打边看整条消息），每位员工都能改、记下谁改的，每条提醒消息最后空一行加上；空的 = 不加；`clinic_settings` 加 3 栏（migration `0008`）；云端 `pytest` 535 个、Vitest 66 个（弹出视窗 + 预览），headless Chromium 用假资料点过；要在开发电脑照 `backend/README.md`「D82 完成的条件」测 10 项，B 要升到 `0008`
 - [x] Admin Platform 换成 shadcn/ui（D83，修改 D30；开发者 2026-11-14 要的）：先换 Reminders 给开发者看，开发者说「全部换」→ **所有页面都换了**、`styles.css` 删掉，Tailwind 4 标准设定 + Radix（`src/components/ui/`，照 shadcn new-york v4 写，云端连不到 shadcn 的网站），颜色还是诊所的青绿色；66 个测试没有改；headless Chromium 1366 / 400 宽看过每一页；要在开发电脑 `npm ci` 后照 `frontend/README.md`「全部换成 shadcn/ui（D83）」测 13 项（卡片每一排对齐：CSS subgrid；提醒卡片的 *Message* 是弹出视窗；Vitest 67 个）；更新 B 只是网页（D82 的 `0008` 也要升）
 
-- [x] 电脑 B 更新到 `f287264`（2026-11-14，D82 + D83，改表 `0007` → `0008`；记录在 `docs/deploy-pc-b.md` 第 11 节）：第一次开成 Command Prompt、第一次解压的是旧版（没有 `0008`，数据库没动）→ 用 PowerShell、`chatbot-f287264.zip` 重做 → `0008 (head)`；10-28 的 `0007 (head)` 也确认了；网页 7 项全部对、`.old` 删了；第 9 节加了：只用 PowerShell、zip 写完整档名、解压后看 `VERSION.txt`、改表要看到 `Running upgrade`
+- [x] 电脑 B 更新到 `f287264`（2026-11-14，D82 + D83，改表 `0007` → `0008`；记录在 `docs/deploy-pc-b.md` 第 11 节）：第一次开成 Command Prompt、第一次解压的是旧版（没有 `0008`，数据库没动）→ 用 PowerShell、`chatbot-f287264.zip` 重做 → `0008 (head)`；10-28 的 `0007 (head)` 也确认了；`start.log`、`--check-gpis` 正常，网页 7 项全部对、`.old` 删了；第 9 节加了：只用 PowerShell、zip 写完整档名、解压后看 `VERSION.txt`、改表要看到 `Running upgrade`
 ## 下一步
 
 1. 员工用 *Open in WhatsApp* 发（D65，2026-10-13 起）：一两个星期后问员工名单有没有漏掉的、*Needs staff* 有没有处理（只问日期、时间、医生，不要截图）；对不上的记下来，回来一起找原因。
