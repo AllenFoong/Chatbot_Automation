@@ -13,10 +13,18 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import * as api from "../api";
-import { Badge, Empty, ErrorBox, Loading, Modal, Notice, PageHeader, Tabs } from "../components";
+import { CheckIcon, CopyIcon, RefreshCwIcon, TriangleAlertIcon } from "lucide-react";
+import { Badge, Empty, ErrorBox, Field, Loading, Modal, Notice, Page, PageHeader, Tabs } from "../components";
+import { Alert, AlertDescription } from "../components/ui/alert";
+import { Badge as UiBadge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
+import { Radio } from "../components/ui/checkbox";
+import { Input } from "../components/ui/input";
 import { formatDate, formatDateTime, formatPhone, formatTime, whatsappLink } from "../format";
 import { useAction, useLoad } from "../hooks";
-import { AlertIcon, CopyIcon, RefreshIcon, WhatsAppIcon } from "../icons";
+import { WhatsAppIcon } from "../icons";
+import { cn } from "../lib/utils";
 import type { AppointmentRequest, AutoConfirmStatus, GpisChoice, RequestStatus } from "../types";
 
 type View = RequestStatus | "TO_TELL";
@@ -40,7 +48,7 @@ function AutoConfirmLine({ status }: { status: AutoConfirmStatus | undefined }) 
   const last = status.checked_at ? formatDateTime(status.checked_at) : "never";
   if (!status.enabled) {
     return (
-      <p className="muted small auto-confirm-line">
+      <p className="text-xs text-muted-foreground">
         Auto-confirm is off: press Entered in GPiS for each request. An admin can turn it on in Settings.
       </p>
     );
@@ -55,18 +63,19 @@ function AutoConfirmLine({ status }: { status: AutoConfirmStatus | undefined }) 
   }
   if (status.stale) {
     return (
-      <div className="error" role="status">
-        <AlertIcon />
-        <span>
+      <Alert variant="destructive" role="status">
+        <TriangleAlertIcon />
+        <AlertDescription className="block">
           Auto-confirm has not checked GPiS since {last}
           {status.error ? ` (${status.error})` : ""}. Is this computer connected to the GPiS computer? Until it
           works again, press Entered in GPiS for each request.
-        </span>
-      </div>
+        </AlertDescription>
+      </Alert>
     );
   }
   return (
-    <p className="muted small auto-confirm-line">
+    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span className="size-2 rounded-full bg-success" aria-hidden="true" />
       Auto-confirm is on: requests that match GPiS exactly are confirmed automatically
       {status.in_business_hours ? "" : " (it checks GPiS 9:00–17:30)"}. Last checked GPiS: {last}.
     </p>
@@ -90,12 +99,16 @@ function ChoiceLine({ c }: { c: GpisChoice }) {
     Boolean,
   );
   return (
-    <span className="choice-text">
-      <span className="time">{c.time}</span> {c.patient_name || "(no name)"}{" "}
-      <span className="muted">· Dr {c.doctor_name}</span>
-      {tags.length > 0 && <span className="choice-tags">{tags.join(" · ")}</span>}
+    <span className="min-w-0">
+      <span className="font-semibold tabular-nums">{c.time}</span> {c.patient_name || "(no name)"}{" "}
+      <span className="text-muted-foreground">· Dr {c.doctor_name}</span>
+      {tags.length > 0 && (
+        <UiBadge variant="success" className="ml-2 align-middle">
+          {tags.join(" · ")}
+        </UiBadge>
+      )}
       {c.used_by_request_id !== null && (
-        <span className="muted"> · already confirms request #{c.used_by_request_id}</span>
+        <span className="text-muted-foreground"> · already confirms request #{c.used_by_request_id}</span>
       )}
     </span>
   );
@@ -149,23 +162,22 @@ function ConfirmDialog({
       onSubmit={submit}
       footer={
         <>
-          <button type="button" onClick={close} disabled={action.busy}>
+          <Button type="button" variant="outline" onClick={close} disabled={action.busy}>
             Back
-          </button>
-          <button type="submit" className="primary" disabled={picked === null || action.busy}>
+          </Button>
+          <Button type="submit" disabled={picked === null || action.busy}>
             Confirm this appointment
-          </button>
+          </Button>
         </>
       }
     >
-      <p className="small">
+      <p className="text-sm">
         Enter the appointment in GPiS first. Then pick it below: the system checks GPiS again and messages the
         patient the GPiS date, time and doctor.
       </p>
-      <div className="confirm-date">
-        <label>
-          GPiS date
-          <input
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label="GPiS date" className="w-44">
+          <Input
             type="date"
             value={date}
             onChange={(e) => {
@@ -173,15 +185,15 @@ function ConfirmDialog({
               setPicked(null);
             }}
           />
-        </label>
-        <button type="button" className="small" onClick={list.reload} disabled={!date || list.loading}>
-          <RefreshIcon />
+        </Field>
+        <Button type="button" variant="outline" onClick={list.reload} disabled={!date || list.loading}>
+          <RefreshCwIcon />
           Read GPiS again
-        </button>
+        </Button>
       </div>
 
       {!date ? (
-        <p className="muted small">This request has no date: choose the date you booked in GPiS.</p>
+        <p className="text-sm text-muted-foreground">This request has no date: choose the date you booked in GPiS.</p>
       ) : list.data === undefined ? (
         list.loading && <Loading />
       ) : (
@@ -192,21 +204,24 @@ function ConfirmDialog({
             </Notice>
           )}
           {choices.length === 0 ? (
-            <p className="muted small">
+            <p className="text-sm text-muted-foreground">
               GPiS has no appointments on {formatDate(date)}. Enter it in GPiS first, then press Read GPiS again.
             </p>
           ) : (
-            <fieldset className="gpis-choices">
-              <legend>
+            <fieldset className="m-0 flex min-w-0 flex-col gap-1 border-0 p-0">
+              <legend className="mb-2 text-sm font-semibold">
                 Appointments in GPiS on {formatDate(list.data.date)} ({choices.length})
               </legend>
               {choices.map((c) => (
                 <label
                   key={c.appointment_id}
-                  className={c.same_patient || (c.same_doctor && c.same_time) ? "match" : ""}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors hover:bg-muted has-[:checked]:border-primary has-[:checked]:bg-brand-soft has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60",
+                    (c.same_patient || (c.same_doctor && c.same_time)) && "border-success-border",
+                  )}
                 >
-                  <input
-                    type="radio"
+                  <Radio
+                    className="mt-0.5"
                     name={`gpis-${request.id}`}
                     value={c.appointment_id}
                     checked={picked === c.appointment_id}
@@ -262,31 +277,32 @@ function TellDialog({
       onClose={onClose}
       footer={
         <>
-          <button type="button" onClick={onClose} disabled={action.busy}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={action.busy}>
             Back
-          </button>
+          </Button>
           {canCopy && r.confirm_message && (
-            <button type="button" onClick={() => void copy()}>
-              <CopyIcon />
+            <Button type="button" variant="outline" onClick={() => void copy()}>
+              {copied ? <CheckIcon /> : <CopyIcon />}
               {copied ? "Copied" : "Copy message"}
-            </button>
+            </Button>
           )}
           {r.whatsapp_allowed && r.whatsapp_phone && r.confirm_message && (
-            <a className="button" href={whatsappLink(r.whatsapp_phone, r.confirm_message)}>
-              <WhatsAppIcon />
-              Open in WhatsApp
-            </a>
+            <Button asChild variant="outline">
+              <a href={whatsappLink(r.whatsapp_phone, r.confirm_message)}>
+                <WhatsAppIcon />
+                Open in WhatsApp
+              </a>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
-            className="primary"
             disabled={action.busy}
             onClick={async () => {
               if (await action.run(() => api.requests.patientTold(r.id))) onTold();
             }}
           >
             Patient told ✓
-          </button>
+          </Button>
         </>
       }
     >
@@ -294,7 +310,11 @@ function TellDialog({
         Not sent by the system{r.notify_problem ? `: ${r.notify_problem}` : " (the system stopped before sending)"}.
         Tell the patient yourself, then press Patient told.
       </Notice>
-      {r.confirm_message && <pre className="message-preview">{r.confirm_message}</pre>}
+      {r.confirm_message && (
+        <pre className="m-0 rounded-lg border bg-muted p-3 font-sans text-sm leading-relaxed whitespace-pre-wrap">
+          {r.confirm_message}
+        </pre>
+      )}
       <ErrorBox message={action.error} />
     </Modal>
   );
@@ -322,22 +342,28 @@ function RequestCard({
   }
 
   return (
-    <li className="card request">
-      <div className="card-head">
-        <div>
-          <strong>{r.customer_name}</strong>
-          {r.whatsapp_phone && <div className="phone muted">{formatPhone(r.whatsapp_phone)}</div>}
-          <div className="muted small">
+    <li className="list-none">
+     <Card>
+      <CardHeader>
+        <CardTitle>
+          <strong className="font-semibold">{r.customer_name}</strong>
+        </CardTitle>
+        <div className="flex flex-col gap-0.5">
+          {r.whatsapp_phone && <div className="text-sm text-muted-foreground tabular-nums">{formatPhone(r.whatsapp_phone)}</div>}
+          <div className="text-xs text-muted-foreground">
             {r.gpis_contact_id ? `GPiS ContactID ${r.gpis_contact_id}` : "Not linked to a GPiS contact"}
           </div>
         </div>
-        <Badge kind={toTell ? "pending" : r.status}>{toTell ? "To tell" : STATUS_LABEL[r.status]}</Badge>
-      </div>
+        <CardAction>
+          <Badge kind={toTell ? "pending" : r.status}>{toTell ? "To tell" : STATUS_LABEL[r.status]}</Badge>
+        </CardAction>
+      </CardHeader>
 
-      <dl className="facts">
+      <CardContent className="flex flex-col gap-3">
+      <dl className="m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 rounded-lg bg-muted p-3 text-sm [&_dd]:m-0 [&_dt]:text-muted-foreground">
         <dt>Treatment</dt>
         <dd>
-          <strong>{r.service_code}</strong> {r.service_name}
+          <strong className="font-semibold">{r.service_code}</strong> {r.service_name}
         </dd>
         <dt>Doctor</dt>
         <dd>{r.doctor_id ?? "Any"}</dd>
@@ -364,7 +390,7 @@ function RequestCard({
           <>
             <dt>In GPiS</dt>
             <dd>
-              <strong>
+              <strong className="font-semibold">
                 {formatDate(r.confirmed_date)}
                 {r.confirmed_slot && ` ${formatTime(r.confirmed_slot)}`}
                 {r.confirmed_doctor_id && ` · Dr ${r.confirmed_doctor_id}`}
@@ -395,13 +421,15 @@ function RequestCard({
         )}
       </dl>
 
-      <div className="card-meta muted small">
+      <div className="text-xs text-muted-foreground">
         Requested {formatDateTime(r.created_at)}
         {r.handled_at && ` · updated ${formatDateTime(r.handled_at)}`}
         {r.conversation_id !== null && (
           <>
             {" · "}
-            <Link to={`/conversations/${r.conversation_id}`}>Open conversation</Link>
+            <Link to={`/conversations/${r.conversation_id}`} className="font-medium text-brand-text underline-offset-2 hover:underline">
+              Open conversation
+            </Link>
           </>
         )}
       </div>
@@ -418,6 +446,7 @@ function RequestCard({
       )}
 
       <ErrorBox message={action.error} />
+      </CardContent>
 
       {confirming && (
         <ConfirmDialog
@@ -431,9 +460,11 @@ function RequestCard({
       )}
 
       {r.status === "REJECTED" || r.status === "CANCELLED" ? (
-        <div className="card-actions actions">
-          <button
+        <CardFooter className="flex-wrap gap-2 border-t pt-4">
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             disabled={action.busy}
             onClick={() =>
               change(
@@ -444,33 +475,37 @@ function RequestCard({
             }
           >
             Back to pending
-          </button>
-        </div>
+          </Button>
+        </CardFooter>
       ) : (
         (r.status === "PENDING" || r.status === "CONFIRMED") && (
-          <div className="card-actions actions">
+          <CardFooter className="flex-wrap gap-2 border-t pt-4">
             {toTell && (
-              <button type="button" className="primary" disabled={action.busy} onClick={() => setTelling(true)}>
+              <Button type="button" size="sm" disabled={action.busy} onClick={() => setTelling(true)}>
                 Tell the patient
-              </button>
+              </Button>
             )}
             {r.status === "PENDING" && (
               <>
-                <button type="button" className="primary" disabled={action.busy} onClick={() => setConfirming(true)}>
+                <Button type="button" size="sm" disabled={action.busy} onClick={() => setConfirming(true)}>
                   Entered in GPiS ✓
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={action.busy}
                   onClick={() => change(`Reject the request for ${r.customer_name}?`, api.requests.reject)}
                 >
                   Reject
-                </button>
+                </Button>
               </>
             )}
-            <button
+            <Button
               type="button"
-              className="ghost"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
               disabled={action.busy}
               onClick={() =>
                 change(
@@ -482,10 +517,11 @@ function RequestCard({
               }
             >
               Patient cancelled
-            </button>
-          </div>
+            </Button>
+          </CardFooter>
         )
       )}
+     </Card>
     </li>
   );
 }
@@ -512,15 +548,15 @@ export default function RequestsPage() {
   ];
 
   return (
-    <div className="page">
+    <Page>
       <PageHeader
         title="Appointment requests"
         description="Booking requests waiting for GPiS. Enter each one in GPiS first, then press Entered in GPiS here."
         actions={
-          <button type="button" onClick={reload}>
-            <RefreshIcon />
+          <Button type="button" variant="outline" onClick={reload}>
+            <RefreshCwIcon className={list.loading ? "animate-spin" : undefined} />
             Refresh
-          </button>
+          </Button>
         }
       />
       <Tabs
@@ -542,7 +578,7 @@ export default function RequestsPage() {
           {view === "TO_TELL" ? "Every confirmed patient has been told." : `No ${view.toLowerCase()} requests.`}
         </Empty>
       ) : (
-        <ul className="cards">
+        <ul className="m-0 grid list-none items-start gap-4 p-0 md:grid-cols-2 xl:grid-cols-3">
           {list.data.map((r) => (
             <RequestCard
               key={r.id}
@@ -557,6 +593,6 @@ export default function RequestsPage() {
           ))}
         </ul>
       )}
-    </div>
+    </Page>
   );
 }

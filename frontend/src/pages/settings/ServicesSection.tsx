@@ -1,10 +1,18 @@
 // 疗程代码（和 GPiS Remarks 同一套）。这些设定决定 AI 能不能自己约、能不能当一格的第 3 人（D15、D16）。
 // 不再提供的疗程改成 inactive，不删除（旧的预约请求还会用到）。
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import * as api from "../../api";
-import { Badge, ErrorBox, Loading } from "../../components";
-import { CheckIcon } from "../../icons";
+import { CheckIcon } from "lucide-react";
+import { Badge, ErrorBox, Field, Loading, SectionTitle } from "../../components";
+import { Badge as UiBadge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Checkbox } from "../../components/ui/checkbox";
+import { Input } from "../../components/ui/input";
+import { NativeSelect } from "../../components/ui/native-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import { cn } from "../../lib/utils";
 import { useAction, useLoad } from "../../hooks";
 import type { Service, ServiceIn } from "../../types";
 
@@ -19,16 +27,25 @@ const FLAGS = [
 
 type Draft = ServiceIn & { active: boolean };
 
-function GroupSelect({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+/** 勾选框和它的名字（点名字也会勾） */
+function CheckLabel({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <label title={title} className="flex cursor-pointer items-center gap-2 text-sm whitespace-nowrap">
+      {children}
+    </label>
+  );
+}
+
+function GroupSelect({ value, onChange, className }: { value: string | null; onChange: (v: string | null) => void; className?: string }) {
   // 数据库里有这里不认识的类别时也要显示出来，不能看起来像 "single visit"
   const groups = value && !TREATMENT_GROUPS.includes(value) ? [...TREATMENT_GROUPS, value] : TREATMENT_GROUPS;
   return (
-    <select aria-label="Treatment group" value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}>
+    <NativeSelect aria-label="Treatment group" value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} className={className}>
       <option value="">— (single visit)</option>
       {groups.map((g) => (
         <option key={g} value={g}>{g}</option>
       ))}
-    </select>
+    </NativeSelect>
   );
 }
 
@@ -48,52 +65,54 @@ function ServiceRow({ service, canEdit, onChanged }: { service: Service; canEdit
 
   if (draft) {
     return (
-      <tr className="editing">
-        <td><strong>{service.code}</strong></td>
-        <td colSpan={7}>
-          <form className="inline" onSubmit={save}>
-            <input aria-label="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required maxLength={100} />
+      <TableRow className="bg-brand-soft/50 hover:bg-brand-soft/50">
+        <TableCell><strong className="font-semibold">{service.code}</strong></TableCell>
+        <TableCell colSpan={7}>
+          <form className="flex flex-wrap items-center gap-x-4 gap-y-2" onSubmit={save}>
+            <Input aria-label="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required maxLength={100} className="w-56" />
             {FLAGS.map((f) => (
-              <label key={f.key} className="check" title={f.help}>
-                <input type="checkbox" checked={draft[f.key]} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.checked })} />
+              <CheckLabel key={f.key} title={f.help}>
+                <Checkbox checked={draft[f.key]} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.checked })} />
                 {f.label}
-              </label>
+              </CheckLabel>
             ))}
-            <GroupSelect value={draft.treatment_group} onChange={(v) => setDraft({ ...draft, treatment_group: v })} />
-            <label className="check">
-              <input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />
+            <GroupSelect value={draft.treatment_group} onChange={(v) => setDraft({ ...draft, treatment_group: v })} className="w-44" />
+            <CheckLabel>
+              <Checkbox checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} />
               Active
-            </label>
-            <button type="submit" className="primary small" disabled={action.busy}>Save</button>
-            <button type="button" className="small" onClick={() => setDraft(null)}>Cancel</button>
+            </CheckLabel>
+            <span className="flex gap-2">
+              <Button type="submit" size="sm" disabled={action.busy}>Save</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
+            </span>
           </form>
           <ErrorBox message={action.error} />
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
     );
   }
 
   return (
-    <tr className={service.active ? undefined : "off"}>
-      <td><strong>{service.code}</strong></td>
-      <td>{service.name}</td>
+    <TableRow className={cn(!service.active && "text-muted-foreground")}>
+      <TableCell><strong className="font-semibold">{service.code}</strong></TableCell>
+      <TableCell>{service.name}</TableCell>
       {FLAGS.map((f) => (
-        <td key={f.key} className="center-cell">
+        <TableCell key={f.key} className="text-center">
           {service[f.key] && (
-            <span className="yes" title="Yes">
-              <CheckIcon size={16} />
+            <span title="Yes" className="inline-flex text-success">
+              <CheckIcon className="size-4" />
             </span>
           )}
-        </td>
+        </TableCell>
       ))}
-      <td>{service.treatment_group && <span className="tag">{service.treatment_group}</span>}</td>
-      <td>{service.active ? <Badge kind="ok">Active</Badge> : <Badge kind="closed">Inactive</Badge>}</td>
-      <td className="cell-actions">
+      <TableCell>{service.treatment_group && <UiBadge variant="outline">{service.treatment_group}</UiBadge>}</TableCell>
+      <TableCell>{service.active ? <Badge kind="ok">Active</Badge> : <Badge kind="closed">Inactive</Badge>}</TableCell>
+      <TableCell className="text-right">
         {canEdit && (
-          <button type="button" className="small" onClick={() => setDraft({ ...service })}>Edit</button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setDraft({ ...service })}>Edit</Button>
         )}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -116,36 +135,36 @@ function AddServiceForm({ onAdded }: { onAdded: () => void }) {
   }
 
   return (
-    <form className="card inline-form" onSubmit={submit}>
-      <div className="card-title">
-        <h3>Add a treatment</h3>
-        <p>Use the same code staff write in GPiS Remarks.</p>
-      </div>
-      <div className="fields">
-        <label>
-          Code
-          <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} required maxLength={20} size={8} />
-        </label>
-        <label>
-          Name
-          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required maxLength={100} />
-        </label>
-        <label>
-          Group
-          <GroupSelect value={form.treatment_group} onChange={(v) => setForm({ ...form, treatment_group: v })} />
-        </label>
-      </div>
-      <div className="checks">
-        {FLAGS.map((f) => (
-          <label key={f.key} className="check" title={f.help}>
-            <input type="checkbox" checked={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />
-            {f.label}
-          </label>
-        ))}
-      </div>
-      <ErrorBox message={action.error} />
-      <button type="submit" className="primary" disabled={action.busy}>Add treatment</button>
-    </form>
+    <Card>
+      <CardContent>
+        <form className="flex flex-col gap-4" onSubmit={submit}>
+          <SectionTitle title="Add a treatment">Use the same code staff write in GPiS Remarks.</SectionTitle>
+          <div className="grid items-end gap-4 sm:grid-cols-[160px_1fr_220px]">
+            <Field label="Code">
+              <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} required maxLength={20} size={8} />
+            </Field>
+            <Field label="Name">
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required maxLength={100} />
+            </Field>
+            <Field label="Group">
+              <GroupSelect value={form.treatment_group} onChange={(v) => setForm({ ...form, treatment_group: v })} />
+            </Field>
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            {FLAGS.map((f) => (
+              <CheckLabel key={f.key} title={f.help}>
+                <Checkbox checked={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />
+                {f.label}
+              </CheckLabel>
+            ))}
+          </div>
+          <ErrorBox message={action.error} />
+          <div>
+            <Button type="submit" disabled={action.busy}>Add treatment</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -153,38 +172,38 @@ export default function ServicesSection({ canEdit }: { canEdit: boolean }) {
   const services = useLoad(() => api.settings.services(), []);
 
   return (
-    <section>
-      <ul className="legend">
+    <section className="flex flex-col gap-4">
+      <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm text-muted-foreground">
         {FLAGS.map((f) => (
-          <li key={f.key}><strong>{f.label}</strong>: {f.help}</li>
+          <li key={f.key}><strong className="font-semibold text-foreground">{f.label}</strong>: {f.help}</li>
         ))}
-        <li><strong>Group</strong>: multi-step treatment; follow-up visits must be with the same doctor.</li>
+        <li><strong className="font-semibold text-foreground">Group</strong>: multi-step treatment; follow-up visits must be with the same doctor.</li>
       </ul>
       <ErrorBox message={services.error} onRetry={services.reload} />
       {services.data === undefined ? (
         services.loading && <Loading />
       ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Name</th>
+        <Card className="gap-0 overflow-hidden py-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Code</TableHead>
+                <TableHead>Name</TableHead>
                 {FLAGS.map((f) => (
-                  <th key={f.key}>{f.label}</th>
+                  <TableHead key={f.key} className="text-center">{f.label}</TableHead>
                 ))}
-                <th>Group</th>
-                <th>Status</th>
-                <th aria-label="Actions"></th>
-              </tr>
-            </thead>
-            <tbody>
+                <TableHead>Group</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead aria-label="Actions"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {services.data.map((s) => (
                 <ServiceRow key={`${JSON.stringify(s)}`} service={s} canEdit={canEdit} onChanged={services.reload} />
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       )}
       {canEdit && <AddServiceForm onAdded={services.reload} />}
     </section>

@@ -3,7 +3,12 @@
 
 import { useState, type FormEvent } from "react";
 import * as api from "../../api";
-import { Empty, ErrorBox, Loading } from "../../components";
+import { Empty, ErrorBox, Field, Loading, SectionTitle } from "../../components";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { NativeSelect } from "../../components/ui/native-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { clinicToday, formatDate } from "../../format";
 import { useAction, useLoad } from "../../hooks";
 import type { Doctor } from "../../types";
@@ -30,33 +35,33 @@ function AddLeaveForm({ doctors, onAdded }: { doctors: Doctor[]; onAdded: () => 
   }
 
   return (
-    <form className="card inline-form" onSubmit={submit}>
-      <div className="card-title">
-        <h3>Add doctor leave</h3>
-        <p>Only for leave that is not written in GPiS as an OFF DAY.</p>
-      </div>
-      <div className="fields">
-        <label>
-          Doctor
-          <select value={doctorId} onChange={(e) => setDoctorId(e.target.value)} required>
-            <option value="">Choose…</option>
-            {doctors.filter((d) => d.active).map((d) => (
-              <option key={d.id} value={d.id}>{d.display_name}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Date
-          <input type="date" value={date} min={clinicToday()} onChange={(e) => setDate(e.target.value)} required />
-        </label>
-        <label>
-          Reason (optional)
-          <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={100} />
-        </label>
-      </div>
-      <ErrorBox message={action.error} />
-      <button type="submit" className="primary" disabled={action.busy}>Add leave</button>
-    </form>
+    <Card>
+      <CardContent>
+        <form className="flex flex-col gap-4" onSubmit={submit}>
+          <SectionTitle title="Add doctor leave">Only for leave that is not written in GPiS as an OFF DAY.</SectionTitle>
+          <div className="grid items-end gap-4 sm:grid-cols-3">
+            <Field label="Doctor">
+              <NativeSelect value={doctorId} onChange={(e) => setDoctorId(e.target.value)} required>
+                <option value="">Choose…</option>
+                {doctors.filter((d) => d.active).map((d) => (
+                  <option key={d.id} value={d.id}>{d.display_name}</option>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field label="Date">
+              <Input type="date" value={date} min={clinicToday()} onChange={(e) => setDate(e.target.value)} required />
+            </Field>
+            <Field label="Reason (optional)">
+              <Input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={100} />
+            </Field>
+          </div>
+          <ErrorBox message={action.error} />
+          <div>
+            <Button type="submit" disabled={action.busy}>Add leave</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -73,8 +78,8 @@ export default function LeavesSection({ canEdit }: { canEdit: boolean }) {
   }
 
   return (
-    <section>
-      <p className="muted section-intro">
+    <section className="flex flex-col gap-4">
+      <p className="max-w-[80ch] text-sm text-muted-foreground">
         Leave from today onwards. A doctor on leave has no free slots that day. "OFF DAY" records in GPiS are
         also respected, so this list is only for leave that is not in GPiS.
       </p>
@@ -85,34 +90,34 @@ export default function LeavesSection({ canEdit }: { canEdit: boolean }) {
       ) : leaves.data.length === 0 ? (
         <Empty>No upcoming doctor leave.</Empty>
       ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Doctor</th>
-                <th>Reason</th>
-                {canEdit && <th aria-label="Actions"></th>}
-              </tr>
-            </thead>
-            <tbody>
+        <Card className="gap-0 overflow-hidden py-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Date</TableHead>
+                <TableHead>Doctor</TableHead>
+                <TableHead>Reason</TableHead>
+                {canEdit && <TableHead aria-label="Actions"></TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {leaves.data.map((l) => (
-                <tr key={`${l.doctor_id}-${l.leave_date}`}>
-                  <td className="nowrap">{formatDate(l.leave_date)}</td>
-                  <td>{names.get(l.doctor_id) ?? l.doctor_id}</td>
-                  <td>{l.reason}</td>
+                <TableRow key={`${l.doctor_id}-${l.leave_date}`}>
+                  <TableCell className="whitespace-nowrap">{formatDate(l.leave_date)}</TableCell>
+                  <TableCell>{names.get(l.doctor_id) ?? l.doctor_id}</TableCell>
+                  <TableCell>{l.reason}</TableCell>
                   {canEdit && (
-                    <td className="cell-actions">
-                      <button type="button" className="small danger-text" disabled={action.busy} onClick={() => remove(l.doctor_id, l.leave_date)}>
+                    <TableCell className="text-right">
+                      <Button type="button" size="sm" variant="ghost-destructive" disabled={action.busy} onClick={() => remove(l.doctor_id, l.leave_date)}>
                         Delete
-                      </button>
-                    </td>
+                      </Button>
+                    </TableCell>
                   )}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       )}
       {canEdit && doctors.data && <AddLeaveForm doctors={doctors.data} onAdded={leaves.reload} />}
     </section>

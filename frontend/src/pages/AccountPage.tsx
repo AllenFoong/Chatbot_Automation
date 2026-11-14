@@ -3,7 +3,9 @@
 import { useState, type FormEvent } from "react";
 import * as api from "../api";
 import { useUser } from "../auth";
-import { Avatar, Badge, ErrorBox, Notice, PageHeader, PasswordInput } from "../components";
+import { Avatar, Badge, ErrorBox, Notice, Page, PageHeader, PasswordInput, SectionTitle } from "../components";
+import { Button } from "../components/ui/button";
+import { Card, CardContent } from "../components/ui/card";
 import { useAction } from "../hooks";
 
 const MIN_PASSWORD = 8; // = backend/app/auth.py MIN_PASSWORD_LENGTH
@@ -31,29 +33,38 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="page narrow">
+    <Page className="max-w-[640px]">
       <PageHeader title="My account" />
-      <div className="card profile">
-        <Avatar name={me.name} />
-        <div>
-          <strong>{me.name}</strong>
-          <div className="muted small">Username: {me.username}</div>
-        </div>
-        <Badge kind={me.role}>{me.role === "ADMIN" ? "Admin" : "Staff"}</Badge>
-      </div>
-      <form className="card inline-form" onSubmit={submit}>
-        <div className="card-title">
-          <h3>Change password</h3>
-          <p>After the change, other computers where you are logged in need to log in again.</p>
-        </div>
-        <PasswordInput label="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" required />
-        <PasswordInput label={`New password (at least ${MIN_PASSWORD} characters)`} value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" minLength={MIN_PASSWORD} required />
-        <PasswordInput label="New password again" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" required />
-        {mismatch && <div className="error" role="alert">The new passwords are not the same.</div>}
-        <ErrorBox message={action.error} />
-        {done && <Notice tone="success">Password changed. Other computers where you were logged in need to log in again.</Notice>}
-        <button type="submit" className="primary" disabled={action.busy || mismatch}>Change password</button>
-      </form>
-    </div>
+      <Card className="py-4">
+        <CardContent className="flex items-center gap-3">
+          <Avatar name={me.name} className="size-10 text-sm" />
+          <div className="min-w-0 flex-1">
+            <strong className="font-semibold">{me.name}</strong>
+            <div className="text-xs text-muted-foreground">Username: {me.username}</div>
+          </div>
+          <Badge kind={me.role}>{me.role === "ADMIN" ? "Admin" : "Staff"}</Badge>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent>
+          <form className="flex flex-col gap-4" onSubmit={submit}>
+            <SectionTitle title="Change password">
+              After the change, other computers where you are logged in need to log in again.
+            </SectionTitle>
+            <PasswordInput label="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" required />
+            <PasswordInput label={`New password (at least ${MIN_PASSWORD} characters)`} value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" minLength={MIN_PASSWORD} required />
+            <PasswordInput label="New password again" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" required />
+            {mismatch && <ErrorBox message="The new passwords are not the same." />}
+            <ErrorBox message={action.error} />
+            {done && <Notice tone="success">Password changed. Other computers where you were logged in need to log in again.</Notice>}
+            <div>
+              <Button type="submit" disabled={action.busy || mismatch}>
+                Change password
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </Page>
   );
 }

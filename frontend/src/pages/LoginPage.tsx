@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth";
-import { APP_NAME, ErrorBox, PasswordInput, usePageTitle } from "../components";
+import { APP_NAME, ErrorBox, Field, PasswordInput, usePageTitle } from "../components";
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardHeader } from "../components/ui/card";
+import { Input } from "../components/ui/input";
 import { useAction } from "../hooks";
 import { ToothIcon } from "../icons";
 
@@ -18,40 +21,45 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login-screen">
-      <form className="login-card" onSubmit={submit}>
-        <div className="login-brand">
-          <span className="brand-mark">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 py-10">
+      <Card className="w-full max-w-sm gap-6 py-7 shadow-lg">
+        <CardHeader className="flex items-center gap-3 px-7">
+          <span className="flex size-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <ToothIcon size={22} />
           </span>
           <div>
-            <h1>{APP_NAME}</h1>
-            <p className="muted">Log in to see today's reminders.</p>
+            <h1 className="text-xl font-semibold tracking-tight">{APP_NAME}</h1>
+            <p className="text-sm text-muted-foreground">Log in to see today's reminders.</p>
           </div>
-        </div>
-        <label>
-          Username
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
-            autoFocus
-            required
-          />
-        </label>
-        <PasswordInput
-          label="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          required
-        />
-        <ErrorBox message={action.error} />
-        <button type="submit" className="primary block" disabled={action.busy}>
-          {action.busy ? "Logging in…" : "Log in"}
-        </button>
-      </form>
-      <p className="login-foot muted">For clinic staff only. Forgot your password? Ask the admin to reset it.</p>
+        </CardHeader>
+        <CardContent className="px-7">
+          <form className="flex flex-col gap-4" onSubmit={submit}>
+            <Field label="Username">
+              <Input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                autoFocus
+                required
+              />
+            </Field>
+            <PasswordInput
+              label="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+            <ErrorBox message={action.error} />
+            <Button type="submit" className="w-full" disabled={action.busy}>
+              {action.busy ? "Logging in…" : "Log in"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+      <p className="text-center text-xs text-muted-foreground">
+        For clinic staff only. Forgot your password? Ask the admin to reset it.
+      </p>
     </div>
   );
 }

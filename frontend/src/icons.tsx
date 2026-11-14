@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 function Icon({ children, size = 18 }: { children: ReactNode; size?: number }) {
   return (
     <svg
-      className="icon"
+      
       width={size}
       height={size}
       viewBox="0 0 24 24"

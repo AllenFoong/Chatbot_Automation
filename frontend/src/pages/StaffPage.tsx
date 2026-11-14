@@ -5,7 +5,13 @@
 import { useState, type FormEvent } from "react";
 import * as api from "../api";
 import { useUser } from "../auth";
-import { Badge, ErrorBox, Loading, PageHeader, PasswordInput } from "../components";
+import { Badge, ErrorBox, Field, Loading, Page, PageHeader, PasswordInput, SectionTitle } from "../components";
+import { Button } from "../components/ui/button";
+import { Card, CardContent } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { NativeSelect } from "../components/ui/native-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { cn } from "../lib/utils";
 import { useAction, useLoad } from "../hooks";
 import type { Role, StaffMember } from "../types";
 
@@ -21,11 +27,11 @@ function ResetPasswordForm({ member, onDone }: { member: StaffMember; onDone: ()
   }
 
   return (
-    <form className="inline" onSubmit={submit}>
-      <PasswordInput aria-label={`New password for ${member.username}`} placeholder="New password"
+    <form className="flex flex-wrap items-center justify-end gap-2" onSubmit={submit}>
+      <PasswordInput aria-label={`New password for ${member.username}`} placeholder="New password" className="w-48"
         autoComplete="new-password" minLength={MIN_PASSWORD} value={password} onChange={(e) => setPassword(e.target.value)} required />
-      <button type="submit" className="primary small" disabled={action.busy}>Set password</button>
-      <button type="button" className="small" onClick={onDone}>Cancel</button>
+      <Button type="submit" size="sm" disabled={action.busy}>Set password</Button>
+      <Button type="button" size="sm" variant="outline" onClick={onDone}>Cancel</Button>
       <ErrorBox message={action.error} />
     </form>
   );
@@ -41,24 +47,24 @@ function StaffRow({ member, isMe, onChanged }: { member: StaffMember; isMe: bool
 
   return (
     <>
-    <tr className={member.active ? undefined : "off"}>
-      <td><strong>{member.username}</strong>{isMe && <span className="muted"> (you)</span>}</td>
-      <td>{member.name}</td>
-      <td><Badge kind={member.role}>{member.role}</Badge></td>
-      <td>{member.active ? <Badge kind="ok">Active</Badge> : <Badge kind="closed">Inactive</Badge>}</td>
-      <td className="cell-actions">
+    <TableRow className={cn(!member.active && "text-muted-foreground")}>
+      <TableCell><strong className="font-semibold">{member.username}</strong>{isMe && <span className="text-muted-foreground"> (you)</span>}</TableCell>
+      <TableCell>{member.name}</TableCell>
+      <TableCell><Badge kind={member.role}>{member.role}</Badge></TableCell>
+      <TableCell>{member.active ? <Badge kind="ok">Active</Badge> : <Badge kind="closed">Inactive</Badge>}</TableCell>
+      <TableCell className="text-right">
         {resetting ? (
           <ResetPasswordForm member={member} onDone={() => setResetting(false)} />
         ) : (
-          <div className="row-actions">
-            <button type="button" className="small" disabled={action.busy}
+          <div className="flex justify-end gap-1.5 whitespace-nowrap">
+            <Button type="button" size="sm" variant="outline" disabled={action.busy}
               onClick={() => {
                 const role: Role = member.role === "ADMIN" ? "STAFF" : "ADMIN";
                 void update(`Change ${member.username} to ${role}?`, { role });
               }}>
               Make {member.role === "ADMIN" ? "staff" : "admin"}
-            </button>
-            <button type="button" className={member.active ? "small danger-text" : "small"} disabled={action.busy}
+            </Button>
+            <Button type="button" size="sm" variant={member.active ? "ghost-destructive" : "outline"} disabled={action.busy}
               onClick={() =>
                 update(
                   member.active
@@ -68,28 +74,28 @@ function StaffRow({ member, isMe, onChanged }: { member: StaffMember; isMe: bool
                 )
               }>
               {member.active ? "Deactivate" : "Activate"}
-            </button>
-            <button type="button" className="small" onClick={() => setResetting(true)}>Reset password</button>
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setResetting(true)}>Reset password</Button>
             {!isMe && (
-              <button type="button" className="small danger-text" disabled={action.busy}
+              <Button type="button" size="sm" variant="ghost-destructive" disabled={action.busy}
                 onClick={async () => {
                   if (window.confirm(`Delete ${member.username} permanently? Only accounts that were never used can be deleted; for a leaver, use Deactivate.`)
                     && (await action.run(() => api.staff.remove(member.id)))) onChanged();
                 }}>
                 Delete
-              </button>
+              </Button>
             )}
           </div>
         )}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
     {action.error && (
       // 错误另起一整行（例：删不掉的原因很长），不要挤在按钮那一格
-      <tr className="row-error">
-        <td colSpan={5}>
+      <TableRow className="hover:bg-transparent">
+        <TableCell colSpan={5}>
           <ErrorBox message={action.error} />
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
     )}
     </>
   );
@@ -119,36 +125,36 @@ function AddStaffForm({ onAdded }: { onAdded: () => void }) {
   }
 
   return (
-    <form className="card inline-form" onSubmit={submit}>
-      <div className="card-title">
-        <h3>Add a staff account</h3>
-        <p>
-          Give the first password to the person directly (not by WhatsApp group). They can change it under their name
-          at the bottom left.
-        </p>
-      </div>
-      <div className="fields">
-        <label>
-          Username
-          <input value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} autoComplete="off" required />
-        </label>
-        <label>
-          Name
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
-        </label>
-        <label>
-          Role
-          <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-            <option value="STAFF">Staff</option>
-            <option value="ADMIN">Admin (settings, accounts)</option>
-          </select>
-        </label>
-        <PasswordInput key={added} label={`Password (at least ${MIN_PASSWORD} characters)`} value={password}
-          onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={MIN_PASSWORD} required />
-      </div>
-      <ErrorBox message={action.error} />
-      <button type="submit" className="primary" disabled={action.busy}>Add account</button>
-    </form>
+    <Card>
+      <CardContent>
+        <form className="flex flex-col gap-4" onSubmit={submit}>
+          <SectionTitle title="Add a staff account">
+            Give the first password to the person directly (not by WhatsApp group). They can change it under their
+            name at the bottom left.
+          </SectionTitle>
+          <div className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Username">
+              <Input value={username} onChange={(e) => setUsername(e.target.value.toLowerCase())} autoComplete="off" required />
+            </Field>
+            <Field label="Name">
+              <Input value={name} onChange={(e) => setName(e.target.value)} required />
+            </Field>
+            <Field label="Role">
+              <NativeSelect value={role} onChange={(e) => setRole(e.target.value as Role)}>
+                <option value="STAFF">Staff</option>
+                <option value="ADMIN">Admin (settings, accounts)</option>
+              </NativeSelect>
+            </Field>
+            <PasswordInput key={added} label={`Password (at least ${MIN_PASSWORD} characters)`} value={password}
+              onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={MIN_PASSWORD} required />
+          </div>
+          <ErrorBox message={action.error} />
+          <div>
+            <Button type="submit" disabled={action.busy}>Add account</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -157,7 +163,7 @@ export default function StaffPage() {
   const list = useLoad(() => api.staff.list(), []);
 
   return (
-    <div className="page">
+    <Page>
       <PageHeader
         title="Staff accounts"
         description="Who can log in. Deactivate leavers (their history stays); delete only accounts made by mistake. Admins can also change settings and accounts."
@@ -166,26 +172,26 @@ export default function StaffPage() {
       {list.data === undefined ? (
         list.loading && <Loading />
       ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th aria-label="Actions"></th>
-              </tr>
-            </thead>
-            <tbody>
+        <Card className="gap-0 overflow-hidden py-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Username</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead aria-label="Actions"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {list.data.map((m) => (
                 <StaffRow key={`${m.id}-${m.role}-${m.active}`} member={m} isMe={m.id === me.id} onChanged={list.reload} />
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       )}
       <AddStaffForm onAdded={list.reload} />
-    </div>
+    </Page>
   );
 }

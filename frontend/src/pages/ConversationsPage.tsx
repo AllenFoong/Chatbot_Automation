@@ -3,10 +3,18 @@
 // 回复经 WhatsApp 真的发出去（Phase 5），每条发出的消息显示送到哪一步；24 小时规则由后端算。
 // 列表每 15 秒、打开的对话每 10 秒自动更新：病人的新消息、送达状态会自己出现。
 
+import { SendIcon } from "lucide-react";
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import * as api from "../api";
 import { Avatar, Badge, Empty, ErrorBox, Loading, Notice, Tabs, usePageTitle } from "../components";
+import { Button } from "../components/ui/button";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
+import { cn } from "../lib/utils";
+
+/** 左右两块的外框：白色、圆角，里面自己上下拉 */
+const pane = "min-h-0 overflow-y-auto rounded-xl border bg-card shadow-xs";
 import { formatDateTime, formatPhone } from "../format";
 import { useAction, useLoad } from "../hooks";
 import type { Conversation, ConversationDetail, ConversationMode, Sender, WaStatus } from "../types";
@@ -51,47 +59,57 @@ function ConversationList({ selectedId }: { selectedId: number | null }) {
   const list = useLoad(() => api.conversations.list(filter === "OPEN" ? undefined : filter), [filter], 15_000);
 
   return (
-    <section className="list-pane">
-      <div className="pane-head">
-        <h1>Conversations</h1>
+    <section className={cn(pane, "flex flex-col", selectedId && "max-[860px]:hidden")}>
+      <div className="sticky top-0 z-[1] flex flex-col gap-3 border-b bg-card p-4">
+        <h1 className="text-lg font-semibold tracking-tight">Conversations</h1>
         <Tabs label="Conversation filter" value={filter} options={FILTERS} onChange={setFilter} />
       </div>
-      <ErrorBox message={list.error} onRetry={list.reload} />
-      {list.data === undefined ? (
-        list.loading && <Loading />
-      ) : list.data.length === 0 ? (
-        <Empty>No conversations.</Empty>
-      ) : (
-        <ul className="conversation-list">
-          {list.data.map((c) => (
-            <li key={c.id}>
-              <Link
-                to={`/conversations/${c.id}`}
-                className={c.id === selectedId ? "selected" : undefined}
-                aria-current={c.id === selectedId ? "page" : undefined}
-              >
-                <Avatar name={displayName(c)} />
-                <div className="conversation-item">
-                  <div className="row-between">
-                    <strong>{displayName(c)}</strong>
-                    <Badge kind={c.mode}>{MODE_LABEL[c.mode]}</Badge>
-                  </div>
-                  {c.last_message_preview && (
-                    <div className="preview">
-                      {c.last_message_sender && <span className="muted">{SENDER_LABEL[c.last_message_sender]}: </span>}
-                      {c.last_message_preview}
+      <div className="flex flex-col gap-3 p-2 empty:hidden [&>[data-slot=alert]]:m-2">
+        <ErrorBox message={list.error} onRetry={list.reload} />
+        {list.data === undefined ? (
+          list.loading && <div className="p-2"><Loading /></div>
+        ) : list.data.length === 0 ? (
+          <Empty>No conversations.</Empty>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+            {list.data.map((c) => {
+              const selected = c.id === selectedId;
+              return (
+                <li key={c.id}>
+                  <Link
+                    to={`/conversations/${c.id}`}
+                    aria-current={selected ? "page" : undefined}
+                    className={cn(
+                      "flex gap-3 rounded-lg p-3 text-foreground no-underline transition-colors outline-none hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/30",
+                      selected && "bg-brand-soft hover:bg-brand-soft",
+                    )}
+                  >
+                    <Avatar name={displayName(c)} />
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <strong className="truncate font-semibold">{displayName(c)}</strong>
+                        <Badge kind={c.mode}>{MODE_LABEL[c.mode]}</Badge>
+                      </div>
+                      {c.last_message_preview && (
+                        <div className="line-clamp-2 text-sm text-text-2">
+                          {c.last_message_sender && (
+                            <span className="text-muted-foreground">{SENDER_LABEL[c.last_message_sender]}: </span>
+                          )}
+                          {c.last_message_preview}
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground">
+                        {formatDateTime(c.last_message_at ?? c.created_at)}
+                        {c.assigned_staff_name && ` · ${c.assigned_staff_name}`}
+                      </div>
                     </div>
-                  )}
-                  <div className="muted small">
-                    {formatDateTime(c.last_message_at ?? c.created_at)}
-                    {c.assigned_staff_name && ` · ${c.assigned_staff_name}`}
-                  </div>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }
@@ -129,27 +147,29 @@ function ReplyForm({ conversation: c, onSent }: { conversation: ConversationDeta
   }
 
   return (
-    <form className="reply" onSubmit={send}>
-      <label>
+    <form className="flex flex-col gap-2 border-t pt-4" onSubmit={send}>
+      <Label className="flex flex-col items-stretch gap-1.5 text-text-2">
         Reply on WhatsApp
-        <textarea
+        <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           maxLength={MAX_REPLY_LENGTH}
           rows={3}
           placeholder="Type your reply…"
+          className="font-normal"
         />
-      </label>
+      </Label>
       <ErrorBox message={action.error} />
-      <div className="row-between">
-        <span className="muted small">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-xs text-muted-foreground">
           You can reply until {formatDateTime(ends)}.
           {c.mode === "BOT" && " Replying takes over this conversation from the AI."}
         </span>
-        <button type="submit" className="primary" disabled={action.busy || !text.trim()}>
+        <Button type="submit" disabled={action.busy || !text.trim()}>
+          <SendIcon />
           {action.busy ? "Sending…" : "Send"}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -167,7 +187,7 @@ function ConversationView({ id }: { id: number }) {
 
   if (c === undefined) {
     return (
-      <section className="detail-pane">
+      <section className={cn(pane, "flex flex-col gap-4 p-5")}>
         <ErrorBox message={conversation.error} onRetry={conversation.reload} />
         {conversation.loading && <Loading />}
       </section>
@@ -175,32 +195,33 @@ function ConversationView({ id }: { id: number }) {
   }
 
   return (
-    <section className="detail-pane">
-      <header className="detail-header">
-        <div className="detail-title">
-          <Avatar name={displayName(c)} />
-          <div>
-            <h2>{displayName(c)}</h2>
-            <div className="muted small">
+    <section className={cn(pane, "flex flex-col gap-4 p-5")}>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar name={displayName(c)} className="size-10 text-sm" />
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-semibold">{displayName(c)}</h2>
+            <div className="text-xs text-muted-foreground">
               {formatPhone(c.wa_phone)} · started {formatDateTime(c.created_at)}
               {c.closed_at && ` · closed ${formatDateTime(c.closed_at)}`}
             </div>
           </div>
         </div>
-        <div className="actions">
+        <div className="flex flex-wrap items-center gap-2">
           {c.mode === "BOT" && (
-            <button type="button" className="primary" disabled={action.busy} onClick={() => act(api.conversations.takeOver)}>
+            <Button type="button" disabled={action.busy} onClick={() => act(api.conversations.takeOver)}>
               Take over
-            </button>
+            </Button>
           )}
           {c.mode === "HUMAN" && (
-            <button type="button" disabled={action.busy} onClick={() => act(api.conversations.handBack)}>
+            <Button type="button" variant="outline" disabled={action.busy} onClick={() => act(api.conversations.handBack)}>
               Hand back to AI
-            </button>
+            </Button>
           )}
           {c.mode !== "CLOSED" && (
-            <button
+            <Button
               type="button"
+              variant="outline"
               disabled={action.busy}
               onClick={() => {
                 if (window.confirm("Close this conversation? If the patient writes again, a new conversation starts.")) {
@@ -209,11 +230,11 @@ function ConversationView({ id }: { id: number }) {
               }}
             >
               Close
-            </button>
+            </Button>
           )}
-          <button type="button" className="ghost" onClick={() => navigate("/conversations")}>
+          <Button type="button" variant="ghost" onClick={() => navigate("/conversations")}>
             Back to list
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -227,19 +248,33 @@ function ConversationView({ id }: { id: number }) {
 
       <ErrorBox message={action.error ?? conversation.error} />
 
-      <ol className="messages" aria-label="Messages">
-        {c.messages.map((m) => (
-          <li key={m.id} className={`message from-${m.sender.toLowerCase()}`}>
-            <div className="bubble">{m.body}</div>
-            <div className="muted small">
-              {SENDER_LABEL[m.sender]} · {formatDateTime(m.created_at)}
-              {m.wa_status && (
-                <span className={`status status-${m.wa_status.toLowerCase()}`}> · {STATUS_LABEL[m.wa_status]}</span>
-              )}
-            </div>
-            {m.wa_status === "FAILED" && <div className="error small">{m.wa_error}</div>}
-          </li>
-        ))}
+      <ol className="m-0 flex flex-1 list-none flex-col gap-3 p-0 py-1" aria-label="Messages">
+        {c.messages.map((m) => {
+          const patient = m.sender === "CUSTOMER";
+          return (
+            <li key={m.id} className={cn("flex max-w-[min(75%,640px)] flex-col gap-1", patient ? "self-start" : "items-end self-end")}>
+              <div
+                className={cn(
+                  "rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]",
+                  patient && "rounded-bl-sm bg-muted",
+                  m.sender === "BOT" && "rounded-br-sm bg-bubble-ai",
+                  m.sender === "STAFF" && "rounded-br-sm bg-bubble-staff",
+                )}
+              >
+                {m.body}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {SENDER_LABEL[m.sender]} · {formatDateTime(m.created_at)}
+                {m.wa_status && (
+                  <span className={cn(m.wa_status === "READ" && "text-info", m.wa_status === "FAILED" && "font-medium text-destructive")}>
+                    {" "}· {STATUS_LABEL[m.wa_status]}
+                  </span>
+                )}
+              </div>
+              {m.wa_status === "FAILED" && <div className="text-xs text-destructive">{m.wa_error}</div>}
+            </li>
+          );
+        })}
       </ol>
 
       <ReplyForm conversation={c} onSent={conversation.reload} />
@@ -253,12 +288,13 @@ export default function ConversationsPage() {
   const selectedId = id !== undefined && /^\d+$/.test(id) ? Number(id) : null;
 
   return (
-    <div className={selectedId ? "split has-detail" : "split"}>
+    // 电脑萤幕：左边列表、右边对话，各自上下拉。窄的萤幕：打开一段对话时只显示对话，没打开时只显示列表
+    <div className="mx-auto grid max-w-[1400px] gap-4 min-[861px]:h-[calc(100vh-76px)] min-[861px]:grid-cols-[340px_minmax(0,1fr)]">
       <ConversationList selectedId={selectedId} />
       {selectedId ? (
         <ConversationView key={selectedId} id={selectedId} />
       ) : (
-        <section className="detail-pane placeholder">
+        <section className={cn(pane, "flex items-center justify-center p-5 max-[860px]:hidden [&>div]:border-0")}>
           <Empty>Select a conversation.</Empty>
         </section>
       )}

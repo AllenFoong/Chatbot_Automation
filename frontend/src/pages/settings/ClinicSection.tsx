@@ -3,7 +3,13 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import * as api from "../../api";
-import { ErrorBox, Loading, Switch } from "../../components";
+import { CheckIcon } from "lucide-react";
+import { ErrorBox, Field, Loading, SectionTitle, Switch } from "../../components";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { NativeSelect } from "../../components/ui/native-select";
+import { Separator } from "../../components/ui/separator";
 import { useAction, useLoad } from "../../hooks";
 import type { ClinicSettings } from "../../types";
 
@@ -48,66 +54,73 @@ export default function ClinicSection({ canEdit }: { canEdit: boolean }) {
 
   const choices = [1, 2, 3];
   return (
-    <form className="card inline-form settings-form" onSubmit={submit}>
-      <div className="card-title">
-        <h3>Slot limits</h3>
-        <p>How many patients can share one 30-minute slot, and the clinic's own contact in GPiS.</p>
-      </div>
-      <label>
-        Patients per slot (at most)
-        <select value={form.max_per_slot} disabled={!canEdit} onChange={(e) => change({ max_per_slot: Number(e.target.value) })}>
-          {choices.map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-      </label>
-      <p className="help">The 3rd place is only for short treatments ("Can be 3rd") and only when the slots next to it are not full.</p>
+    <Card className="max-w-2xl">
+      <CardContent>
+        <form className="flex flex-col gap-5" onSubmit={submit}>
+          <SectionTitle title="Slot limits">
+            How many patients can share one 30-minute slot, and the clinic's own contact in GPiS.
+          </SectionTitle>
+          <Field
+            label="Patients per slot (at most)"
+            help={'The 3rd place is only for short treatments ("Can be 3rd") and only when the slots next to it are not full.'}
+          >
+            <NativeSelect value={form.max_per_slot} disabled={!canEdit} onChange={(e) => change({ max_per_slot: Number(e.target.value) })} className="max-w-40">
+              {choices.map((n) => <option key={n} value={n}>{n}</option>)}
+            </NativeSelect>
+          </Field>
 
-      <label>
-        Patients per slot the AI may book (at most)
-        <select value={form.max_per_slot_for_ai} disabled={!canEdit} onChange={(e) => change({ max_per_slot_for_ai: Number(e.target.value) })}>
-          {choices.map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-      </label>
-      <p className="help">Set to 2 to keep the 3rd place for staff only.</p>
+          <Field label="Patients per slot the AI may book (at most)" help="Set to 2 to keep the 3rd place for staff only.">
+            <NativeSelect value={form.max_per_slot_for_ai} disabled={!canEdit} onChange={(e) => change({ max_per_slot_for_ai: Number(e.target.value) })} className="max-w-40">
+              {choices.map((n) => <option key={n} value={n}>{n}</option>)}
+            </NativeSelect>
+          </Field>
 
-      <label>
-        Clinic's own ContactID in GPiS
-        <input type="number" min={1} value={form.clinic_contact_id} disabled={!canEdit}
-          onChange={(e) => change({ clinic_contact_id: Number(e.target.value) })} required />
-      </label>
-      <p className="help">Appointments under this contact (other than OFF DAY) mark the day for staff review.</p>
+          <Field
+            label="Clinic's own ContactID in GPiS"
+            help="Appointments under this contact (other than OFF DAY) mark the day for staff review."
+          >
+            <Input type="number" min={1} value={form.clinic_contact_id} disabled={!canEdit} className="max-w-40"
+              onChange={(e) => change({ clinic_contact_id: Number(e.target.value) })} required />
+          </Field>
 
-      <div className="card-title">
-        <h3>Auto-confirm from GPiS</h3>
-        <p>
-          Every 3 minutes (9:00–17:30) the system looks in GPiS for the appointments staff entered. A request is
-          confirmed and the patient is messaged only when GPiS has exactly the same patient, date, time, doctor,
-          treatment and length. Everything else still waits for <em>Entered in GPiS</em>.
-        </p>
-      </div>
-      <Switch
-        label="Confirm matching requests automatically"
-        checked={form.auto_confirm}
-        disabled={!canEdit}
-        onChange={(on) => change({ auto_confirm: on })}
-      />
-      {/* 关的时候不写说明（开发者 2026-10-18 要的）；拨了还没 Save 的才写 Press Save to apply. */}
-      {form.auto_confirm && (
-        <p className="help">
-          Off by default. Turn it on after staff have used Entered in GPiS for a while and the requests match GPiS.
-          New patients are never confirmed automatically the first time.
-        </p>
-      )}
-      {canEdit && stored && form.auto_confirm !== stored.auto_confirm && (
-        <p className="help">Press Save to apply.</p>
-      )}
+          <Separator />
 
-      <ErrorBox message={action.error} />
-      {canEdit && (
-        <div className="actions">
-          <button type="submit" className="primary" disabled={action.busy}>Save</button>
-          {saved && <span className="ok">Saved.</span>}
-        </div>
-      )}
-    </form>
+          <SectionTitle title="Auto-confirm from GPiS">
+            Every 3 minutes (9:00–17:30) the system looks in GPiS for the appointments staff entered. A request is
+            confirmed and the patient is messaged only when GPiS has exactly the same patient, date, time, doctor,
+            treatment and length. Everything else still waits for <em>Entered in GPiS</em>.
+          </SectionTitle>
+          <Switch
+            label="Confirm matching requests automatically"
+            checked={form.auto_confirm}
+            disabled={!canEdit}
+            onChange={(on) => change({ auto_confirm: on })}
+          />
+          {/* 关的时候不写说明（开发者 2026-10-18 要的）；拨了还没 Save 的才写 Press Save to apply. */}
+          {form.auto_confirm && (
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Off by default. Turn it on after staff have used Entered in GPiS for a while and the requests match GPiS.
+              New patients are never confirmed automatically the first time.
+            </p>
+          )}
+          {canEdit && stored && form.auto_confirm !== stored.auto_confirm && (
+            <p className="-mt-2 text-xs font-medium text-warning">Press Save to apply.</p>
+          )}
+
+          <ErrorBox message={action.error} />
+          {canEdit && (
+            <div className="flex items-center gap-3">
+              <Button type="submit" disabled={action.busy}>Save</Button>
+              {saved && (
+                <span className="flex items-center gap-1 text-sm font-medium text-success">
+                  <CheckIcon className="size-4" aria-hidden="true" />
+                  Saved.
+                </span>
+              )}
+            </div>
+          )}
+        </form>
+      </CardContent>
+    </Card>
   );
 }

@@ -25,7 +25,7 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import * as api from "../api";
-import { PageHeader } from "../components";
+import { Page, PageHeader } from "../components";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -545,7 +545,7 @@ export default function RemindersPage() {
   }
 
   return (
-    <div className="page">
+    <Page>
       <PageHeader
         title="Reminders"
         description={data ? <Summary data={data} /> : "Appointments from GPiS, ready to send on WhatsApp."}
@@ -687,6 +687,6 @@ export default function RemindersPage() {
           </Tabs>
         </>
       )}
-    </div>
+    </Page>
   );
 }
