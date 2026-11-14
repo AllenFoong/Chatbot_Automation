@@ -176,7 +176,7 @@ describe("reminders", () => {
     expect(screen.queryByRole("link", { name: /Open in WhatsApp/ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Not appointments 3" }));
-    expect(screen.getByText(/Cancelled or postponed/)).toHaveTextContent("Cancelled or postponed: 2");
+    expect(screen.getByText("Cancelled or postponed").closest("li")).toHaveTextContent("Cancelled or postponed2");
   });
 
   it("can show another date and go back", async () => {

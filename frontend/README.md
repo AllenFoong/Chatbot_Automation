@@ -15,7 +15,11 @@ React 19 + TypeScript + Vite。只多用了一个套件 React Router（网址 �
 | `src/App.tsx` | 外框：左边的选单、各个页面的网址；登录后先到 Reminders（D66） |
 | `src/components.tsx` | 共用的小元件：每页的标题（`PageHeader`）、提醒框（`Notice`）、分页按钮（`Tabs`）、错误、读取中、没有资料 |
 | `src/icons.tsx` | 画面上的小图示（自己画的 SVG，不用图示套件） |
-| `src/styles.css` | 全部的样式；颜色、大小放在最上面的变数里（D66） |
+| `src/index.css` | 样式的入口（D83）：Tailwind + shadcn/ui 的颜色（= `styles.css` 的变数），再放进原来的 `styles.css` |
+| `src/styles.css` | 原来的样式（还没换成 shadcn/ui 的页面用）；颜色、大小放在最上面的变数里（D66） |
+| `src/components/ui/` | shadcn/ui 的元件（D83）：Button、Card、Badge、Tabs、Dialog、Alert … 先只有 Reminders 用 |
+| `src/lib/utils.ts` | shadcn/ui 的 `cn()`（合并 class） |
+| `components.json` | shadcn/ui 的设定：开发电脑可以用 `npx shadcn@latest add <元件>` 加新的元件 |
 | `src/hooks.ts` | `useLoad`（读资料、自动更新）、`useAction`（按钮做事情） |
 | `src/format.ts` | 日期时间的显示（一律马来西亚时间） |
 | `src/schedule.ts` | 排班送出前的检查（和数据库的 CHECK 一样，信息比较好懂） |
@@ -198,6 +202,38 @@ headless Chromium 点过：登入的密码栏按眼睛看得到；新增再删�
 *Back* 关掉不送任何请求）；`npm run build` 成功；headless Chromium 1366 / 400 宽截图、Esc 和点视窗外面都关得掉；
 *Entered in GPiS ✓* 的视窗改成共用同一个 `Modal` 之后照旧。找到、已经改好：400 宽时视窗下面 3 个按钮挤出视窗 → 按钮会换行。
 
+## Reminders 换成 shadcn/ui（D83）：在开发电脑上测试
+
+**只有 Reminders 换了**，其他页面应该和以前一模一样（云端截图比过：Conversations、Requests、Settings、Staff accounts、My account、登录画面，每个像素都一样）。
+有新套件，`git pull` 之后要先 `npm ci`。
+
+```powershell
+cd frontend
+git pull
+npm ci                        # 装新套件（Tailwind、Radix、lucide-react …）
+npm test                      # 应该 66 passed
+npm run build                 # ✓ built
+npm run dev                   # 视窗 1 的 Admin API 也要开着；backend\.env 加 REMINDER_SOURCE=demo
+```
+
+打开 `http://localhost:5173` 登录：
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的指令 | `npm test` 66 passed；`npm run build` 成功 |
+| 2 | *Reminders* | 上面 *Appointment date*、*Show*、**Extra note**、*Refresh* 是新的按钮；黄色的 *Preview only …*；分页变成灰底、选到的是白色（*Ready 2*）；右边 *Opened in WhatsApp: 0 of 2* 和进度条 |
+| 3 | 看 *Ready* 的卡片 | 名字、号码、右上角灰色 *To send*；时间在浅灰框里；绿色 **Open in WhatsApp**（号码在允许名单的那张）、*Copy message*；最下面 *Message* 和红字 *NO WA: stop reminders* |
+| 4 | 按 *Message* | 整条消息在卡片下面整行打开；旁边的卡片高度不变；再按收起来 |
+| 5 | **Open in WhatsApp**（不要按 Enter）→ 回来 | 卡片变绿色底、*Opened*（绿色勾）、进度 *1 of 2*；按 **Mark as not sent** → 黄色 *Not sent* |
+| 6 | *Needs staff* | 每个问题前面有黄色三角形（例 *Lab work not marked as arrived (*C)*）；*Landline* 是黄色小标签 |
+| 7 | *Not appointments* | 一个白框，左边原因、右边数字 |
+| 8 | **Extra note** | 弹出视窗：输入框、字数、*Preview*（边打边变）；Esc、右上角 ×、点视窗外面、*Cancel* 都是关掉不存 |
+| 9 | *Appointment date* 选一天 → *Show* → *Back to today's reminders* | 和以前一样 |
+| 10 | 视窗缩窄（或手机宽度） | 卡片一排一张、按钮换行、没有左右卷动 |
+| 11 | 其他页面（Conversations、Requests、Settings、Staff accounts、My account） | **和以前一样**，没有变样 |
+
+觉得好看、好用，再换下一页（建议 Requests，D83）。不喜欢的地方（颜色、大小、排法）直接说，改 `src/index.css` 或 `src/components/ui/` 就好。
+
 ## 上线
 
 `npm run build` 产生的 `dist\` 是普通的 HTML / JS / CSS 文件，要和 `/api` 放在**同一个网址**下，cookie 才会带上。
@@ -242,3 +278,15 @@ headless Chromium 点过：登入的密码栏按眼睛看得到；新增再删�
 - *Import public holidays for 2026* → *Added 11 day(s)*：1 月 1 日 + 诊所给的 10 天，没有替代假（3 月 24 日、11 月 9 日）。
 - *Import public holidays for 2027* → *Added 11 day(s)*：和诊所的名单一样（Deepavali 10 月 28 日：诊所漏写了，W59）。
 - 加 `2026-09-02 Test closure`：`python -m app.cli 2026-09-02 PHANG S+P` → `CLINIC_CLOSED`；`python -m app.reminders_cli 2026-09-02` → Ready 0，25 个预约在 *Needs staff*（*Clinic is closed that day (Test closure)*）；删掉之后变回 `OK`（W56）。
+
+### Reminders 换成 shadcn/ui（D83，2026-11-14，云端容器，只用假资料）
+
+- 新套件（版本固定）：`radix-ui` 1.8.1、`class-variance-authority` 0.7.1、`clsx` 2.1.1、`tailwind-merge` 3.7.0、`lucide-react` 1.72.0；
+  开发用 `tailwindcss` / `@tailwindcss/vite` 4.3.5、`tw-animate-css` 1.4.0；`npm audit --omit=dev`：0 vulnerabilities；
+  `package-lock.json` 有 Windows 用的 `@tailwindcss/oxide-win32-x64-msvc`、`lightningcss-win32-x64-msvc`。
+- shadcn 的网站（ui.shadcn.com）云端连不到：`src/components/ui/` 照 new-york v4 的原始码写（Button、Card、Badge、Alert、Tabs、Dialog、Textarea、Input、Label、Progress、Collapsible、Separator）。
+- `npm test` → 66 passed（测试只改一行：*Not appointments* 原因后面不再有冒号）；`npm run build` 成功（JS 约 136 kB gzip，以前 102 kB）。
+- headless Chromium（`REMINDER_SOURCE=demo`）：Reminders 1366 / 400 宽（Ready、打开 *Message*、Needs staff、Not appointments、Extra note 视窗），400 宽没有左右卷动；
+  其他 6 个画面（Conversations、Requests、Settings、Staff accounts、My account、登录）和换之前的版本**逐像素比较一样**。
+- 找到、已经改好：打开 *Message* 时消息挤在 *NO WA* 旁边很窄、旁边的卡片跟着变高 → 消息改成卡片下面整行、卡片各自的高度；*Needs staff* 卡片左边的黄线和圆角不搭 → 拿掉。
+
