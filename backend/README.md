@@ -1268,7 +1268,7 @@ AI 怎么说话照 D80：不主动说自己是 AI，但被问时不说是真人�
 | `app/reminders.py` | `ReminderText.note`、`render_message` 把它放在最后、`clean_note`（换行统一、拿掉前后空白） |
 | `app/api/reminders.py` | `GET /api/reminders` 多 `note`（内容、谁、几点改的）；`PUT /api/reminders/note`（最多 500 字） |
 | `app/api/staff.py` | 改过这段话的账号不能删（D75） |
-| `frontend/src/pages/RemindersPage.tsx` | 上面的 **Extra note** 按钮 → 弹出视窗（和 *Requests* 共用 `Modal`）：输入 → **Save note**；存了视窗关掉、重新读名单 |
+| `frontend/src/pages/RemindersPage.tsx` | 上面的 **Extra note** 按钮 → 弹出视窗（和 *Requests* 共用 `Modal`）：输入、下面 **Preview** 马上看到整条消息（名单上第一条 + 正在打的话）→ **Save note**；存了视窗关掉、重新读名单 |
 
 ### 更新（开发电脑）
 
@@ -1281,7 +1281,7 @@ pytest                        # 应该 535 passed，没有 skipped
 
 # frontend
 cd ..\frontend
-npm test                      # 应该 63 passed
+npm test                      # 应该 66 passed
 npm run build                 # ✓ built
 ```
 
@@ -1291,9 +1291,10 @@ npm run build                 # ✓ built
 
 | # | 做什么 | 应该看到 |
 |---|---|---|
-| 1 | 上面的「更新」 | `0008 (head)`；`pytest` 535 passed、没有 skipped；`npm test` 63 passed；`npm run build` 成功 |
+| 1 | 上面的「更新」 | `0008 (head)`；`pytest` 535 passed、没有 skipped；`npm test` 66 passed；`npm run build` 成功 |
 | 2 | 用 **STAFF** 帐号登入 → *Reminders* | 上面 *Refresh* 旁边有 **Extra note** 按钮（旁边没有 *On*）；页面上没有多出固定的区块 |
-| 3 | 按 **Extra note** → 弹出视窗输入两行 `Feel free to pay cash 💵` / `可以付现金哦` → **Save note** | 视窗关掉；按钮旁边多绿色 *On*；再按开视窗：那两行还在、*Last changed by <你的名字> at <现在>*；按 **Cancel** 关掉 |
+| 3 | 按 **Extra note** → 弹出视窗输入两行 `Feel free to pay cash 💵` / `可以付现金哦`（先不存）| 下面 **Preview** 是名单上第一条消息，最后 `See you!` 空一行接着正在打的两行，边打边变、自己拉到最下面 |
+| 3b | **Save note** | 视窗关掉；按钮旁边多绿色 *On*；再按开视窗：那两行还在、*Last changed by <你的名字> at <现在>*；按 **Cancel** 关掉 |
 | 4 | *Ready* 的 Demo Patient A & B → 打开 **Message** | 消息最后 `See you!` 后面空一行，接着那两行 |
 | 5 | **Copy message** → 贴到记事本 | 最后也有那两行 |
 | 6 | 按 Demo Patient A & B 的 **Open in WhatsApp**（自己的手机号码在允许名单）→ 看 WhatsApp Desktop 填好的消息（**不要按 Enter**）→ 回来按 **Mark as not sent** | 填好的消息最后有那两行 |
@@ -1313,4 +1314,7 @@ npm run build                 # ✓ built
   Demo Patient A & B 的 **Message** 最后有那两行；400 宽没有横向卷动。
 - 2026-11-14 改成弹出视窗（开发者要的，不要固定在页面上的区块）：`npm test` → 63 passed（加 → 存 → 视窗关掉、按钮 *On* → 改 → 清空；
   *Cancel* 不存；存不了时视窗和输入的字都还在）；headless Chromium 1366 / 400 宽看过视窗，400 宽没有横向卷动。
+- 2026-11-14 弹出视窗加 **Preview**（开发者要的）：名单上第一条消息拿掉已经存的那段话、再接正在打的（和后端一样：空一行、前后空白不算），
+  没有消息时写在哪里；`npm test` → 66 passed（边打边变、旧的那段话换掉不会出现两次、没有消息、和后端一样的整理）；
+  headless Chromium 1366 / 400 宽：预览最后是 `See you!` + 空一行 + 打的两行。
 

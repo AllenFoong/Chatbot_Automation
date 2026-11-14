@@ -1329,6 +1329,16 @@ ul.error {
   width: 100%;
 }
 
+.reminder-note h3 {
+  margin: 0;
+}
+
+.note-preview {
+  margin: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
 .message-preview {
   margin: 0;
   max-width: 640px;

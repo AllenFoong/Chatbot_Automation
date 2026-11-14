@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { whatsappLink } from "./pages/RemindersPage";
+import { previewBase, whatsappLink, withNote } from "./pages/RemindersPage";
 import { STAFF, err, fakeApi, fakeReminderList, ok } from "./test/fakeApi";
 import type { ReminderRecord } from "./types";
 import { renderApp } from "./test/render";
@@ -251,6 +251,42 @@ describe("reminders", () => {
     await user.clear(box);
     await user.click(within(dialog).getByRole("button", { name: "Save note" }));
     expect(await screen.findByRole("button", { name: "Extra note" })).toBeInTheDocument();
+  });
+
+  it("previews the message with the note while typing", async () => {
+    const msg = "NAME: DEMO PATIENT A & DEMO PATIENT B\nTIME: 10:00 AM & 10:30 AM";
+    const saved = "Old note";
+    const list = fakeReminderList({ note: { text: saved, updated_at: "2026-10-08T02:10:00Z", staff_name: "Amy Tan" } });
+    list.ready[0]!.message = `${msg}\n\n${saved}`; // 后端回的消息已经有存好的那段话
+    fakeApi({ ...base, "GET /api/reminders": ok(list) });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    await user.click(await screen.findByRole("button", { name: /^Extra note\s*On$/ }));
+    const preview = screen.getByLabelText("Message preview");
+    expect(preview.textContent).toBe(`${msg}\n\n${saved}`);
+
+    const box = screen.getByRole("textbox", { name: "Note" });
+    await user.clear(box);
+    await user.type(box, "Feel free to pay cash");
+    expect(preview.textContent).toBe(`${msg}\n\nFeel free to pay cash`); // 换掉旧的，不是加两次
+    await user.clear(box);
+    expect(preview.textContent).toBe(msg);
+  });
+
+  it("says there is nothing to preview when the list has no message", async () => {
+    fakeApi({ ...base, "GET /api/reminders": ok(fakeReminderList({ ready: [], needs_staff: [] })) });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    await user.click(await screen.findByRole("button", { name: "Extra note" }));
+    expect(screen.getByText(/No message on this list to preview/)).toBeInTheDocument();
+  });
+
+  it("builds the preview the same way as the server", () => {
+    expect(withNote("Hi", "  Pay cash  \r\n\r\n  Thanks  \n")).toBe("Hi\n\nPay cash\n\n  Thanks");
+    expect(withNote("Hi", " \n ")).toBe("Hi");
+    const list = fakeReminderList({ note: { text: "x", updated_at: null, staff_name: null } });
+    list.ready[0]!.message = "Hi\n\nx";
+    expect(previewBase(list)).toBe("Hi");
   });
 
   it("Cancel closes the window without saving", async () => {

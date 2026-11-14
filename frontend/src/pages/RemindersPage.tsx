@@ -11,7 +11,7 @@
 //   已经按过 Open in WhatsApp 的不会变（WhatsApp 那边已经填好了）。
 // - 每次 Refresh 都重新读 GPiS，不自动更新。
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import * as api from "../api";
 import { Badge, Empty, ErrorBox, Loading, Modal, Notice, PageHeader, Tabs } from "../components";
 import { formatDate, formatDateTime, formatPhone, whatsappLink } from "../format";
@@ -240,7 +240,22 @@ function StaffCard({ group, showDate, onChanged }: { group: ReminderGroup; showD
 }
 
 /** 每条消息最后加的一段话（D82）：页面上面一个按钮，按了开弹出视窗看、改、拿掉。每位员工都能改 */
-function NoteButton({ note, onSaved }: { note: ReminderNote; onSaved: () => void }) {
+/** 名单上第一条消息，拿掉已经存的那段话 = 预览用的原来的消息（后端是「消息 + 空一行 + 那段话」） */
+export function previewBase(data: ReminderList): string | null {
+  const message = [...data.ready, ...data.needs_staff].find((g) => g.message)?.message ?? null;
+  const saved = data.note.text;
+  if (message && saved && message.endsWith(`\n\n${saved}`)) return message.slice(0, -(saved.length + 2));
+  return message;
+}
+
+/** 预览：原来的消息 + 空一行 + 正在打的那段话（和后端一样，前后空白不算） */
+export function withNote(base: string, draft: string): string {
+  const note = draft.replace(/\r\n?/g, "\n").split("\n").map((l) => l.trimEnd()).join("\n").trim();
+  return note ? `${base}\n\n${note}` : base;
+}
+
+function NoteButton({ data, onSaved }: { data: ReminderList; onSaved: () => void }) {
+  const note = data.note;
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -252,6 +267,7 @@ function NoteButton({ note, onSaved }: { note: ReminderNote; onSaved: () => void
       {open && (
         <NoteModal
           note={note}
+          base={previewBase(data)}
           onClose={() => setOpen(false)}
           onSaved={() => {
             setOpen(false);
@@ -263,9 +279,24 @@ function NoteButton({ note, onSaved }: { note: ReminderNote; onSaved: () => void
   );
 }
 
-function NoteModal({ note, onClose, onSaved }: { note: ReminderNote; onClose: () => void; onSaved: () => void }) {
+function NoteModal({
+  note,
+  base,
+  onClose,
+  onSaved,
+}: {
+  note: ReminderNote;
+  base: string | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [draft, setDraft] = useState(note.text ?? "");
   const action = useAction();
+  // 预览拉到最下面：那段话在消息最后，打字时要看得到
+  const previewRef = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    if (previewRef.current) previewRef.current.scrollTop = previewRef.current.scrollHeight;
+  }, [draft]);
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -309,6 +340,21 @@ function NoteModal({ note, onClose, onSaved }: { note: ReminderNote; onClose: ()
           </p>
         )}
         <ErrorBox message={action.error} />
+      </div>
+      <div className="reminder-note">
+        <h3 className="small">Preview</h3>
+        {base ? (
+          <>
+            <p className="muted small">The first message on this list, with the note as typed above. Not saved yet.</p>
+            <pre ref={previewRef} className="message-preview note-preview" aria-label="Message preview">
+              {withNote(base, draft)}
+            </pre>
+          </>
+        ) : (
+          <p className="muted small">
+            No message on this list to preview. The note goes after the last line, "… See you!", after one empty line.
+          </p>
+        )}
       </div>
     </Modal>
   );
@@ -373,7 +419,7 @@ export default function RemindersPage() {
                 Show
               </button>
             </form>
-            {data && <NoteButton note={data.note} onSaved={list.reload} />}
+            {data && <NoteButton data={data} onSaved={list.reload} />}
             <button type="button" onClick={list.reload}>
               <RefreshIcon />
               Refresh
