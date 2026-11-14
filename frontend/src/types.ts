@@ -237,6 +237,13 @@ export interface ReminderGroup {
   record: ReminderRecord | null;
 }
 
+/** 每条提醒消息最后加的一段话（D82，例 Feel free to pay cash）。text 是 null = 不加 */
+export interface ReminderNote {
+  text: string | null;
+  updated_at: string | null;
+  staff_name: string | null;
+}
+
 export interface ReminderList {
   dates: string[];
   suggested_dates: string[];
@@ -246,4 +253,5 @@ export interface ReminderList {
   ready: ReminderGroup[];
   needs_staff: ReminderGroup[];
   not_appointments: { reason: string; count: number }[];
+  note: ReminderNote;
 }

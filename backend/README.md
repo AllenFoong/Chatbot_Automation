@@ -1257,3 +1257,64 @@ AI 怎么说话照 D80：不主动说自己是 AI，但被问时不说是真人�
   不在允许名单、9:00 以前 / 21:00 以后不送去 AI；已经回过、reaction、员工的对话不回；API 错误（不露出 key）、拒绝、太长、太多步、
   空的回复、AI 想的时候员工接手、WhatsApp 发不出去 → 转员工；背景执行拿锁、出错转员工；设定；webhook 同一段对话只排一次、AI 关着不排。
 - 真的 `anthropic` 2.3.0：送出的参数都被 SDK 接受（只连到一个连不上的地址，没有送出去）。
+
+## 提醒消息最后加的一段话（D82）
+
+*Reminders* 页面上面的 **Extra note** 按钮（有内容时旁边显示绿色 *On*）→ 弹出视窗：员工写一段话（例 *Feel free to pay cash*），每条提醒消息最后空一行加上去。
+每位员工都能改（不是 *Settings*，不用 ADMIN）；空的 = 不加。改表：`clinic_settings` 加 3 栏（migration `0008`）。
+
+| 档案 | 改了什么 |
+|---|---|
+| `app/reminders.py` | `ReminderText.note`、`render_message` 把它放在最后、`clean_note`（换行统一、拿掉前后空白） |
+| `app/api/reminders.py` | `GET /api/reminders` 多 `note`（内容、谁、几点改的）；`PUT /api/reminders/note`（最多 500 字） |
+| `app/api/staff.py` | 改过这段话的账号不能删（D75） |
+| `frontend/src/pages/RemindersPage.tsx` | 上面的 **Extra note** 按钮 → 弹出视窗（和 *Requests* 共用 `Modal`）：输入、下面 **Preview** 马上看到整条消息（名单上第一条 + 正在打的话）→ **Save note**；存了视窗关掉、重新读名单 |
+
+### 更新（开发电脑）
+
+```powershell
+# backend（先启用 venv）
+git pull
+alembic upgrade head          # 0007 -> 0008
+alembic current               # 0008 (head)
+pytest                        # 应该 535 passed，没有 skipped
+
+# frontend
+cd ..\frontend
+npm test                      # 应该 66 passed
+npm run build                 # ✓ built
+```
+
+### D82 完成的条件（在开发电脑上测试）
+
+视窗照「Phase 5a」的「使用」（视窗 1 Admin API、视窗 4 网页）。`.env` 加 `REMINDER_SOURCE=demo`（假资料），重开视窗 1。
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的「更新」 | `0008 (head)`；`pytest` 535 passed、没有 skipped；`npm test` 66 passed；`npm run build` 成功 |
+| 2 | 用 **STAFF** 帐号登入 → *Reminders* | 上面 *Refresh* 旁边有 **Extra note** 按钮（旁边没有 *On*）；页面上没有多出固定的区块 |
+| 3 | 按 **Extra note** → 弹出视窗输入两行 `Feel free to pay cash 💵` / `可以付现金哦`（先不存）| 下面 **Preview** 是名单上第一条消息，最后 `See you!` 空一行接着正在打的两行，边打边变、自己拉到最下面 |
+| 3b | **Save note** | 视窗关掉；按钮旁边多绿色 *On*；再按开视窗：那两行还在、*Last changed by <你的名字> at <现在>*；按 **Cancel** 关掉 |
+| 4 | *Ready* 的 Demo Patient A & B → 打开 **Message** | 消息最后 `See you!` 后面空一行，接着那两行 |
+| 5 | **Copy message** → 贴到记事本 | 最后也有那两行 |
+| 6 | 按 Demo Patient A & B 的 **Open in WhatsApp**（自己的手机号码在允许名单）→ 看 WhatsApp Desktop 填好的消息（**不要按 Enter**）→ 回来按 **Mark as not sent** | 填好的消息最后有那两行 |
+| 7 | **Extra note** → 全部删掉 → **Save note** | 按钮旁边的 *On* 不见了；**Message** 回到 `See you!` 结尾 |
+| 8 | **Extra note** → 贴 501 个字 | 输入框最多只能打 500 个字（`500 / 500 characters`） |
+| 9 | 用 ADMIN 帐号 → *Staff accounts* → 删第 3 项改过的那个 STAFF 账号（如果是测试用的） | 不能删：*… has changed the reminder note. Deactivate the account instead …* |
+| 10 | 清理：*Extra note* 清空（第 7 项）；`.env` 拿掉 `REMINDER_SOURCE=demo` → 重开视窗 1 | |
+
+更新电脑 B 时要升到 `0008`（照 `docs/deploy-pc-b.md` 第 9 节，改表前手动备份）。
+
+### 云端容器的测试记录（2026-11-14，PostgreSQL 16、Python 3.13、Node 22、只用假资料）
+
+- `pytest` → 535 passed（新增 6 个）：这段话放在消息最后、没有就和原来一样、`clean_note`；API 存了每条消息都有、
+  *Open in WhatsApp* 记下来的消息也有、空的 = 拿掉、501 字 422、要登入；改过的账号不能删。
+- `npm test` → 62 passed（新增 2 个）：加 → 存 → 重新读名单 → 改 → 清空；存不了时显示错误、输入的字还在。`npm run build` 成功。
+- headless Chromium（`REMINDER_SOURCE=demo`、假资料）1366 / 400 宽：加了两行（含 emoji、中文）→ 卡片显示、*Last changed by*、
+  Demo Patient A & B 的 **Message** 最后有那两行；400 宽没有横向卷动。
+- 2026-11-14 改成弹出视窗（开发者要的，不要固定在页面上的区块）：`npm test` → 63 passed（加 → 存 → 视窗关掉、按钮 *On* → 改 → 清空；
+  *Cancel* 不存；存不了时视窗和输入的字都还在）；headless Chromium 1366 / 400 宽看过视窗，400 宽没有横向卷动。
+- 2026-11-14 弹出视窗加 **Preview**（开发者要的）：名单上第一条消息拿掉已经存的那段话、再接正在打的（和后端一样：空一行、前后空白不算），
+  没有消息时写在哪里；`npm test` → 66 passed（边打边变、旧的那段话换掉不会出现两次、没有消息、和后端一样的整理）；
+  headless Chromium 1366 / 400 宽：预览最后是 `See you!` + 空一行 + 打的两行。
+

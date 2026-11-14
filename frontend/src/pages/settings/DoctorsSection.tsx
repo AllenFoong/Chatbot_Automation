@@ -3,7 +3,16 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import * as api from "../../api";
-import { Badge, Empty, ErrorBox, Loading } from "../../components";
+import { CheckIcon, TriangleAlertIcon } from "lucide-react";
+import { Badge, Empty, ErrorBox, Field, Loading, SectionTitle } from "../../components";
+import { Alert, AlertDescription } from "../../components/ui/alert";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Checkbox } from "../../components/ui/checkbox";
+import { Input } from "../../components/ui/input";
+import { NativeSelect } from "../../components/ui/native-select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
+import { cn } from "../../lib/utils";
 import { HALF_HOURS, formatTime, weekdayName } from "../../format";
 import { useAction, useLoad } from "../../hooks";
 import { scheduleProblems } from "../../schedule";
@@ -23,11 +32,12 @@ function TimeSelect({
   optional?: boolean;
 }) {
   return (
-    <select
+    <NativeSelect
       aria-label={label}
       value={value ? formatTime(value) : ""}
       onChange={(e) => onChange(e.target.value || null)}
       disabled={disabled}
+      className="w-28"
     >
       <option value="">{optional ? "None" : "—"}</option>
       {HALF_HOURS.map((t) => (
@@ -35,7 +45,7 @@ function TimeSelect({
           {t}
         </option>
       ))}
-    </select>
+    </NativeSelect>
   );
 }
 
@@ -72,81 +82,89 @@ function ScheduleEditor({ doctor, canEdit }: { doctor: Doctor; canEdit: boolean 
   }
 
   return (
-    <div className="card">
-      <div className="card-title">
-        <h3>Weekly schedule – {doctor.display_name}</h3>
-        <p>
-          "Last slot" is the last time a 30-minute appointment can start. Slots from "break start" up to (not
-          including) "break end" cannot be booked.
-        </p>
-      </div>
-      <div className="table-wrap flat">
-        <table>
-          <thead>
-            <tr>
-              <th>Day</th>
-              <th>Working</th>
-              <th>Start</th>
-              <th>Last slot</th>
-              <th>Break start</th>
-              <th>Break end</th>
-            </tr>
-          </thead>
-          <tbody>
+    <Card>
+      <CardContent className="flex flex-col gap-4">
+      <SectionTitle title={`Weekly schedule – ${doctor.display_name}`}>
+        "Last slot" is the last time a 30-minute appointment can start. Slots from "break start" up to (not
+        including) "break end" cannot be booked.
+      </SectionTitle>
+      <div className="overflow-hidden rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Day</TableHead>
+              <TableHead>Working</TableHead>
+              <TableHead>Start</TableHead>
+              <TableHead>Last slot</TableHead>
+              <TableHead>Break start</TableHead>
+              <TableHead>Break end</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {days.map((d) => {
               const name = weekdayName(d.weekday);
               const off = !d.is_working;
               return (
-                <tr key={d.weekday} className={off ? "off" : undefined}>
-                  <td>{name}</td>
-                  <td>
-                    <input
-                      type="checkbox"
+                <TableRow key={d.weekday} className={cn(off && "text-muted-foreground")}>
+                  <TableCell className="font-medium">{name}</TableCell>
+                  <TableCell>
+                    <Checkbox
                       aria-label={`${name} working`}
                       checked={d.is_working}
                       disabled={!canEdit}
                       onChange={(e) => update(d.weekday, { is_working: e.target.checked })}
                     />
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <TimeSelect label={`${name} start`} value={d.start_time} disabled={!canEdit || off}
                       onChange={(v) => update(d.weekday, { start_time: v })} />
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <TimeSelect label={`${name} last slot`} value={d.last_slot} disabled={!canEdit || off}
                       onChange={(v) => update(d.weekday, { last_slot: v })} />
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <TimeSelect label={`${name} break start`} value={d.break_start} disabled={!canEdit || off} optional
                       onChange={(v) => update(d.weekday, { break_start: v })} />
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     <TimeSelect label={`${name} break end`} value={d.break_end} disabled={!canEdit || off} optional
                       onChange={(v) => update(d.weekday, { break_end: v })} />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
       {canEdit && problems.length > 0 && (
-        <ul className="error" role="alert">
-          {problems.map((p) => (
-            <li key={p}>{p}</li>
-          ))}
-        </ul>
+        <Alert variant="destructive">
+          <TriangleAlertIcon />
+          <AlertDescription>
+            <ul className="m-0 list-disc pl-4">
+              {problems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
       )}
       <ErrorBox message={action.error} />
       {canEdit && (
-        <div className="actions">
-          <button type="button" className="primary" disabled={action.busy || problems.length > 0} onClick={save}>
+        <div className="flex items-center gap-3">
+          <Button type="button" disabled={action.busy || problems.length > 0} onClick={save}>
             Save schedule
-          </button>
-          {saved && <span className="ok">Saved.</span>}
+          </Button>
+          {saved && (
+            <span className="flex items-center gap-1 text-sm font-medium text-success">
+              <CheckIcon className="size-4" aria-hidden="true" />
+              Saved.
+            </span>
+          )}
         </div>
       )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -183,42 +201,42 @@ function DoctorRow({ doctor, canEdit, selected, onSelect, onChanged }: {
   }
 
   return (
-    <tr className={selected ? "selected" : undefined}>
-      <td><strong>{doctor.id}</strong></td>
+    <TableRow data-state={selected ? "selected" : undefined} className={cn(!doctor.active && "text-muted-foreground", selected && "bg-brand-soft/60 hover:bg-brand-soft/60")}>
+      <TableCell><strong className="font-semibold">{doctor.id}</strong></TableCell>
       {editing ? (
-        <td colSpan={2}>
-          <form className="inline" onSubmit={save}>
-            <input aria-label="Display name" value={name} onChange={(e) => setName(e.target.value)} required />
-            <input aria-label="Remark tag" value={tag} onChange={(e) => setTag(e.target.value)} size={4} maxLength={5} />
-            <button type="submit" className="primary small" disabled={action.busy}>Save</button>
-            <button type="button" className="small" onClick={() => setEditing(false)}>Cancel</button>
+        <TableCell colSpan={2}>
+          <form className="flex flex-wrap items-center gap-2" onSubmit={save}>
+            <Input aria-label="Display name" value={name} onChange={(e) => setName(e.target.value)} required className="w-48" />
+            <Input aria-label="Remark tag" value={tag} onChange={(e) => setTag(e.target.value)} size={4} maxLength={5} className="w-20" />
+            <Button type="submit" size="sm" disabled={action.busy}>Save</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
           </form>
           <ErrorBox message={action.error} />
-        </td>
+        </TableCell>
       ) : (
         <>
-          <td>{doctor.display_name}</td>
-          <td>{doctor.remark_tag}</td>
+          <TableCell>{doctor.display_name}</TableCell>
+          <TableCell>{doctor.remark_tag}</TableCell>
         </>
       )}
-      <td>{doctor.active ? <Badge kind="ok">Active</Badge> : <Badge kind="closed">Inactive</Badge>}</td>
-      <td className="cell-actions">
-        <div className="row-actions">
-          <button type="button" className="small" onClick={onSelect} disabled={selected}>
+      <TableCell>{doctor.active ? <Badge kind="ok">Active</Badge> : <Badge kind="closed">Inactive</Badge>}</TableCell>
+      <TableCell className="text-right">
+        <div className="flex justify-end gap-1.5 whitespace-nowrap">
+          <Button type="button" size="sm" variant={selected ? "secondary" : "outline"} onClick={onSelect} disabled={selected}>
             {selected ? "Schedule shown" : "Schedule"}
-          </button>
+          </Button>
           {canEdit && !editing && (
             <>
-              <button type="button" className="small" onClick={() => setEditing(true)}>Edit</button>
-              <button type="button" className={doctor.active ? "small danger-text" : "small"} onClick={toggleActive} disabled={action.busy}>
+              <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>Edit</Button>
+              <Button type="button" size="sm" variant={doctor.active ? "ghost-destructive" : "outline"} onClick={toggleActive} disabled={action.busy}>
                 {doctor.active ? "Deactivate" : "Activate"}
-              </button>
+              </Button>
             </>
           )}
         </div>
         {!editing && <ErrorBox message={action.error} />}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -245,28 +263,30 @@ function AddDoctorForm({ onAdded }: { onAdded: (id: string) => void }) {
   }
 
   return (
-    <form className="card inline-form" onSubmit={submit}>
-      <div className="card-title">
-        <h3>Add a doctor</h3>
-        <p>The new doctor starts with every day off. Set the working days in the schedule.</p>
-      </div>
-      <div className="fields">
-        <label>
-          GPiS DoctorID
-          <input value={id} onChange={(e) => setId(e.target.value.toUpperCase())} required maxLength={20} />
-        </label>
-        <label>
-          Display name
-          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} />
-        </label>
-        <label>
-          Remark tag (e.g. P)
-          <input value={tag} onChange={(e) => setTag(e.target.value)} maxLength={5} size={4} />
-        </label>
-      </div>
-      <ErrorBox message={action.error} />
-      <button type="submit" className="primary" disabled={action.busy}>Add doctor</button>
-    </form>
+    <Card>
+      <CardContent>
+        <form className="flex flex-col gap-4" onSubmit={submit}>
+          <SectionTitle title="Add a doctor">
+            The new doctor starts with every day off. Set the working days in the schedule.
+          </SectionTitle>
+          <div className="grid items-end gap-4 sm:grid-cols-3">
+            <Field label="GPiS DoctorID">
+              <Input value={id} onChange={(e) => setId(e.target.value.toUpperCase())} required maxLength={20} />
+            </Field>
+            <Field label="Display name">
+              <Input value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} />
+            </Field>
+            <Field label="Remark tag (e.g. P)">
+              <Input value={tag} onChange={(e) => setTag(e.target.value)} maxLength={5} size={4} />
+            </Field>
+          </div>
+          <ErrorBox message={action.error} />
+          <div>
+            <Button type="submit" disabled={action.busy}>Add doctor</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -277,32 +297,32 @@ export default function DoctorsSection({ canEdit }: { canEdit: boolean }) {
   const selected = list.find((d) => d.id === selectedId) ?? list.find((d) => d.active) ?? null;
 
   return (
-    <section>
+    <section className="flex flex-col gap-4">
       <ErrorBox message={doctors.error} onRetry={doctors.reload} />
       {doctors.data === undefined ? (
         doctors.loading && <Loading />
       ) : list.length === 0 ? (
         <Empty>No doctors yet.</Empty>
       ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Remark tag</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
+        <Card className="gap-0 overflow-hidden py-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>ID</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Remark tag</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead aria-label="Actions"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {list.map((d) => (
                 <DoctorRow key={`${d.id}-${d.display_name}-${d.remark_tag}-${d.active}`} doctor={d} canEdit={canEdit}
                   selected={d.id === selected?.id} onSelect={() => setSelectedId(d.id)} onChanged={doctors.reload} />
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       )}
       {selected && <ScheduleEditor key={selected.id} doctor={selected} canEdit={canEdit} />}
       {canEdit && (

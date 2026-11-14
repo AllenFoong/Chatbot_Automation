@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..auth import end_all_sessions, hash_password, require_admin
 from ..db.models import (
-    AppointmentRequest, Conversation, Message, Reminder, Staff, StaffRole, WaContact,
+    AppointmentRequest, ClinicSettings, Conversation, Message, Reminder, Staff, StaffRole, WaContact,
 )
 from ..db.session import get_session
 from .auth import StaffOut
@@ -97,6 +97,7 @@ _STAFF_REFERENCES = (
     (AppointmentRequest.patient_told_by, "told patients about appointments"),
     (Reminder.staff_id, "sent reminders"),
     (WaContact.reminders_opt_out_staff_id, "marked NO WA numbers"),
+    (ClinicSettings.reminder_note_updated_by, "changed the reminder note"),
 )
 
 

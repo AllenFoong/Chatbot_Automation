@@ -208,3 +208,40 @@ def test_actions_need_login(session, client_for):
     assert anon.post("/api/reminders/opened", json=KEY).status_code == 401
     assert anon.post("/api/reminders/not-sent", json=KEY).status_code == 401
     assert anon.put("/api/reminders/opt-out", json={"phone": "60120000001", "opted_out": True}).status_code == 401
+
+
+# ---------- 消息最后加的一段话（D82） ----------
+
+def test_note_is_added_to_every_message_and_recorded(amy, session):
+    from app.db.models import Reminder
+    use(FakeSource(ROWS), allowed=OWN)
+    family, body = ready_family(amy)
+    assert body["note"] == {"text": None, "updated_at": None, "staff_name": None}
+    assert family["message"].endswith("See you!")
+
+    r = amy.put("/api/reminders/note", json={"text": "  Feel free to pay cash \r\n可以付现金  "})
+    assert r.status_code == 200, r.text
+    assert r.json()["text"] == "Feel free to pay cash\n可以付现金" and r.json()["staff_name"] == "amy (test)"
+
+    family, body = ready_family(amy)
+    assert body["note"]["text"] == "Feel free to pay cash\n可以付现金" and body["note"]["updated_at"]
+    assert family["message"].endswith("See you!\n\nFeel free to pay cash\n可以付现金")
+    assert amy.post("/api/reminders/opened", json=KEY).status_code == 200
+    [row] = session.query(Reminder).all()
+    assert row.body.endswith("可以付现金")             # 记下来的是真的发出去的那条
+
+    r = amy.put("/api/reminders/note", json={"text": "   "})        # 空的 = 拿掉
+    assert r.status_code == 200 and r.json()["text"] is None
+    family, _ = ready_family(amy)
+    assert family["message"].endswith("See you!")
+
+
+def test_note_too_long(amy):
+    use(FakeSource(ROWS))
+    r = amy.put("/api/reminders/note", json={"text": "x" * 501})
+    assert r.status_code == 422 and "500" in r.json()["detail"]
+    assert amy.put("/api/reminders/note", json={"text": "x" * 500}).status_code == 200
+
+
+def test_note_needs_login(session, client_for):
+    assert client_for().put("/api/reminders/note", json={"text": "hi"}).status_code == 401

@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { whatsappLink } from "./pages/RemindersPage";
+import { previewBase, whatsappLink, withNote } from "./pages/RemindersPage";
 import { STAFF, err, fakeApi, fakeReminderList, ok } from "./test/fakeApi";
 import type { ReminderRecord } from "./types";
 import { renderApp } from "./test/render";
@@ -176,7 +176,7 @@ describe("reminders", () => {
     expect(screen.queryByRole("link", { name: /Open in WhatsApp/ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Not appointments 3" }));
-    expect(screen.getByText(/Cancelled or postponed/)).toHaveTextContent("Cancelled or postponed: 2");
+    expect(screen.getByText("Cancelled or postponed").closest("li")).toHaveTextContent("Cancelled or postponed2");
   });
 
   it("can show another date and go back", async () => {
@@ -206,6 +206,130 @@ describe("reminders", () => {
     fakeApi({ ...base, "GET /api/reminders": err(503, "Cannot read GPiS. See the server log.") });
     renderApp("/reminders");
     expect(await screen.findByRole("alert")).toHaveTextContent("Cannot read GPiS");
+  });
+
+  it("adds, edits and removes the extra note in a pop-up window (D82)", async () => {
+    const saved = {
+      text: "Feel free to pay cash",
+      updated_at: "2026-10-08T02:10:00Z",
+      staff_name: "Amy Tan",
+    };
+    let list = fakeReminderList();
+    const { calls } = fakeApi({
+      ...base,
+      "GET /api/reminders": () => ok(list),
+      "PUT /api/reminders/note": (body) => {
+        const text = (body as { text: string }).text.trim() || null;
+        list = fakeReminderList({ note: { ...saved, text } });
+        return ok(list.note);
+      },
+    });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    await screen.findByText("DEMO PATIENT A & DEMO PATIENT B");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(); // 没有固定在页面上的区块
+
+    await user.click(screen.getByRole("button", { name: "Extra note" }));
+    let dialog = screen.getByRole("dialog", { name: "Extra note" });
+    await user.type(within(dialog).getByRole("textbox", { name: "Note" }), "Feel free to pay cash");
+    expect(within(dialog).getByText(/21 \/ 500 characters/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+
+    // 存了视窗关掉、重新读名单（消息跟着变）；按钮多一个 On
+    expect(await screen.findByRole("button", { name: /^Extra note\s*On$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(calls.filter((c) => c.method === "PUT")).toEqual([
+      { method: "PUT", path: "/api/reminders/note", body: { text: "Feel free to pay cash" } },
+    ]);
+    expect(calls.filter((c) => c.path === "/api/reminders").length).toBe(2);
+
+    await user.click(screen.getByRole("button", { name: /^Extra note\s*On$/ }));
+    dialog = screen.getByRole("dialog", { name: "Extra note" });
+    expect(within(dialog).getByText(/Last changed by Amy Tan/)).toBeInTheDocument();
+    const box = within(dialog).getByRole("textbox", { name: "Note" });
+    expect(box).toHaveValue("Feel free to pay cash");
+    await user.clear(box);
+    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+    expect(await screen.findByRole("button", { name: "Extra note" })).toBeInTheDocument();
+  });
+
+  it("previews the message with the note while typing", async () => {
+    const msg = "NAME: DEMO PATIENT A & DEMO PATIENT B\nTIME: 10:00 AM & 10:30 AM";
+    const saved = "Old note";
+    const list = fakeReminderList({ note: { text: saved, updated_at: "2026-10-08T02:10:00Z", staff_name: "Amy Tan" } });
+    list.ready[0]!.message = `${msg}\n\n${saved}`; // 后端回的消息已经有存好的那段话
+    fakeApi({ ...base, "GET /api/reminders": ok(list) });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    await user.click(await screen.findByRole("button", { name: /^Extra note\s*On$/ }));
+    const preview = screen.getByLabelText("Message preview");
+    expect(preview.textContent).toBe(`${msg}\n\n${saved}`);
+
+    const box = screen.getByRole("textbox", { name: "Note" });
+    await user.clear(box);
+    await user.type(box, "Feel free to pay cash");
+    expect(preview.textContent).toBe(`${msg}\n\nFeel free to pay cash`); // 换掉旧的，不是加两次
+    await user.clear(box);
+    expect(preview.textContent).toBe(msg);
+  });
+
+  it("says there is nothing to preview when the list has no message", async () => {
+    fakeApi({ ...base, "GET /api/reminders": ok(fakeReminderList({ ready: [], needs_staff: [] })) });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    await user.click(await screen.findByRole("button", { name: "Extra note" }));
+    expect(screen.getByText(/No message on this list to preview/)).toBeInTheDocument();
+  });
+
+  it("builds the preview the same way as the server", () => {
+    expect(withNote("Hi", "  Pay cash  \r\n\r\n  Thanks  \n")).toBe("Hi\n\nPay cash\n\n  Thanks");
+    expect(withNote("Hi", " \n ")).toBe("Hi");
+    const list = fakeReminderList({ note: { text: "x", updated_at: null, staff_name: null } });
+    list.ready[0]!.message = "Hi\n\nx";
+    expect(previewBase(list)).toBe("Hi");
+  });
+
+  it("Cancel closes the window without saving", async () => {
+    const { calls } = fakeApi({ ...base, "GET /api/reminders": ok(fakeReminderList()) });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    await user.click(await screen.findByRole("button", { name: "Extra note" }));
+    await user.type(screen.getByRole("textbox", { name: "Note" }), "Pay cash");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+  });
+
+  it("keeps the window and the text when saving fails", async () => {
+    fakeApi({
+      ...base,
+      "GET /api/reminders": ok(fakeReminderList()),
+      "PUT /api/reminders/note": err(422, "The note can be at most 500 characters."),
+    });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    await user.click(await screen.findByRole("button", { name: "Extra note" }));
+    const dialog = screen.getByRole("dialog", { name: "Extra note" });
+    await user.type(within(dialog).getByRole("textbox", { name: "Note" }), "Pay cash");
+    await user.click(within(dialog).getByRole("button", { name: "Save note" }));
+    expect(await within(dialog).findByText("The note can be at most 500 characters.")).toBeInTheDocument();
+    expect(within(dialog).getByRole("textbox", { name: "Note" })).toHaveValue("Pay cash");
+  });
+
+  it("shows the whole message in a pop-up window", async () => {
+    fakeApi({ ...base, "GET /api/reminders": ok(fakeReminderList()) });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    const card = (await screen.findByText("DEMO PATIENT A & DEMO PATIENT B")).closest("li")!;
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await user.click(within(card).getByRole("button", { name: "Message" }));
+    const dialog = screen.getByRole("dialog", { name: "Message – DEMO PATIENT A & DEMO PATIENT B" });
+    expect(within(dialog).getByLabelText("Reminder message").textContent).toBe(
+      "NAME: DEMO PATIENT A & DEMO PATIENT B\nTIME: 10:00 AM & 10:30 AM",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("builds the WhatsApp link with the message encoded", () => {

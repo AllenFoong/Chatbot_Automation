@@ -3,6 +3,7 @@
 - 每次都重新读 GPiS（员工会改、会删预约，W26），名单不存。
 - 只记员工做过的事（reminders 表）：按过 Open in WhatsApp、没有发出去；号码不要提醒（opt-out，D55）。
 - 回应里有病人名字和号码：员工本来就看得到（和 GPiS 一样），只在 Admin Platform 上显示，不写日志。
+- 消息最后可以加一段话（D82，例 Feel free to pay cash）：员工在 Reminders 页面改，每位员工都能改，记下是谁改的。
 - Open in WhatsApp（D54）：只有读主机的 GPiS 时才给；读 GPiS_Dev 或假资料时，只给允许名单里的号码。
   这里还没有「系统自己发」：要等 5c（docs/architecture.md 第 10 节）。
 """
@@ -10,11 +11,12 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -23,15 +25,15 @@ from ..auth import current_staff
 from ..config import (
     WhatsAppSettings, get_reminder_text, get_settings, get_whatsapp_settings, reminder_source_name,
 )
-from ..db.models import Doctor, Reminder, ReminderStatus, Staff
+from ..db.models import ClinicSettings, Doctor, Reminder, ReminderStatus, Staff
 from ..db.reminders import find_reminders, mark_not_sent, opted_out_phones, record_opened, set_opt_out
 from ..db.rules import RulesNotConfigured, load_clinic_rules
 from ..db.session import get_session
 from ..gpis import GpisReader, WrongDatabaseError
 from ..reminder_demo import DemoReminderSource
 from ..reminders import (
-    PhoneKind, ReminderGroup, ReminderList, ReminderSource, ReminderText, build_reminder_list, clinic_today,
-    reminder_dates,
+    REMINDER_NOTE_MAX, PhoneKind, ReminderGroup, ReminderList, ReminderSource, ReminderText, build_reminder_list,
+    clean_note, clinic_today, reminder_dates,
 )
 from ..phone import normalize_phone
 
@@ -76,6 +78,13 @@ class CountOut(BaseModel):
     count: int
 
 
+class ReminderNoteOut(BaseModel):
+    """消息最后加的那段话（D82）。text 是 None = 不加。"""
+    text: str | None
+    updated_at: datetime | None
+    staff_name: str | None
+
+
 class ReminderListOut(BaseModel):
     dates: list[date]
     suggested_dates: list[date]
@@ -85,6 +94,7 @@ class ReminderListOut(BaseModel):
     ready: list[ReminderGroupOut]
     needs_staff: list[ReminderGroupOut]
     not_appointments: list[CountOut]
+    note: ReminderNoteOut
 
 
 @lru_cache
@@ -151,12 +161,26 @@ def _group_out(g: ReminderGroup, doctor_names: dict[str, str], allowed: bool, op
     )
 
 
+def _clinic_settings(session: Session) -> ClinicSettings:
+    s = session.get(ClinicSettings, 1)
+    if s is None:
+        raise RulesNotConfigured("Clinic settings are missing: run python -m app.db.seed")
+    return s
+
+
+def _note_out(session: Session, s: ClinicSettings) -> ReminderNoteOut:
+    staff = session.get(Staff, s.reminder_note_updated_by) if s.reminder_note_updated_by is not None else None
+    return ReminderNoteOut(text=s.reminder_note, updated_at=s.reminder_note_updated_at,
+                           staff_name=staff.name if staff else None)
+
+
 def _build(session: Session, source: ReminderSource, text: ReminderText, date_: date | None):
     """读设置和 GPiS，排好名单。回传 (名单, 建议的日期, 医生名字, 不要提醒的号码)。"""
     try:
         rules = load_clinic_rules(session)
         doctor_names = {d.id: d.display_name for d in session.scalars(select(Doctor))}
         opted_out = opted_out_phones(session)
+        text = replace(text, note=_clinic_settings(session).reminder_note)
     except RulesNotConfigured as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except SQLAlchemyError as e:
@@ -198,6 +222,7 @@ def preview(
         ready=[_group_out(g, doctor_names, whatsapp_allowed(g, source, wa), opted_out, records) for g in result.ready],
         needs_staff=[_group_out(g, doctor_names, False, opted_out, records) for g in result.needs_staff],
         not_appointments=[CountOut(reason=r, count=n) for r, n in result.not_appointments],
+        note=_note_out(session, _clinic_settings(session)),
     )
 
 
@@ -206,6 +231,10 @@ def preview(
 class ReminderKeyIn(BaseModel):
     date: date
     phone: str
+
+
+class ReminderNoteIn(BaseModel):
+    text: str | None = Field(None, max_length=REMINDER_NOTE_MAX * 2, description="空的 = 不加")
 
 
 class OptOutIn(BaseModel):
@@ -281,3 +310,25 @@ def opt_out(
     session.commit()
     log.info("提醒：员工 %d 把一个号码改成%s", staff.id, "不要提醒" if body.opted_out else "照常提醒")
     return OptOutOut(phone=contact.wa_phone, opted_out=contact.reminders_opt_out_at is not None)
+
+
+@router.put("/note", response_model=ReminderNoteOut)
+def update_note(
+    body: ReminderNoteIn,
+    session: Session = Depends(get_session),
+    staff: Staff = Depends(current_staff),
+) -> ReminderNoteOut:
+    """改消息最后加的那段话（D82）。每位员工都能改；之后打开的提醒才有，已经发出去的不会变。"""
+    note = clean_note(body.text)
+    if note is not None and len(note) > REMINDER_NOTE_MAX:
+        raise HTTPException(status_code=422, detail=f"The note can be at most {REMINDER_NOTE_MAX} characters.")
+    try:
+        s = _clinic_settings(session)
+    except RulesNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    s.reminder_note = note
+    s.reminder_note_updated_at = datetime.now(timezone.utc)
+    s.reminder_note_updated_by = staff.id
+    session.commit()
+    log.info("提醒：员工 %d 改了消息最后的那段话（%s）", staff.id, "有" if note else "拿掉")
+    return _note_out(session, s)

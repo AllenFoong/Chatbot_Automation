@@ -13,9 +13,12 @@ React 19 + TypeScript + Vite。只多用了一个套件 React Router（网址 �
 | `src/types.ts` | API 回传的资料长什么样子（= 后端的 Pydantic model） |
 | `src/auth.tsx` | 谁登录了（问 `/api/auth/me`）；登录、登出 |
 | `src/App.tsx` | 外框：左边的选单、各个页面的网址；登录后先到 Reminders（D66） |
-| `src/components.tsx` | 共用的小元件：每页的标题（`PageHeader`）、提醒框（`Notice`）、分页按钮（`Tabs`）、错误、读取中、没有资料 |
-| `src/icons.tsx` | 画面上的小图示（自己画的 SVG，不用图示套件） |
-| `src/styles.css` | 全部的样式；颜色、大小放在最上面的变数里（D66） |
+| `src/components.tsx` | 共用的小元件（底下是 shadcn/ui，D83）：每页的外框（`Page`）、标题（`PageHeader`）、提醒框（`Notice`）、分页按钮（`Tabs`）、错误、读取中、没有资料、表单的一栏（`Field`）、密码栏、开关、弹出视窗（`Modal`） |
+| `src/icons.tsx` | 自己画的几个图示（牙齿、WhatsApp …）；其他图示用 `lucide-react`（D83） |
+| `src/index.css` | 全部的样式设定（D83）：Tailwind CSS 4；颜色、圆角放在 `:root` 的变数（诊所的青绿色），shadcn 的颜色名字对应到这些变数。页面直接写 Tailwind 的 class（以前的 `styles.css` 删掉了） |
+| `src/components/ui/` | shadcn/ui 的元件（D83）：Button、Card、Badge、Alert、Tabs、Dialog、Table、Input、Textarea、NativeSelect、Checkbox、Switch、Label、Progress、Collapsible、Separator、Avatar |
+| `src/lib/utils.ts` | shadcn/ui 的 `cn()`（合并 class） |
+| `components.json` | shadcn/ui 的设定：开发电脑可以用 `npx shadcn@latest add <元件>` 加新的元件 |
 | `src/hooks.ts` | `useLoad`（读资料、自动更新）、`useAction`（按钮做事情） |
 | `src/format.ts` | 日期时间的显示（一律马来西亚时间） |
 | `src/schedule.ts` | 排班送出前的检查（和数据库的 CHECK 一样，信息比较好懂） |
@@ -198,6 +201,40 @@ headless Chromium 点过：登入的密码栏按眼睛看得到；新增再删�
 *Back* 关掉不送任何请求）；`npm run build` 成功；headless Chromium 1366 / 400 宽截图、Esc 和点视窗外面都关得掉；
 *Entered in GPiS ✓* 的视窗改成共用同一个 `Modal` 之后照旧。找到、已经改好：400 宽时视窗下面 3 个按钮挤出视窗 → 按钮会换行。
 
+## 全部换成 shadcn/ui（D83）：在开发电脑上测试
+
+**每一页都换了**（登录、选单、Reminders、Conversations、Requests、Settings 5 块、Staff accounts、My account），原来的 `styles.css` 删掉了。
+功能、按钮的名字、网址都没有变，只有样子变。有新套件，`git pull` 之后要先 `npm ci`。
+
+```powershell
+cd frontend
+git pull
+npm ci                        # 装新套件（Tailwind、Radix、lucide-react …）
+npm test                      # 应该 66 passed
+npm run build                 # ✓ built
+npm run dev                   # 视窗 1 的 Admin API 也要开着；backend\.env 加 REMINDER_SOURCE=demo
+```
+
+另一个视窗放一点假资料（对话、请求）：`python -m app.db.demo`。打开 `http://localhost:5173`：
+
+| # | 做什么 | 应该看到 |
+|---|---|---|
+| 1 | 上面的指令 | `npm test` 66 passed；`npm run build` 成功 |
+| 2 | 登录画面 | 中间一张白色卡片：牙齿图示、*Username*、*Password*（右边眼睛）、青绿色 **Log in**；打错密码有红色框 |
+| 3 | 左边选单 | 白色一栏（页面往下拉也一直白到底）；选到的那页浅青绿底；Conversations、Requests 后面红色数字；☰ 收成只有图示、再按展开 |
+| 4 | *Reminders* → 卡片下面的 **Message** | 画面中间弹出视窗：标题 *Message – 名字*、整条消息、*Copy message*、**Done**；Esc、×、点外面都关掉；卡片本身不变高 |
+| 5 | *Conversations* | 左边列表（选到的浅青绿底）、右边对话：病人的消息靠左灰色、AI 靠右浅蓝、员工靠右浅青绿；下面 *Reply on WhatsApp*、**Send** |
+| 6 | *Requests* | 每个请求一张卡片：资料在浅灰框里；**Entered in GPiS ✓**、*Reject*、*Patient cancelled*；按 **Entered in GPiS ✓** → 弹出视窗、GPiS 的预约一行一个框，选到的变青绿框 |
+| 7 | *Settings* 5 块 | 上面一排灰底的切换（选到的白色）；表格有灰色表头；*Slots & auto-confirm* 的开关是青绿 / 灰色；*Save* 之后绿色 *Saved.* |
+| 8 | *Settings → Doctors & schedules* → **Schedule** → 改一天 → **Save schedule** | 排班表每天一行、时间是下拉选单；排错有红色框写原因 |
+| 9 | *Staff accounts*（ADMIN） | 表格；*Make staff* / *Reset password* 是白色按钮，*Deactivate* / *Delete* 是红字；下面 *Add a staff account* |
+| 10 | *My account* | 名字卡片 + *Change password*（三个密码栏都有眼睛） |
+| 11 | 视窗缩窄（或手机宽度） | 上面一排 ☰ 打开选单；卡片一排一张；表格在卡片里左右拉；没有整页左右卷动 |
+| 12 | 用 STAFF 帐号 | *Settings* 看得到、不能改（开关灰色拨不动）；选单没有 *Staff accounts* |
+| 13 | *Reminders*（Ready、Needs staff）、*Requests* 一排几张卡片 | 名字、预约的框、按钮、最下面一行在每一排都对齐（一样高）；*Message* 是弹出视窗，卡片不会变高 |
+
+不喜欢的地方（颜色、大小、排法）直接说：颜色在 `src/index.css` 最上面，元件在 `src/components/ui/`。
+
 ## 上线
 
 `npm run build` 产生的 `dist\` 是普通的 HTML / JS / CSS 文件，要和 `/api` 放在**同一个网址**下，cookie 才会带上。
@@ -242,3 +279,29 @@ headless Chromium 点过：登入的密码栏按眼睛看得到；新增再删�
 - *Import public holidays for 2026* → *Added 11 day(s)*：1 月 1 日 + 诊所给的 10 天，没有替代假（3 月 24 日、11 月 9 日）。
 - *Import public holidays for 2027* → *Added 11 day(s)*：和诊所的名单一样（Deepavali 10 月 28 日：诊所漏写了，W59）。
 - 加 `2026-09-02 Test closure`：`python -m app.cli 2026-09-02 PHANG S+P` → `CLINIC_CLOSED`；`python -m app.reminders_cli 2026-09-02` → Ready 0，25 个预约在 *Needs staff*（*Clinic is closed that day (Test closure)*）；删掉之后变回 `OK`（W56）。
+
+### Reminders 换成 shadcn/ui（D83，2026-11-14，云端容器，只用假资料）
+
+- 新套件（版本固定）：`radix-ui` 1.8.1、`class-variance-authority` 0.7.1、`clsx` 2.1.1、`tailwind-merge` 3.7.0、`lucide-react` 1.72.0；
+  开发用 `tailwindcss` / `@tailwindcss/vite` 4.3.5、`tw-animate-css` 1.4.0；`npm audit --omit=dev`：0 vulnerabilities；
+  `package-lock.json` 有 Windows 用的 `@tailwindcss/oxide-win32-x64-msvc`、`lightningcss-win32-x64-msvc`。
+- shadcn 的网站（ui.shadcn.com）云端连不到：`src/components/ui/` 照 new-york v4 的原始码写（Button、Card、Badge、Alert、Tabs、Dialog、Textarea、Input、Label、Progress、Collapsible、Separator）。
+- `npm test` → 66 passed（测试只改一行：*Not appointments* 原因后面不再有冒号）；`npm run build` 成功（JS 约 136 kB gzip，以前 102 kB）。
+- headless Chromium（`REMINDER_SOURCE=demo`）：Reminders 1366 / 400 宽（Ready、打开 *Message*、Needs staff、Not appointments、Extra note 视窗），400 宽没有左右卷动；
+  其他 6 个画面（Conversations、Requests、Settings、Staff accounts、My account、登录）和换之前的版本**逐像素比较一样**。
+- 找到、已经改好：打开 *Message* 时消息挤在 *NO WA* 旁边很窄、旁边的卡片跟着变高 → 消息改成卡片下面整行、卡片各自的高度；*Needs staff* 卡片左边的黄线和圆角不搭 → 拿掉。
+
+### 全部换成 shadcn/ui（D83，2026-11-14，云端容器，只用假资料）
+
+- 选单（`App.tsx`）、共用元件（`components.tsx`，名字和参数不变）、登录、Conversations、Requests、Settings 5 块、Staff accounts、My account 都换成 shadcn/ui + Tailwind；
+  `styles.css` 删掉，`index.css` 改成 Tailwind 的标准设定（有 preflight）；新加的元件：Table、NativeSelect、Checkbox / Radio、Switch、Avatar。
+- `npm test` → 66 passed（测试没有改；测试环境加了 `ResizeObserver` 的替身，Radix 的 Switch 要用）；`npm run build` 成功。
+- headless Chromium（`REMINDER_SOURCE=demo` + `python -m app.db.demo` 的假对话、假请求）1366 / 400 宽截图每一页、打开一段对话、*Entered in GPiS ✓* 视窗：没有整页左右卷动。
+- 找到、已经改好：页面很长时选单的白色只到画面底 → 外面一层白到底；手机宽度医生表格的按钮叠成一直排 → 不换行、表格在卡片里左右拉；
+  *Patient cancelled* 换行后靠右 → 靠左；密码栏的标题比别的栏低一点 → 对齐；*Slots & auto-confirm* 的卡片太宽 → 窄一点。
+- 2026-11-14 卡片对齐（开发者要的）：*Reminders* 的 Ready / Needs staff、*Requests* 的卡片用 CSS subgrid（`CARD_GRID`、`CARD_ROWS_3/4`，在 `components/ui/card.tsx`），
+  同一排每张卡片的每一块一样高、在同一个位置；Needs staff 没有号码的卡片也有最下面一行（*No WhatsApp number to stop.*）；
+  headless Chromium 量过 Requests 3 张卡片按钮那一行的顶端都是 538px；400 宽一排一张照常；`npm test` 66 passed。
+- 2026-11-14 *Reminders* 卡片的 **Message** 改成弹出视窗（开发者要的，和 *Extra note* 同一种 `Modal`）：整条消息、*Copy message*、**Done**（右上角 × 也是关）；
+  `npm test` → 67 passed（新增：按 Message → 视窗里是整条消息 → Done 关掉）；headless Chromium 1366 / 400 宽看过、Esc 关得掉。
+

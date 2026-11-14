@@ -1,0 +1,179 @@
+/* 网页的样式（D83）：Tailwind CSS 4 + shadcn/ui。元件在 src/components/ui/，页面直接写 Tailwind 的 class。
+   - 颜色、圆角、阴影都在下面 :root 的变数（诊所的青绿色、浅色）；shadcn 的颜色名字（primary、muted …）在 @theme 对应到这些变数。
+   - 大小用 px：网页的字是 14px（电脑 B 的萤幕），不跟着 rem 变。
+   - 字体用 Windows 的 Segoe UI（电脑 B），不另外下载。 */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Tailwind 只看 src/ 里的 class（不看 node_modules） */
+@source not "../node_modules";
+
+:root {
+  color-scheme: light;
+
+  /* 底色 */
+  --bg: #f4f6f7;
+  --surface: #ffffff;
+  --surface-2: #f8fafa; /* 表头、滑过 */
+  --surface-3: #eef2f3; /* 小圆框、按下 */
+
+  /* 文字 */
+  --text: #17222b;
+  --text-2: #3b4a55;
+  --muted: #64737e;
+  --subtle: #8b98a1;
+
+  /* 线 */
+  --border: #e1e6e9;
+  --border-strong: #cdd5da;
+  --border-hover: #b6c1c7;
+
+  /* 主色：诊所的青绿色 */
+  --accent: #0f766e;
+  --accent-hover: #0c625b;
+  --accent-text: #0b5f58;
+  --accent-soft: #e5f3f1;
+  --focus: rgba(15, 118, 110, 0.24);
+
+  /* 状态 */
+  --success: #15803d;
+  --success-text: #14612f;
+  --success-bg: #ecfdf3;
+  --success-border: #b7e4c7;
+  --warning: #b86e09;
+  --warning-text: #7f4a05;
+  --warning-bg: #fff8eb;
+  --warning-border: #f2d6a2;
+  --danger: #b42318;
+  --danger-bg: #fef3f2;
+  --danger-border: #f5c6c1;
+  --info: #1d5fa8;
+  --info-text: #1a4f8a;
+  --info-bg: #eef5fd;
+  --info-border: #c6dbf3;
+
+  /* 对话框 */
+  --bubble-ai: #eef5fd;
+  --bubble-staff: #e5f3f1;
+
+  /* 形状 */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 10px;
+  --shadow-xs: 0 1px 2px rgba(16, 24, 32, 0.05);
+  --shadow-lg: 0 12px 32px rgba(16, 24, 32, 0.08), 0 2px 6px rgba(16, 24, 32, 0.04);
+  --control-h: 36px;
+  --sidebar-w: 236px;
+
+}
+
+@theme inline {
+  /* :root 的字是 14px：大小用 px，不跟着 rem 缩小 */
+  --spacing: 4px;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 20px;
+  --text-base: 14px;
+  --text-base--line-height: 22px;
+  --text-lg: 16px;
+  --text-lg--line-height: 24px;
+  --text-xl: 18px;
+  --text-xl--line-height: 26px;
+  --text-2xl: 22px;
+  --text-2xl--line-height: 30px;
+  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* shadcn/ui 的颜色 = 原来的颜色 */
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--accent);
+  --color-primary-foreground: #ffffff;
+  --color-primary-hover: var(--accent-hover);
+  --color-secondary: var(--surface-3);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--surface-3);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--danger);
+  --color-border: var(--border);
+  --color-input: var(--border-strong);
+  --color-ring: var(--accent);
+
+  /* 状态色（Badge、Alert 用） */
+  --color-success: var(--success-text);
+  --color-success-bg: var(--success-bg);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning-text);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-border: var(--danger-border);
+  --color-info: var(--info-text);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+  --color-bubble-ai: var(--bubble-ai);
+  --color-bubble-staff: var(--bubble-staff);
+  --color-subtle: var(--subtle);
+  --color-text-2: var(--text-2);
+  --color-brand-soft: var(--accent-soft);
+  --color-brand-text: var(--accent-text);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --shadow-xs: 0 1px 2px rgba(16, 24, 32, 0.05);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 32, 0.08);
+  --shadow-lg: 0 12px 32px rgba(16, 24, 32, 0.12), 0 2px 6px rgba(16, 24, 32, 0.05);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background: var(--bg);
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  em {
+    font-style: italic;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* 有 focus-visible:ring 的元件（shadcn）用光圈，不要再多一圈外框 */
+  [data-slot]:focus-visible,
+  a:focus-visible[class*="ring"],
+  button:focus-visible[class*="ring"] {
+    outline: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition: none !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}

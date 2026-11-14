@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 function Icon({ children, size = 18 }: { children: ReactNode; size?: number }) {
   return (
     <svg
-      className="icon"
+      
       width={size}
       height={size}
       viewBox="0 0 24 24"
@@ -175,3 +175,10 @@ export const EyeOffIcon = ({ size }: P) => (
   </Icon>
 );
 
+
+export const PencilIcon = ({ size }: P) => (
+  <Icon size={size}>
+    <path d="M16.5 3.5l4 4L8 20H4v-4L16.5 3.5z" />
+    <path d="M14 6l4 4" />
+  </Icon>
+);

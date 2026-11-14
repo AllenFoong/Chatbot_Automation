@@ -148,3 +148,14 @@ def test_used_accounts_and_yourself_cannot_be_deleted(session, client_for):
     r = boss.delete(f"/api/staff/{boss_row.id}")
     assert r.status_code == 409 and "your own account" in r.json()["detail"]
     assert len(boss.get("/api/staff").json()) == 2
+
+
+def test_account_that_changed_the_reminder_note_cannot_be_deleted(session, client_for):
+    """改过提醒的那段话（D82）：要知道是谁改的，所以只能停用。"""
+    from app.db.seed import seed
+    seed(session)
+    add_staff(session, "boss", role=StaffRole.ADMIN, password=PASSWORD)
+    amy = add_staff(session, "amy", password=PASSWORD)
+    assert client_for("amy").put("/api/reminders/note", json={"text": "Pay cash"}).status_code == 200
+    r = client_for("boss").delete(f"/api/staff/{amy.id}")
+    assert r.status_code == 409 and "changed the reminder note" in r.json()["detail"]
