@@ -229,6 +229,8 @@ Windows PowerShell 5.1、Python 3.11.9、PostgreSQL 18.6、`GPiS_Dev`（`chatbot
 
 ## 9. 以后更新
 
+**全部在 Windows PowerShell 里做**（开始 → 打 `PowerShell`；每一行前面有 `PS`）。**不是 Command Prompt（cmd）**：cmd 看不懂 `Rename-Item`、`Get-FileHash`，`.ps1` 也不会真的跑（2026-11-14）。
+
 1. 开发电脑：新的 `chatbot-<commit>.zip`（第 2 节），经 Google Drive 链接下载到 B、对 hash（第 3 节第 5 步，D64）。
 2. B：`C:\Chatbot_Automation\deploy\stop-chatbot.ps1` → `已经停了`；`cd C:\`（PowerShell 在那个文件夹里就改不了名），
    把 `C:\Chatbot_Automation` 改名成 `C:\Chatbot_Automation.old`（要退回时用）。
@@ -237,14 +239,14 @@ Windows PowerShell 5.1、Python 3.11.9、PostgreSQL 18.6、`GPiS_Dev`（`chatbot
    是 `explorer.exe`（2026-10-28 就是它，视窗关了也还抓着）→ 工作管理员 → *Windows Explorer* 右键 → *Restart*，再改名；
    **改名没有成功就停在这里，不要解压**（2026-10-13 在 B 上：改名失败后照样解压，第 11 节「更新到 PR #23」）。
 3. 先确认 `Test-Path C:\Chatbot_Automation` 是 `False`（旧的已经改名；是 `True` 就停下来，先查里面是什么），再解压新的到 `C:\Chatbot_Automation`
-   （用指令 `Expand-Archive "$HOME\Downloads\chatbot-<commit>.zip" C:\Chatbot_Automation`，**不用文件总管**开这个文件夹，下次改名才不会被挡）、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
+   （用指令 `Expand-Archive "$HOME\Downloads\chatbot-<commit>.zip" C:\Chatbot_Automation`，**不用文件总管**开这个文件夹，下次改名才不会被挡）；`<commit>` 写完整的档名、不用 `*`（`Downloads` 有旧的 zip 会拿错）；**解压后先 `Get-Content C:\Chatbot_Automation\VERSION.txt`，要是这次的 commit**，不是就停下来、`Unblock-File`；把旧的 `backend\.env` 复制过来；照第 3 节第 5 步用完整路径重新建 venv、`pip install -r requirements-lock.txt`。
 4. 先 `alembic current` 记下现在是哪一版。有改表的话，改表前**再手动备份一次**（开机那份没有今天按过的 *Open in WhatsApp*，退回时员工会看不到今天发过谁）：
    ```powershell
    $pgDump = (Get-ChildItem "C:\Program Files\PostgreSQL\*\bin\pg_dump.exe" | Select-Object -First 1).FullName
    & $pgDump -h localhost -U chatbot -w -Fc -f "$env:LOCALAPPDATA\Chatbot\backup\chatbot-$(Get-Date -Format 'yyyyMMdd-HHmm').dump" chatbot
    $LASTEXITCODE                                        # → 0
    ```
-   然后 `alembic upgrade head`（要退回见第 10 节，用上面那一份）；`python -m app.retention --dry-run` 看会删几条（只看、不删）。
+   然后 `alembic upgrade head`（要退回见第 10 节，用上面那一份）：有新的改表要看到 `Running upgrade … -> …`，再 `alembic current` 看是新的版本；只有两行 `INFO`、版本没变 = 程序里没有新的改表档，先看 `VERSION.txt`，不要往下做（2026-11-14）；`python -m app.retention --dry-run` 看会删几条（只看、不删）。
    有改表的更新（例：A10 的 `0005`）在**当天的提醒发完之后**才做：万一要退回，员工当天不用在一半的时候停下来；手动备份之后才按的 *Open in WhatsApp* 还原后会不见。
 5. `Start-ScheduledTask -TaskName Chatbot_Automation`，跑第 7 节的 1、4 项。没问题再删 `.old`。
 
@@ -380,3 +382,24 @@ B 上现在装的（给以后维护、移除时看）：python.org 的 Python 3.
 - zip 的 hash 没有记下来。下次照第 9 节记：日期、zip 的名字、hash、`alembic current` 前后。
 - 自动确认的开关保持 **Off**；B 上还没有 AI，*Requests* 是空的。
 
+### 更新到 `f287264`（2026-11-14，D82 提醒最后加的一段话 + D83 全部换成 shadcn/ui + 改表 `0008`）
+
+`main` 的 `f287264`（PR #38 合并后）。这次开发者说开发电脑上不跑测试（云端 `pytest` 535、`npm test` 67 都通过）。`.env` 照旧复制。
+
+| 步骤 | 结果 |
+|---|---|
+| 第一次开错视窗 | ⚠️ 开的是 **Command Prompt（cmd）**：`Rename-Item is not recognized`、`Get-FileHash … was unexpected`；`stop-chatbot.ps1` 在 cmd 里没有真的跑。没有改到任何东西 → 改用 **Windows PowerShell**（每行前面有 `PS`）重做 |
+| 停止、改名 `.old`、解压、venv、`pip install` | ✅（PowerShell） |
+| `alembic current`（改表前） | ✅ `0007 (head)`：顺便确认了 10-28 那次改表成功 |
+| 手动备份 | ✅ `$LASTEXITCODE` = `0` |
+| 第一次 `alembic upgrade head` | ⚠️ 没有 `Running upgrade`，`alembic current` 还是 `0007 (head)`：**解压的是旧版的程序**（里面没有 `0008_reminder_note.py`；`VERSION.txt` 不是 `f287264`）。是开发电脑没在 `main` 最新版上做 zip，还是 B 的 `Downloads` 里有旧的 zip（`chatbot-*.zip` 会找到旧的），没有记下来。数据库没有被改，程序和数据库都是 `0007`，对得上 |
+| 重做 | 删掉装错的 `C:\Chatbot_Automation`（`.old` 不动）→ 用 `chatbot-f287264.zip` 重新解压 → `Unblock-File`、复制 `.env`、venv、`pip install`。手动备份没有重做（系统停着，之后没有人按过 *Open in WhatsApp*） |
+| `alembic upgrade head` → `alembic current` | ✅ `0008 (head)`（开发者回报） |
+| 启动、网页 6 项（新的登入画面、明天的名单和 GPiS 一样、*Message* 视窗、*Extra note* 视窗空的、自动确认 **Off**、*Open in WhatsApp* → *Mark as not sent*）、删 `.old` | 待确认：开发者只回报到 `0008`，下次去 B 补看 |
+
+这次找到的（第 9 节照着改了）：
+
+- **Command Prompt 和 PowerShell 长得很像**：PowerShell 每一行前面有 `PS`。第 9 节一开头写清楚要开 **Windows PowerShell**。
+- **zip 用完整的档名**，不用 `chatbot-*.zip`：`Downloads` 有旧的 zip 时会拿错。解压后先看 `VERSION.txt` 是不是这次的 commit。
+- **改表要看到 `Running upgrade … -> …`**：只有 `INFO` 两行、版本没变，就是程序里没有新的改表档，先查 `VERSION.txt`，不要往下做。
+- zip 的 hash 这次也没有记下来。
