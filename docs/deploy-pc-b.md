@@ -395,7 +395,11 @@ B 上现在装的（给以后维护、移除时看）：python.org 的 Python 3.
 | 第一次 `alembic upgrade head` | ⚠️ 没有 `Running upgrade`，`alembic current` 还是 `0007 (head)`：**解压的是旧版的程序**（里面没有 `0008_reminder_note.py`；`VERSION.txt` 不是 `f287264`）。是开发电脑没在 `main` 最新版上做 zip，还是 B 的 `Downloads` 里有旧的 zip（`chatbot-*.zip` 会找到旧的），没有记下来。数据库没有被改，程序和数据库都是 `0007`，对得上 |
 | 重做 | 删掉装错的 `C:\Chatbot_Automation`（`.old` 不动）→ 用 `chatbot-f287264.zip` 重新解压 → `Unblock-File`、复制 `.env`、venv、`pip install`。手动备份没有重做（系统停着，之后没有人按过 *Open in WhatsApp*） |
 | `alembic upgrade head` → `alembic current` | ✅ `0008 (head)`（开发者回报） |
-| 启动、网页 6 项（新的登入画面、明天的名单和 GPiS 一样、*Message* 视窗、*Extra note* 视窗空的、自动确认 **Off**、*Open in WhatsApp* → *Mark as not sent*）、删 `.old` | 待确认：开发者只回报到 `0008`，下次去 B 补看 |
+| `retention --dry-run` | ✅ `预约日期在 2026-08-16 之前的提醒有 0 条（0 天）；不用再留的号码有 0 个` |
+| 启动 | ✅ `Start-ScheduledTask` 没有错误。`start.log` 的路径是 `%LOCALAPPDATA%\Chatbot\logs\start.log`（当天给开发者的指令漏了 `logs`，找不到档案；第 9 节的写法本来就对）；内容开发者没有回报 |
+| `--check-gpis` | 开发者没有回报（网页名单读得到 GPiS，见下一行） |
+| 网页 7 项（新的登入画面、明天的名单和 GPiS 一样、*Message* 视窗、*Extra note* 视窗空的 → *Cancel*、自动确认 **Off**、*Open in WhatsApp* → *Mark as not sent*、`staff` 登入看得到名单、*Settings* 不能改、没有 *Staff accounts*） | ✅ 开发者说全部对 |
+| 清理 | ✅ `.old` 删了 |
 
 这次找到的（第 9 节照着改了）：
 
@@ -403,3 +407,4 @@ B 上现在装的（给以后维护、移除时看）：python.org 的 Python 3.
 - **zip 用完整的档名**，不用 `chatbot-*.zip`：`Downloads` 有旧的 zip 时会拿错。解压后先看 `VERSION.txt` 是不是这次的 commit。
 - **改表要看到 `Running upgrade … -> …`**：只有 `INFO` 两行、版本没变，就是程序里没有新的改表档，先查 `VERSION.txt`，不要往下做。
 - zip 的 hash 这次也没有记下来。
+- *Extra note* 没有设（空的）：诊所要加什么话，员工自己在 *Reminders* 按 **Extra note** 加。
