@@ -231,6 +231,7 @@ npm run dev                   # 视窗 1 的 Admin API 也要开着；backend\.e
 | 10 | *My account* | 名字卡片 + *Change password*（三个密码栏都有眼睛） |
 | 11 | 视窗缩窄（或手机宽度） | 上面一排 ☰ 打开选单；卡片一排一张；表格在卡片里左右拉；没有整页左右卷动 |
 | 12 | 用 STAFF 帐号 | *Settings* 看得到、不能改（开关灰色拨不动）；选单没有 *Staff accounts* |
+| 13 | *Reminders*（Ready、Needs staff）、*Requests* 一排几张卡片 | 名字、预约的框、按钮、最下面一行在每一排都对齐（一样高）；打开一张卡片的 *Message*，旁边卡片的按钮不动 |
 
 不喜欢的地方（颜色、大小、排法）直接说：颜色在 `src/index.css` 最上面，元件在 `src/components/ui/`。
 
@@ -298,4 +299,7 @@ npm run dev                   # 视窗 1 的 Admin API 也要开着；backend\.e
 - headless Chromium（`REMINDER_SOURCE=demo` + `python -m app.db.demo` 的假对话、假请求）1366 / 400 宽截图每一页、打开一段对话、*Entered in GPiS ✓* 视窗：没有整页左右卷动。
 - 找到、已经改好：页面很长时选单的白色只到画面底 → 外面一层白到底；手机宽度医生表格的按钮叠成一直排 → 不换行、表格在卡片里左右拉；
   *Patient cancelled* 换行后靠右 → 靠左；密码栏的标题比别的栏低一点 → 对齐；*Slots & auto-confirm* 的卡片太宽 → 窄一点。
+- 2026-11-14 卡片对齐（开发者要的）：*Reminders* 的 Ready / Needs staff、*Requests* 的卡片用 CSS subgrid（`CARD_GRID`、`CARD_ROWS_3/4`，在 `components/ui/card.tsx`），
+  同一排每张卡片的每一块一样高、在同一个位置；Needs staff 没有号码的卡片也有最下面一行（*No WhatsApp number to stop.*）；
+  headless Chromium 量过 Requests 3 张卡片按钮那一行的顶端都是 538px；400 宽一排一张照常；`npm test` 66 passed。
 

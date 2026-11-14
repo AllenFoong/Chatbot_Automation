@@ -29,7 +29,7 @@ import { Page, PageHeader } from "../components";
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
+import { CARD_GRID, CARD_ROWS_3, CARD_ROWS_4, Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/ui/collapsible";
 import {
   Dialog,
@@ -42,7 +42,7 @@ import {
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Progress } from "../components/ui/progress";
-import { Separator } from "../components/ui/separator";
+import { cn } from "../lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Textarea } from "../components/ui/textarea";
 import { formatDate, formatDateTime, formatPhone, whatsappLink } from "../format";
@@ -167,10 +167,10 @@ function RecordLine({ record }: { record: ReminderRecord }) {
 
 /** 卡片最下面：Message（按了在下面整行打开整条消息）+ 右边的 NO WA */
 function MessageFooter({ message, children }: { message: string | null; children: ReactNode }) {
-  if (!message) return <CardFooter className="justify-end">{children}</CardFooter>;
+  if (!message) return <CardFooter className="items-start justify-end border-t pt-4">{children}</CardFooter>;
   return (
     <Collapsible asChild className="group/msg">
-      <CardFooter className="flex-wrap items-start gap-2">
+      <CardFooter className="flex-wrap items-start gap-2 self-stretch border-t pt-4">
         <CollapsibleTrigger asChild>
           <Button type="button" variant="link" size="sm" className="text-sm">
             <ChevronDownIcon className="transition-transform group-data-[state=closed]/msg:-rotate-90" />
@@ -253,8 +253,8 @@ function ReadyCard({
   }
 
   return (
-    <li className="list-none">
-      <Card className={opened ? "border-success-border bg-success-bg/40" : undefined}>
+    <li className={CARD_ROWS_4}>
+      <Card className={cn(CARD_ROWS_4, opened && "border-success-border bg-success-bg/40")}>
         <CardTop group={group} status={<StatusBadge record={record} />} />
 
         <CardContent className="flex flex-col gap-3">
@@ -269,8 +269,9 @@ function ReadyCard({
               </AlertDescription>
             </Alert>
           )}
+        </CardContent>
 
-          <div className="flex flex-col gap-2">
+        <CardContent className="flex flex-col gap-2">
             {group.whatsapp_allowed && group.phone && group.message ? (
               <Button asChild className="w-full">
                 <a href={whatsappLink(group.phone, group.message)} onClick={recordOpened}>
@@ -302,10 +303,8 @@ function ReadyCard({
             )}
             {record && <RecordLine record={record} />}
             <ErrorAlert message={action.error} />
-          </div>
         </CardContent>
 
-        <Separator className="mx-5 w-auto data-[orientation=horizontal]:w-auto" />
         <MessageFooter message={group.message}>
           <OptOutButton group={group} onChanged={onChanged} />
         </MessageFooter>
@@ -316,8 +315,8 @@ function ReadyCard({
 
 function StaffCard({ group, showDate, onChanged }: { group: ReminderGroup; showDate: boolean; onChanged: () => void }) {
   return (
-    <li className="list-none">
-      <Card>
+    <li className={CARD_ROWS_3}>
+      <Card className={CARD_ROWS_3}>
         <CardTop group={group} />
         <CardContent className="flex flex-col gap-3">
           <Lines group={group} showDate={showDate} />
@@ -330,19 +329,19 @@ function StaffCard({ group, showDate, onChanged }: { group: ReminderGroup; showD
             ))}
           </ul>
         </CardContent>
-        {(group.phone || group.record) && (
-          <>
-            <Separator className="mx-5 data-[orientation=horizontal]:w-auto" />
-            <CardFooter className="flex-wrap items-start gap-2">
-              {group.record && (
-                <div className="flex-1">
-                  <RecordLine record={group.record} />
-                </div>
-              )}
-              <OptOutButton group={group} onChanged={onChanged} />
-            </CardFooter>
-          </>
-        )}
+        {/* 最下面一行每张卡片都有（和旁边的卡片对齐）；没有号码时写一句，不放 NO WA */}
+        <CardFooter className="flex-wrap items-start gap-2 border-t pt-4">
+          {group.record && (
+            <div className="flex-1">
+              <RecordLine record={group.record} />
+            </div>
+          )}
+          {group.phone ? (
+            <OptOutButton group={group} onChanged={onChanged} />
+          ) : (
+            !group.record && <p className="py-1.5 text-xs text-muted-foreground">No WhatsApp number to stop.</p>
+          )}
+        </CardFooter>
       </Card>
     </li>
   );
@@ -628,7 +627,7 @@ export default function RemindersPage() {
               {data.ready.length === 0 ? (
                 <EmptyState>No reminders to send.</EmptyState>
               ) : (
-                <ul className="m-0 grid list-none items-start gap-4 p-0 md:grid-cols-2 xl:grid-cols-3">
+                <ul className={CARD_GRID}>
                   {data.ready.map((g) => (
                     <ReadyCard
                       key={g.key}
@@ -653,7 +652,7 @@ export default function RemindersPage() {
                     <InfoIcon className="size-4" aria-hidden="true" />
                     These are not sent from here. Check each one and remind the patient the usual way if needed.
                   </p>
-                  <ul className="m-0 grid list-none items-start gap-4 p-0 md:grid-cols-2 xl:grid-cols-3">
+                  <ul className={CARD_GRID}>
                     {data.needs_staff.map((g) => (
                       <StaffCard key={g.key} group={g} showDate={showDate} onChanged={list.reload} />
                     ))}

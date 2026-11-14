@@ -18,7 +18,7 @@ import { Badge, Empty, ErrorBox, Field, Loading, Modal, Notice, Page, PageHeader
 import { Alert, AlertDescription } from "../components/ui/alert";
 import { Badge as UiBadge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
+import { CARD_GRID, CARD_ROWS_4, Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
 import { Radio } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
 import { formatDate, formatDateTime, formatPhone, formatTime, whatsappLink } from "../format";
@@ -342,8 +342,8 @@ function RequestCard({
   }
 
   return (
-    <li className="list-none">
-     <Card>
+    <li className={CARD_ROWS_4}>
+     <Card className={CARD_ROWS_4}>
       <CardHeader>
         <CardTitle>
           <strong className="font-semibold">{r.customer_name}</strong>
@@ -420,7 +420,9 @@ function RequestCard({
           </>
         )}
       </dl>
+      </CardContent>
 
+      <CardContent className="flex flex-col gap-3">
       <div className="text-xs text-muted-foreground">
         Requested {formatDateTime(r.created_at)}
         {r.handled_at && ` · updated ${formatDateTime(r.handled_at)}`}
@@ -578,7 +580,7 @@ export default function RequestsPage() {
           {view === "TO_TELL" ? "Every confirmed patient has been told." : `No ${view.toLowerCase()} requests.`}
         </Empty>
       ) : (
-        <ul className="m-0 grid list-none items-start gap-4 p-0 md:grid-cols-2 xl:grid-cols-3">
+        <ul className={CARD_GRID}>
           {list.data.map((r) => (
             <RequestCard
               key={r.id}
