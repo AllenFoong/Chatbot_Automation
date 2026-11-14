@@ -118,6 +118,7 @@ class ReminderText:
     clinic_name: str = "<诊所名>"
     clinic_name_en: str = "<Clinic name>"
     branch: str = "<分行名>"
+    note: str | None = None        # 员工在 Reminders 页面写的一段话（D82），放在消息最后；不在 .env
 
 
 @dataclass(frozen=True)
@@ -216,12 +217,15 @@ def _time_12h(t: time) -> str:
 
 
 def render_message(lines: tuple[ReminderLine, ...], doctor_names: dict[str, str], text: ReminderText) -> str:
-    """诊所现在用的原文（W32），英文那段改成写日期（W45）。和以后送审的模板一样（8.5）。"""
+    """诊所现在用的原文（W32），英文那段改成写日期（W45）。和以后送审的模板一样（8.5）。
+
+    员工加的一段话（D82）照原样放在最后，空一行。
+    """
     day = lines[0].day
     name = _join([ln.patient_name for ln in lines])
     when = _join([_time_12h(ln.slot) if ln.slot else "?" for ln in lines])
     doctor = _join([f"DR {doctor_names.get(ln.doctor_id, ln.doctor_id).upper()}" for ln in lines])
-    return (
+    message = (
         "温馨提醒💕\n"
         "\n"
         f"你好 这里是{text.clinic_name} 🦷\n"
@@ -238,6 +242,17 @@ def render_message(lines: tuple[ReminderLine, ...], doctor_names: dict[str, str]
         "on the date above 😊\n"
         "If there is any problem, pls contact us😊 Thank you 💕 See you!"
     )
+    return f"{message}\n\n{text.note}" if text.note else message
+
+
+REMINDER_NOTE_MAX = 500
+
+
+def clean_note(raw: str | None) -> str | None:
+    """员工输入的那段话：换行统一、拿掉前后空白和每行后面的空白；空的 = 不加（None）。"""
+    lines = [ln.rstrip() for ln in (raw or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    note = "\n".join(lines).strip()
+    return note or None
 
 
 def build_reminder_list(

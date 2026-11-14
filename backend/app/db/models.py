@@ -191,11 +191,16 @@ class ClinicSettings(Base):
     auto_confirm: Mapped[bool] = mapped_column(server_default=false())
     auto_confirm_checked_at: Mapped[datetime | None]              # 上次成功查 GPiS 的时间（页面显示，太久就红字）
     auto_confirm_error: Mapped[str | None] = mapped_column(Text)  # 上次失败的原因（成功一次就清掉；不写连接字符串）
+    # 提醒消息最后加的一段话（D82，例 Feel free to pay cash）：员工在 Reminders 页面改；NULL = 不加
+    reminder_note: Mapped[str | None] = mapped_column(Text)
+    reminder_note_updated_at: Mapped[datetime | None]
+    reminder_note_updated_by: Mapped[int | None] = mapped_column(ForeignKey("staff.id"))     # 最后改的员工
 
     __table_args__ = (
         CheckConstraint("id = 1", name="single_row"),
         CheckConstraint("max_per_slot BETWEEN 1 AND 3", name="max_per_slot"),
         CheckConstraint("max_per_slot_for_ai BETWEEN 1 AND 3", name="max_per_slot_for_ai"),
+        CheckConstraint("char_length(reminder_note) BETWEEN 1 AND 500", name="reminder_note_length"),
     )
 
 

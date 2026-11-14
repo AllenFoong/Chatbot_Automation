@@ -16,6 +16,7 @@ import type {
   HolidayImport,
   Leave,
   ReminderList,
+  ReminderNote,
   ReminderRecord,
   RequestStatus,
   ScheduleDay,
@@ -186,6 +187,8 @@ export const reminders = {
   /** 这个号码不要提醒（NO WA）/ 改回照常提醒 */
   optOut: (phone: string, opted_out: boolean) =>
     request<{ phone: string; opted_out: boolean }>("PUT", "/reminders/opt-out", { phone, opted_out }),
+  /** 改每条消息最后加的那段话（D82）；空的 = 不加 */
+  setNote: (text: string) => request<ReminderNote>("PUT", "/reminders/note", { text }),
 };
 
 // ---------- 设置（看：所有员工；改：只有 ADMIN，后端会检查） ----------

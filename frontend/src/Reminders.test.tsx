@@ -208,6 +208,63 @@ describe("reminders", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Cannot read GPiS");
   });
 
+  it("adds, edits and removes the extra note at the end of every message (D82)", async () => {
+    const saved = {
+      text: "Feel free to pay cash",
+      updated_at: "2026-10-08T02:10:00Z",
+      staff_name: "Amy Tan",
+    };
+    let list = fakeReminderList();
+    const { calls } = fakeApi({
+      ...base,
+      "GET /api/reminders": () => ok(list),
+      "PUT /api/reminders/note": (body) => {
+        const text = (body as { text: string }).text.trim() || null;
+        list = fakeReminderList({ note: { ...saved, text } });
+        return ok(list.note);
+      },
+    });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    const card = await screen.findByRole("region", { name: "Extra note" });
+    expect(within(card).getByText("No extra note.")).toBeInTheDocument();
+
+    await user.click(within(card).getByRole("button", { name: "Add note" }));
+    await user.type(within(card).getByRole("textbox", { name: "Note" }), "Feel free to pay cash");
+    expect(within(card).getByText(/21 \/ 500 characters/)).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "Save note" }));
+
+    expect(await within(card).findByText("Feel free to pay cash")).toBeInTheDocument();
+    expect(within(card).getByText(/Last changed by Amy Tan/)).toBeInTheDocument();
+    expect(calls.filter((c) => c.method === "PUT")).toEqual([
+      { method: "PUT", path: "/api/reminders/note", body: { text: "Feel free to pay cash" } },
+    ]);
+    expect(calls.filter((c) => c.path === "/api/reminders").length).toBe(2); // 存了就重新读名单，消息跟着变
+
+    await user.click(within(card).getByRole("button", { name: "Edit note" }));
+    const box = within(card).getByRole("textbox", { name: "Note" });
+    expect(box).toHaveValue("Feel free to pay cash");
+    await user.clear(box);
+    await user.click(within(card).getByRole("button", { name: "Save note" }));
+    expect(await within(card).findByText("No extra note.")).toBeInTheDocument();
+  });
+
+  it("keeps the note being edited when saving fails", async () => {
+    fakeApi({
+      ...base,
+      "GET /api/reminders": ok(fakeReminderList()),
+      "PUT /api/reminders/note": err(422, "The note can be at most 500 characters."),
+    });
+    const user = userEvent.setup();
+    renderApp("/reminders");
+    const card = await screen.findByRole("region", { name: "Extra note" });
+    await user.click(within(card).getByRole("button", { name: "Add note" }));
+    await user.type(within(card).getByRole("textbox", { name: "Note" }), "Pay cash");
+    await user.click(within(card).getByRole("button", { name: "Save note" }));
+    expect(await within(card).findByText("The note can be at most 500 characters.")).toBeInTheDocument();
+    expect(within(card).getByRole("textbox", { name: "Note" })).toHaveValue("Pay cash");
+  });
+
   it("builds the WhatsApp link with the message encoded", () => {
     expect(whatsappLink("60120000001", "温馨提醒💕\nA & B")).toBe(
       "whatsapp://send?phone=60120000001&text=%E6%B8%A9%E9%A6%A8%E6%8F%90%E9%86%92%F0%9F%92%95%0AA%20%26%20B",

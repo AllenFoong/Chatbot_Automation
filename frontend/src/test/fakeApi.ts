@@ -170,6 +170,7 @@ export function fakeReminderList(overrides: Partial<ReminderList> = {}): Reminde
         record: null,
       },
     ],
+    note: { text: null, updated_at: null, staff_name: null },
     not_appointments: [
       { reason: "Cancelled or postponed", count: 2 },
       { reason: "To-do at 00:00", count: 1 },

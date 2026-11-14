@@ -210,6 +210,20 @@ def test_message_uses_the_clinic_names_from_settings():
     assert "tomorrow" not in g.message.lower()          # 假期前要提早发（W45）
 
 
+def test_note_from_staff_goes_at_the_end_of_the_message():
+    """员工在 Reminders 页面写的一段话（D82）：空一行放在最后；没有就和原来一样。"""
+    plain = only_group(build(appt("12:00"))).message
+    g = only_group(build(appt("12:00"), text=ReminderText(note="Feel free to pay cash 💵\n可以付现金哦")))
+    assert g.message == plain + "\n\nFeel free to pay cash 💵\n可以付现金哦"
+    assert plain.endswith("See you!")
+
+
+def test_clean_note():
+    from app.reminders import clean_note
+    assert clean_note(None) is None and clean_note("  \r\n \n") is None
+    assert clean_note("  Pay cash  \r\n\r\n  Thanks  \n") == "Pay cash\n\n  Thanks"
+
+
 def test_duplicate_records_of_one_patient_become_one_line():
     same = dict(contact_id=777, name="Demo A")
     g = only_group(build(appt(**same, appointment_id=1001), appt(**same, appointment_id=1002)))

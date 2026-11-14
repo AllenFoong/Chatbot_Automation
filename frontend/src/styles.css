@@ -1318,6 +1318,23 @@ ul.error {
   margin-left: auto;
 }
 
+/* 每条提醒最后加的一段话（D82） */
+.reminder-note {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reminder-note textarea {
+  align-self: stretch;
+  max-width: 640px;
+}
+
+.reminder-note .message-preview {
+  margin: 0;
+  max-width: 640px;
+}
+
 .message-preview {
   margin: 8px 0 0;
   padding: 10px 12px;
